@@ -1810,7 +1810,13 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                         label = { Text("Page number") },
                         keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            cursorColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -1825,7 +1831,11 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                                 viewModel.updateSelectedPage(1)
                                 pageInput = "1"
                             },
-                            enabled = currentPage != 1
+                            enabled = currentPage != 1,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
                         ) {
                             Text("First")
                         }
@@ -1836,7 +1846,11 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                                 viewModel.updateSelectedPage(prev)
                                 pageInput = prev.toString()
                             },
-                            enabled = selectedPage > 1
+                            enabled = selectedPage > 1,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
                         ) {
                             Text("Prev")
                         }
@@ -1846,7 +1860,10 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                                 val next = selectedPage + 1
                                 viewModel.updateSelectedPage(next)
                                 pageInput = next.toString()
-                            }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
                         ) {
                             Text("Next")
                         }
@@ -1856,14 +1873,30 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
             confirmButton = {
                 Button(
                     onClick = { viewModel.applySelectedPage() },
-                    enabled = selectedPage != currentPage && selectedPage >= 1
+                    enabled = selectedPage != currentPage && selectedPage >= 1,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
                 ) {
                     Text("Go to Page")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.hidePageDialog() }) {
-                    Text("Cancel")
+                Button(
+                    onClick = { viewModel.hidePageDialog() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp
+                    )
+                ) {
+                    Text(
+                        "Cancel",
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         )
@@ -1879,14 +1912,14 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                     .fillMaxWidth()
                     .padding(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = "Search",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1908,12 +1941,29 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                             ),
                             keyboardActions = KeyboardActions(
                                 onSearch = { viewModel.search() }
-                            )
+                            ),
+                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                cursorColor = MaterialTheme.colorScheme.primary
+                            ),
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
                         )
                         
                         Button(
                             onClick = { viewModel.search() },
-                            enabled = searchQuery.isNotEmpty() && !isSearching
+                            enabled = searchQuery.isNotEmpty() && !isSearching,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
                         ) {
                             Text("Search")
                         }
@@ -1928,12 +1978,17 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-        contentAlignment = Alignment.Center
-    ) {
+                contentAlignment = Alignment.Center
+            ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Searching for \"$searchQuery\"...")
+                    Text(
+                        text = "Searching for \"$searchQuery\"...",
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
             }
         } else if (searchResult != null) {
@@ -2241,8 +2296,20 @@ fun TopicDetailScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.hidePageDialog() }) {
-                    Text("Cancel")
+                Button(
+                    onClick = { viewModel.hidePageDialog() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Transparent
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp
+                    )
+                ) {
+                    Text(
+                        "Cancel",
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         )
