@@ -70,7 +70,8 @@ data class Topic(
     val commentCount: Int = 0,
     val entries: List<Entry> = emptyList(),
     val entriesLoaded: Boolean = false,
-    val redirectedUrl: String = ""
+    val redirectedUrl: String = "",
+    val totalPages: Int = 1
 )
 
 data class Entry(
@@ -633,15 +634,11 @@ object EksiService {
             val finalUrl = connection.url().toString()
             logDebug("EksiService: Final URL after redirection: $finalUrl")
             
-            // Extract the redirected path from the final URL
+            // Extract the redirected path from the final URL (without query parameters)
             val redirectedPath = if (finalUrl.startsWith(BASE_URL)) {
-                // Extract just the path without any query parameters
                 val path = finalUrl.substring(BASE_URL.length)
-                if (path.contains("?")) {
-                    path.substring(0, path.indexOf("?"))
-                } else {
-                    path
-                }
+                // Remove query parameters if present
+                if (path.contains("?")) path.substring(0, path.indexOf("?")) else path
             } else {
                 searchUrl // Fallback to the original search URL
             }
@@ -653,6 +650,92 @@ object EksiService {
             val entryElements = document.select("div.content")
             logDebug("EksiService: Found ${entryElements.size} entries on page $page")
             
+            // Try to determine the total number of pages
+            var totalPages = 1
+            
+            // Method 1: Look for pager element with page numbers
+            val pagerElements = document.select("div.pager")
+            if (pagerElements.isNotEmpty()) {
+                logDebug("EksiService: Found pager element")
+                
+                // Try to find the last page number from page links
+                val pageLinks = pagerElements.select("a")
+                for (link in pageLinks) {
+                    val pageText = link.text().trim()
+                    if (pageText.matches(Regex("\\d+"))) {
+                        val pageNum = pageText.toIntOrNull() ?: 1
+                        if (pageNum > totalPages) {
+                            totalPages = pageNum
+                        }
+                    }
+                }
+                
+                // Also check for "son" (last) link which might point to the last page
+                val lastPageLink = pagerElements.select("a:contains(son)").firstOrNull()
+                if (lastPageLink != null) {
+                    val href = lastPageLink.attr("href")
+                    val lastPageMatch = Regex("p=(\\d+)").find(href)
+                    if (lastPageMatch != null) {
+                        val lastPage = lastPageMatch.groupValues[1].toIntOrNull() ?: 1
+                        if (lastPage > totalPages) {
+                            totalPages = lastPage
+                        }
+                    }
+                }
+                
+                logDebug("EksiService: Found $totalPages pages from pager links")
+            }
+            
+            // Method 2: Look for entry count info
+            if (totalPages == 1) {
+                // Try to find entry count from topic info
+                val infoElements = document.select("div.topic-list-description small, span.entry-count, div.sub-title-container span")
+                for (infoElement in infoElements) {
+                    val infoText = infoElement.text()
+                    // Look for patterns like "123 entry" or "123 entries"
+                    val entryCountMatch = Regex("(\\d+)[\\s]*(?:entry|entries|entry'ler)").find(infoText)
+                    if (entryCountMatch != null) {
+                        val entryCount = entryCountMatch.groupValues[1].toIntOrNull() ?: 0
+                        // Calculate pages (10 entries per page)
+                        val calculatedPages = (entryCount + 9) / 10 // Ceiling division
+                        if (calculatedPages > totalPages) {
+                            totalPages = calculatedPages
+                        }
+                        logDebug("EksiService: Found entry count: $entryCount, calculated pages: $totalPages")
+                        break
+                    }
+                }
+            }
+            
+            // Method 3: Check if there's a "next page" link
+            if (totalPages == 1 && page == 1) {
+                val nextPageLink = document.select("a.next").firstOrNull()
+                if (nextPageLink != null) {
+                    // If there's a next page link on page 1, there are at least 2 pages
+                    totalPages = 2
+                    logDebug("EksiService: Found next page link, setting minimum of 2 pages")
+                }
+            }
+            
+            // Ensure we have at least one page
+            if (totalPages < 1) totalPages = 1
+            
+            // If we're on a page higher than 1 and we got entries, ensure totalPages is at least the current page
+            if (page > 1 && entryElements.isNotEmpty() && totalPages < page) {
+                totalPages = page
+                logDebug("EksiService: Adjusting totalPages to at least current page: $page")
+            }
+            
+            // If we couldn't detect more than 1 page but we have entries,
+            // set a reasonable default to allow navigation (Ekşi Sözlük topics can have many pages)
+            if (totalPages == 1 && entryElements.isNotEmpty()) {
+                totalPages = 100 // Default to 100 pages when we can't detect the actual count
+                logDebug("EksiService: Setting default of 100 pages since detection failed")
+            }
+            
+            logDebug("EksiService: Final estimated total pages: $totalPages")
+            
+            // Process entries
             val entries = mutableListOf<Entry>()
             for (entryElement in entryElements.take(10)) {
                 val content = entryElement.text()
@@ -663,6 +746,11 @@ object EksiService {
             
             if (entries.isEmpty()) {
                 entries.add(Entry("No entries found for this topic on page $page"))
+                // If no entries found and we're beyond page 1, adjust totalPages
+                if (page > 1) {
+                    totalPages = page - 1
+                    logDebug("EksiService: No entries found on page $page, adjusting totalPages to $totalPages")
+                }
             }
             
             // Create a topic with the search query and fetched entries
@@ -672,10 +760,11 @@ object EksiService {
                 commentCount = entries.size,
                 entries = entries,
                 entriesLoaded = true,
-                redirectedUrl = redirectedPath // Store the redirected URL for future page requests
+                redirectedUrl = redirectedPath,
+                totalPages = totalPages
             )
             
-            logDebug("EksiService: Search completed for '$query', page $page, found ${entries.size} entries, redirectedUrl: $redirectedPath")
+            logDebug("EksiService: Search completed for '$query', page $page, found ${entries.size} entries, totalPages: $totalPages")
             return@withContext topic
         } catch (e: Exception) {
             e.printStackTrace()
@@ -687,7 +776,8 @@ object EksiService {
                 url = "",
                 commentCount = 0,
                 entries = listOf(Entry("Error: ${e.message ?: "Unknown error"}")),
-                entriesLoaded = true
+                entriesLoaded = true,
+                totalPages = 1
             )
         }
     }
@@ -736,6 +826,9 @@ class EksiViewModel : ViewModel() {
 
     private val _redirectedUrl = mutableStateOf("")
     val redirectedUrl: State<String> = _redirectedUrl
+
+    private val _totalPages = mutableStateOf(1)
+    val totalPages: State<Int> = _totalPages
 
     init {
         fetchTopics()
@@ -943,6 +1036,9 @@ class EksiViewModel : ViewModel() {
                 }
                 
                 _searchResult.value = result
+                
+                // Update the total pages
+                _totalPages.value = result.totalPages
             } catch (e: Exception) {
                 println("EksiViewModel: Error searching: ${e.message}")
                 _searchResult.value = Topic(
@@ -977,9 +1073,11 @@ class EksiViewModel : ViewModel() {
         _isPageDialogVisible.value = false
     }
     
-    // Update selected page
+    // Update selected page without upper limit validation
     fun updateSelectedPage(page: Int) {
-        _selectedPage.value = page
+        if (page >= 1) { // Only validate that page is positive
+            _selectedPage.value = page
+        }
     }
     
     // Apply selected page and load entries
@@ -1127,7 +1225,7 @@ fun MainApp(viewModel: EksiViewModel = viewModel()) {
                         selected = currentRoute == screen.route,
                         onClick = {
                             if (currentRoute != screen.route) {
-                                navController.navigate(screen.route) {
+                            navController.navigate(screen.route) {
                                     // Pop up to the start destination of the graph to
                                     // avoid building up a large stack of destinations
                                     popUpTo(navController.graph.startDestinationId) {
@@ -1135,7 +1233,7 @@ fun MainApp(viewModel: EksiViewModel = viewModel()) {
                                     }
                                     // Avoid multiple copies of the same destination when
                                     // reselecting the same item
-                                    launchSingleTop = true
+                                launchSingleTop = true
                                     // Restore state when reselecting a previously selected item
                                     restoreState = true
                                 }
@@ -1364,6 +1462,9 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
     val selectedPage by viewModel.selectedPage
     val context = LocalContext.current
     
+    // Get total pages from the search result, with a minimum of the current page
+    val totalPages = (searchResult?.totalPages ?: 1).coerceAtLeast(currentPage)
+    
     // Page selection dialog
     if (isPageDialogVisible) {
         AlertDialog(
@@ -1374,25 +1475,75 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                     Text("Current page: $currentPage")
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // Page slider
-                    var sliderPosition by remember { mutableStateOf(selectedPage.toFloat()) }
+                    // Page input field
+                    var pageInput by remember { mutableStateOf(currentPage.toString()) }
                     
-                    Text("Page: ${sliderPosition.toInt()}")
-                    Slider(
-                        value = sliderPosition,
+                    OutlinedTextField(
+                        value = pageInput,
                         onValueChange = { 
-                            sliderPosition = it
-                            viewModel.updateSelectedPage(it.toInt())
+                            // Only allow numeric input
+                            if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                pageInput = it
+                                // Update selected page if valid
+                                it.toIntOrNull()?.let { num ->
+                                    if (num >= 1) { // Allow any page number >= 1
+                                        viewModel.updateSelectedPage(num)
+                                    }
+                                }
+                            }
                         },
-                        valueRange = 1f..20f,
-                        steps = 18,
-                        modifier = Modifier.padding(horizontal = 16.dp)
+                        label = { Text("Page number") },
+                        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
                     )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Quick navigation buttons - only First, Prev, Next
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Button(
+                            onClick = { 
+                                viewModel.updateSelectedPage(1)
+                                pageInput = "1"
+                            },
+                            enabled = currentPage != 1
+                        ) {
+                            Text("First")
+                        }
+                        
+                        Button(
+                            onClick = { 
+                                val prev = (currentPage - 1).coerceAtLeast(1)
+                                viewModel.updateSelectedPage(prev)
+                                pageInput = prev.toString()
+                            },
+                            enabled = currentPage > 1
+                        ) {
+                            Text("Prev")
+                        }
+                        
+                        Button(
+                            onClick = { 
+                                val next = currentPage + 1
+                                viewModel.updateSelectedPage(next)
+                                pageInput = next.toString()
+                            }
+                        ) {
+                            Text("Next")
+                        }
+                    }
                 }
             },
             confirmButton = {
-                Button(onClick = { viewModel.applySelectedPage() }) {
-                    Text("Apply")
+                Button(
+                    onClick = { viewModel.applySelectedPage() },
+                    enabled = selectedPage != currentPage && selectedPage >= 1
+                ) {
+                    Text("Go to Page")
                 }
             },
             dismissButton = {
@@ -1495,14 +1646,14 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        // Page selector
+                        // Page selector - simplified display
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Page:",
+                                text = "Page $currentPage",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
@@ -1512,7 +1663,7 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                                 onClick = { viewModel.showPageDialog() },
                                 modifier = Modifier.padding(horizontal = 8.dp)
                             ) {
-                                Text("$currentPage")
+                                Text("Change Page")
                             }
                         }
                     }
@@ -1752,7 +1903,11 @@ fun TopicDetailScreen(
                     }
                 } else {
                     itemsIndexed(topic.entries) { index, entry ->
-                        EntryItem(entry = entry, index = index)
+                        val currentPage: Int = 1
+                        EntryItem(
+                            entry = entry, 
+                            index = ((currentPage - 1) * 10) + index + 1
+                        )
                     }
                 }
             }
