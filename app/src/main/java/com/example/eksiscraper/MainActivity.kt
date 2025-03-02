@@ -1,4 +1,5 @@
 // MainActivity.kt
+// MainActivity.kt
 package com.example.eksiscraper
 
 import android.os.Bundle
@@ -53,6 +54,10 @@ import java.text.SimpleDateFormat
 import java.util.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.ActivityResultLauncher
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 
 // ======== DATA CLASSES ========
 data class HomeResponse(
@@ -588,6 +593,44 @@ object EksiService {
                  .replace("\r", "\\r")
                  .replace("\t", "\\t")
     }
+    
+    // Add a new method to search for a topic
+    suspend fun searchTopic(query: String): Topic = withContext(Dispatchers.IO) {
+        try {
+            logDebug("EksiService: Searching for topic: $query")
+            
+            // Format the query for URL
+            val formattedQuery = query.trim().replace(" ", "-").lowercase()
+            val searchUrl = "/$formattedQuery"
+            
+            // Get entries for this search term
+            val entries = getEntriesForTopic(BASE_URL, searchUrl)
+            
+            // Create a topic with the search query and fetched entries
+            val topic = Topic(
+                title = query,
+                url = "$BASE_URL$searchUrl",
+                commentCount = entries.size,
+                entries = entries,
+                entriesLoaded = true
+            )
+            
+            logDebug("EksiService: Search completed for '$query', found ${entries.size} entries")
+            return@withContext topic
+        } catch (e: Exception) {
+            e.printStackTrace()
+            logDebug("EksiService: Exception in searchTopic: ${e.message}")
+            
+            // Return an error topic
+            return@withContext Topic(
+                title = "Error searching for: $query",
+                url = "",
+                commentCount = 0,
+                entries = listOf(Entry("Error: ${e.message ?: "Unknown error"}")),
+                entriesLoaded = true
+            )
+        }
+    }
 }
 
 // ======== VIEW MODEL ========
@@ -611,6 +654,16 @@ class EksiViewModel : ViewModel() {
     // Add a loading state specifically for the selected topic
     private val _isLoadingTopic = mutableStateOf(false)
     val isLoadingTopic: State<Boolean> = _isLoadingTopic
+
+    // Add state for search results
+    private val _searchQuery = mutableStateOf("")
+    val searchQuery: State<String> = _searchQuery
+    
+    private val _searchResult = mutableStateOf<Topic?>(null)
+    val searchResult: State<Topic?> = _searchResult
+    
+    private val _isSearching = mutableStateOf(false)
+    val isSearching: State<Boolean> = _isSearching
 
     init {
         fetchTopics()
@@ -770,6 +823,47 @@ class EksiViewModel : ViewModel() {
                 _isLoadingTopic.value = false
             }
         }
+    }
+    
+    // Update search query
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+    
+    // Perform search
+    fun search() {
+        val query = _searchQuery.value.trim()
+        if (query.isEmpty()) {
+            return
+        }
+        
+        _isSearching.value = true
+        _searchResult.value = null
+        
+        viewModelScope.launch {
+            try {
+                println("EksiViewModel: Searching for: $query")
+                val result = EksiService.searchTopic(query)
+                _searchResult.value = result
+            } catch (e: Exception) {
+                println("EksiViewModel: Error searching: ${e.message}")
+                _searchResult.value = Topic(
+                    title = "Error searching for: $query",
+                    url = "",
+                    commentCount = 0,
+                    entries = listOf(Entry("Error: ${e.message ?: "Unknown error"}")),
+                    entriesLoaded = true
+                )
+            } finally {
+                _isSearching.value = false
+            }
+        }
+    }
+    
+    // Clear search results
+    fun clearSearch() {
+        _searchQuery.value = ""
+        _searchResult.value = null
     }
 }
 
@@ -953,13 +1047,14 @@ fun MainApp(viewModel: EksiViewModel = viewModel()) {
             }
             
             composable(Screen.Search.route) {
-                SearchScreen()
+                println("MainApp: Navigating to SearchScreen")
+                SearchScreen(viewModel = viewModel)
             }
             
             composable(Screen.Profile.route) {
                 ProfileScreen()
             }
-            }
+        }
     }
 }
 
@@ -1130,13 +1225,174 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
+fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
+    val searchQuery by viewModel.searchQuery
+    val searchResult by viewModel.searchResult
+    val isSearching by viewModel.isSearching
+    val context = LocalContext.current
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Search header with status and buttons
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Search Ekşi Sözlük",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { viewModel.updateSearchQuery(it) },
+                        label = { Text("Enter search term") },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Search
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSearch = { viewModel.search() }
+                        )
+                    )
+                    
+                    Button(
+                        onClick = { viewModel.search() },
+                        enabled = searchQuery.isNotEmpty() && !isSearching
+                    ) {
+                        Text("Search")
+                    }
+                }
+                
+                if (searchResult != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { viewModel.clearSearch() },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary
+                        )
+                    ) {
+                        Text("Clear Results")
+                    }
+                }
+            }
+        }
+        
+        // Search results or loading indicator
+        if (isSearching) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
         contentAlignment = Alignment.Center
     ) {
-        Text("Search Screen (Coming Soon)")
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Searching for \"$searchQuery\"...")
+                }
+            }
+        } else if (searchResult != null) {
+            // Display search results
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                // Topic title
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Text(
+                        text = searchResult!!.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+                
+                // Entries
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (searchResult!!.entries.isEmpty()) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                )
+                            ) {
+                                Text(
+                                    text = "No entries found for \"${searchResult!!.title}\"",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        itemsIndexed(searchResult!!.entries) { index, entry ->
+                            EntryItem(entry = entry, index = index)
+                        }
+                    }
+                }
+            }
+        } else {
+            // Empty state - no search performed yet
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Enter a search term and press Search",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -1255,7 +1511,7 @@ fun TopicDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
+                        Text(
                         text = "Error: Topic not found",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error
@@ -1299,10 +1555,10 @@ fun TopicDetailScreen(
                         ) {
                             Text(
                                 text = "No entries available",
-                                style = MaterialTheme.typography.bodyMedium,
+                            style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.padding(16.dp)
-                            )
+                        )
                         }
                     }
                 } else {
