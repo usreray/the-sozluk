@@ -1002,7 +1002,7 @@ fun MainApp(viewModel: EksiViewModel = viewModel()) {
                         selected = currentRoute == screen.route,
                         onClick = {
                             if (currentRoute != screen.route) {
-                            navController.navigate(screen.route) {
+                                navController.navigate(screen.route) {
                                     // Pop up to the start destination of the graph to
                                     // avoid building up a large stack of destinations
                                     popUpTo(navController.graph.startDestinationId) {
@@ -1010,10 +1010,13 @@ fun MainApp(viewModel: EksiViewModel = viewModel()) {
                                     }
                                     // Avoid multiple copies of the same destination when
                                     // reselecting the same item
-                                launchSingleTop = true
+                                    launchSingleTop = true
                                     // Restore state when reselecting a previously selected item
                                     restoreState = true
                                 }
+                            } else if (screen.route == Screen.Search.route) {
+                                // If already on Search screen and tapped again, clear the search
+                                viewModel.clearSearch()
                             }
                         }
                     )
@@ -1234,65 +1237,53 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
     val context = LocalContext.current
     
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier = Modifier.fillMaxSize()
     ) {
-        // Search header with status and buttons
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Search Ekşi Sözlük",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
+        // Only show search container if no results are displayed or if we're searching
+        if (searchResult == null || isSearching) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
-                
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { viewModel.updateSearchQuery(it) },
-                        label = { Text("Enter search term") },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(end = 8.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Search
-                        ),
-                        keyboardActions = KeyboardActions(
-                            onSearch = { viewModel.search() }
-                        )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Search Ekşi Sözlük",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     
-                    Button(
-                        onClick = { viewModel.search() },
-                        enabled = searchQuery.isNotEmpty() && !isSearching
-                    ) {
-                        Text("Search")
-                    }
-                }
-                
-                if (searchResult != null) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = { viewModel.clearSearch() },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
-                        )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Clear Results")
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.updateSearchQuery(it) },
+                            label = { Text("Enter search term") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Search
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onSearch = { viewModel.search() }
+                            )
+                        )
+                        
+                        Button(
+                            onClick = { viewModel.search() },
+                            enabled = searchQuery.isNotEmpty() && !isSearching
+                        ) {
+                            Text("Search")
+                        }
                     }
                 }
             }
@@ -1323,44 +1314,48 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
                     Text(
-                        text = searchResult!!.title,
+                        text = searchResult?.title ?: "",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.padding(16.dp)
                     )
                 }
                 
-                // Entries
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    if (searchResult!!.entries.isEmpty()) {
-                        item {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer
-                                )
-                            ) {
-                                Text(
-                                    text = "No entries found for \"${searchResult!!.title}\"",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.padding(16.dp)
-                                )
+                // Entries - Make sure searchResult is not null before accessing its properties
+                searchResult?.let { result ->
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        if (result.entries.isEmpty()) {
+                            item {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer
+                                    )
+                                ) {
+                                    Text(
+                                        text = "No entries found for \"${result.title}\"",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.padding(16.dp)
+                                    )
+                                }
                             }
-                        }
-                    } else {
-                        itemsIndexed(searchResult!!.entries) { index, entry ->
-                            EntryItem(entry = entry, index = index)
+                        } else {
+                            itemsIndexed(result.entries) { index, entry ->
+                                EntryItem(entry = entry, index = index)
+                            }
                         }
                     }
                 }
