@@ -69,7 +69,8 @@ data class Topic(
     val url: String = "",
     val commentCount: Int = 0,
     val entries: List<Entry> = emptyList(),
-    val entriesLoaded: Boolean = false
+    val entriesLoaded: Boolean = false,
+    val redirectedUrl: String = ""
 )
 
 data class Entry(
@@ -595,16 +596,74 @@ object EksiService {
     }
     
     // Add a new method to search for a topic
-    suspend fun searchTopic(query: String): Topic = withContext(Dispatchers.IO) {
+    suspend fun searchTopic(query: String, page: Int = 1, redirectedUrl: String = ""): Topic = withContext(Dispatchers.IO) {
         try {
-            logDebug("EksiService: Searching for topic: $query")
+            logDebug("EksiService: Searching for topic: $query, page: $page, redirectedUrl: $redirectedUrl")
             
-            // Format the query for URL
-            val formattedQuery = query.trim().replace(" ", "-").lowercase()
-            val searchUrl = "/$formattedQuery"
+            // Determine the URL to use
+            val searchUrl = if (redirectedUrl.isNotEmpty()) {
+                // If we have a redirected URL, use it with the page parameter if needed
+                if (page > 1) {
+                    // Make sure we're not adding a page parameter to a URL that already has one
+                    if (redirectedUrl.contains("?p=")) {
+                        // Replace existing page parameter
+                        redirectedUrl.replaceFirst(Regex("\\?p=\\d+"), "?p=$page")
+                    } else {
+                        "$redirectedUrl?p=$page"
+                    }
+                } else {
+                    // For page 1, remove any page parameter if present
+                    redirectedUrl.replaceFirst(Regex("\\?p=\\d+"), "")
+                }
+            } else {
+                // If we don't have a redirected URL, use the formatted query
+                "/${query.trim().replace(" ", "-").lowercase()}"
+            }
             
-            // Get entries for this search term
-            val entries = getEntriesForTopic(BASE_URL, searchUrl)
+            logDebug("EksiService: Using search URL: $searchUrl")
+            
+            // Connect to the URL and follow redirections
+            val connection = Jsoup.connect("$BASE_URL$searchUrl")
+                .userAgent(USER_AGENT)
+                .timeout(10000)
+                .followRedirects(true)
+                .execute()
+            
+            // Get the final URL after redirection
+            val finalUrl = connection.url().toString()
+            logDebug("EksiService: Final URL after redirection: $finalUrl")
+            
+            // Extract the redirected path from the final URL
+            val redirectedPath = if (finalUrl.startsWith(BASE_URL)) {
+                // Extract just the path without any query parameters
+                val path = finalUrl.substring(BASE_URL.length)
+                if (path.contains("?")) {
+                    path.substring(0, path.indexOf("?"))
+                } else {
+                    path
+                }
+            } else {
+                searchUrl // Fallback to the original search URL
+            }
+            
+            // Parse the document to get entries
+            val document = connection.parse()
+            
+            // Extract entries from the document
+            val entryElements = document.select("div.content")
+            logDebug("EksiService: Found ${entryElements.size} entries on page $page")
+            
+            val entries = mutableListOf<Entry>()
+            for (entryElement in entryElements.take(10)) {
+                val content = entryElement.text()
+                if (content.isNotEmpty()) {
+                    entries.add(Entry(content))
+                }
+            }
+            
+            if (entries.isEmpty()) {
+                entries.add(Entry("No entries found for this topic on page $page"))
+            }
             
             // Create a topic with the search query and fetched entries
             val topic = Topic(
@@ -612,10 +671,11 @@ object EksiService {
                 url = "$BASE_URL$searchUrl",
                 commentCount = entries.size,
                 entries = entries,
-                entriesLoaded = true
+                entriesLoaded = true,
+                redirectedUrl = redirectedPath // Store the redirected URL for future page requests
             )
             
-            logDebug("EksiService: Search completed for '$query', found ${entries.size} entries")
+            logDebug("EksiService: Search completed for '$query', page $page, found ${entries.size} entries, redirectedUrl: $redirectedPath")
             return@withContext topic
         } catch (e: Exception) {
             e.printStackTrace()
@@ -664,6 +724,18 @@ class EksiViewModel : ViewModel() {
     
     private val _isSearching = mutableStateOf(false)
     val isSearching: State<Boolean> = _isSearching
+
+    private val _currentPage = mutableStateOf(1)
+    val currentPage: State<Int> = _currentPage
+    
+    private val _isPageDialogVisible = mutableStateOf(false)
+    val isPageDialogVisible: State<Boolean> = _isPageDialogVisible
+    
+    private val _selectedPage = mutableStateOf(1)
+    val selectedPage: State<Int> = _selectedPage
+
+    private val _redirectedUrl = mutableStateOf("")
+    val redirectedUrl: State<String> = _redirectedUrl
 
     init {
         fetchTopics()
@@ -831,19 +903,45 @@ class EksiViewModel : ViewModel() {
     }
     
     // Perform search
-    fun search() {
+    fun search(page: Int = 1) {
         val query = _searchQuery.value.trim()
         if (query.isEmpty()) {
             return
         }
         
         _isSearching.value = true
-        _searchResult.value = null
+        _currentPage.value = page
         
         viewModelScope.launch {
             try {
-                println("EksiViewModel: Searching for: $query")
-                val result = EksiService.searchTopic(query)
+                println("EksiViewModel: Searching for: $query, page: $page, redirectedUrl: ${_redirectedUrl.value}")
+                
+                // Always use the stored redirected URL if available, regardless of the page
+                val result = if (_redirectedUrl.value.isNotEmpty()) {
+                    // We already have a redirected URL, so use it with the new page number
+                    println("EksiViewModel: Using existing redirectedUrl: ${_redirectedUrl.value} for page $page")
+                    EksiService.searchTopic(query, page, _redirectedUrl.value)
+                } else {
+                    // First search, need to discover the redirected URL
+                    println("EksiViewModel: First search, no redirectedUrl yet")
+                    val initialResult = EksiService.searchTopic(query, 1, "")
+                    
+                    if (initialResult.redirectedUrl.isNotEmpty()) {
+                        _redirectedUrl.value = initialResult.redirectedUrl
+                        println("EksiViewModel: Discovered redirectedUrl: ${_redirectedUrl.value}")
+                        
+                        // If the requested page is not 1, fetch that page using the discovered redirected URL
+                        if (page > 1) {
+                            println("EksiViewModel: Fetching requested page $page using discovered redirectedUrl")
+                            EksiService.searchTopic(query, page, _redirectedUrl.value)
+                        } else {
+                            initialResult
+                        }
+                    } else {
+                        initialResult
+                    }
+                }
+                
                 _searchResult.value = result
             } catch (e: Exception) {
                 println("EksiViewModel: Error searching: ${e.message}")
@@ -860,10 +958,37 @@ class EksiViewModel : ViewModel() {
         }
     }
     
-    // Clear search results
+    // Clear search results and reset state
     fun clearSearch() {
         _searchQuery.value = ""
         _searchResult.value = null
+        _redirectedUrl.value = "" // Clear the redirected URL when clearing the search
+        _currentPage.value = 1 // Reset to page 1
+    }
+    
+    // Show page selection dialog
+    fun showPageDialog() {
+        _selectedPage.value = _currentPage.value
+        _isPageDialogVisible.value = true
+    }
+    
+    // Hide page selection dialog
+    fun hidePageDialog() {
+        _isPageDialogVisible.value = false
+    }
+    
+    // Update selected page
+    fun updateSelectedPage(page: Int) {
+        _selectedPage.value = page
+    }
+    
+    // Apply selected page and load entries
+    fun applySelectedPage() {
+        val page = _selectedPage.value
+        if (page != _currentPage.value) {
+            search(page)
+        }
+        hidePageDialog()
     }
 }
 
@@ -1234,7 +1359,49 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
     val searchQuery by viewModel.searchQuery
     val searchResult by viewModel.searchResult
     val isSearching by viewModel.isSearching
+    val currentPage by viewModel.currentPage
+    val isPageDialogVisible by viewModel.isPageDialogVisible
+    val selectedPage by viewModel.selectedPage
     val context = LocalContext.current
+    
+    // Page selection dialog
+    if (isPageDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hidePageDialog() },
+            title = { Text("Select Page") },
+            text = {
+                Column {
+                    Text("Current page: $currentPage")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Page slider
+                    var sliderPosition by remember { mutableStateOf(selectedPage.toFloat()) }
+                    
+                    Text("Page: ${sliderPosition.toInt()}")
+                    Slider(
+                        value = sliderPosition,
+                        onValueChange = { 
+                            sliderPosition = it
+                            viewModel.updateSelectedPage(it.toInt())
+                        },
+                        valueRange = 1f..20f,
+                        steps = 18,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(onClick = { viewModel.applySelectedPage() }) {
+                    Text("Apply")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.hidePageDialog() }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
     
     Column(
         modifier = Modifier.fillMaxSize()
@@ -1310,7 +1477,7 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // Topic title
+                // Topic title with page selector
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1319,12 +1486,36 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                         containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
-                    Text(
-                        text = searchResult?.title ?: "",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = searchResult?.title ?: "",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        // Page selector
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "Page:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            
+                            // Page button that opens the dialog
+                            OutlinedButton(
+                                onClick = { viewModel.showPageDialog() },
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            ) {
+                                Text("$currentPage")
+                            }
+                        }
+                    }
                 }
                 
                 // Entries - Make sure searchResult is not null before accessing its properties
@@ -1345,7 +1536,7 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                                     )
                                 ) {
                                     Text(
-                                        text = "No entries found for \"${result.title}\"",
+                                        text = "No entries found for \"${result.title}\" on page $currentPage",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.padding(16.dp)
@@ -1354,7 +1545,10 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                             }
                         } else {
                             itemsIndexed(result.entries) { index, entry ->
-                                EntryItem(entry = entry, index = index)
+                                EntryItem(
+                                    entry = entry, 
+                                    index = ((currentPage - 1) * 10) + index + 1
+                                )
                             }
                         }
                     }
