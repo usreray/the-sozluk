@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -24,6 +25,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -56,6 +58,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 
@@ -605,16 +610,23 @@ object EksiService {
             val searchUrl = if (redirectedUrl.isNotEmpty()) {
                 // If we have a redirected URL, use it with the page parameter if needed
                 if (page > 1) {
-                    // Make sure we're not adding a page parameter to a URL that already has one
-                    if (redirectedUrl.contains("?p=")) {
-                        // Replace existing page parameter
-                        redirectedUrl.replaceFirst(Regex("\\?p=\\d+"), "?p=$page")
+                    // Check if the URL already has query parameters
+                    if (redirectedUrl.contains("?")) {
+                        // Check if it already has a page parameter
+                        if (redirectedUrl.contains("p=")) {
+                            // Replace existing page parameter
+                            redirectedUrl.replaceFirst(Regex("p=\\d+"), "p=$page")
+                        } else {
+                            // Add page parameter to existing query string
+                            "$redirectedUrl&p=$page"
+                        }
                     } else {
+                        // Add page parameter as first query parameter
                         "$redirectedUrl?p=$page"
                     }
                 } else {
-                    // For page 1, remove any page parameter if present
-                    redirectedUrl.replaceFirst(Regex("\\?p=\\d+"), "")
+                    // For page 1, keep the original URL with all its parameters
+                    redirectedUrl
                 }
             } else {
                 // If we don't have a redirected URL, use the formatted query
@@ -628,33 +640,124 @@ object EksiService {
                 .userAgent(USER_AGENT)
                 .timeout(10000)
                 .followRedirects(true)
-                .execute()
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+                .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
+                .header("Accept-Encoding", "gzip, deflate, br")
+                .header("Connection", "keep-alive")
+                .header("Upgrade-Insecure-Requests", "1")
+                .header("Sec-Fetch-Dest", "document")
+                .header("Sec-Fetch-Mode", "navigate")
+                .header("Sec-Fetch-Site", "same-origin")
+                .header("Sec-Fetch-User", "?1")
+                .header("Pragma", "no-cache")
+                .header("Cache-Control", "no-cache")
+                .header("DNT", "1")
+                .ignoreHttpErrors(true) // Important: ignore HTTP errors to handle them gracefully
             
+            logDebug("EksiService: Executing connection")
+            val response = connection.execute()
+            
+            // Check for HTTP errors
+            if (response.statusCode() != 200) {
+                logDebug("EksiService: HTTP error: ${response.statusCode()} - ${response.statusMessage()}")
+                
+                // Try fallback URL if main URL fails
+                if (BASE_URL == "https://eksisozluk.com") {
+                    logDebug("EksiService: Trying fallback URL")
+                    val fallbackUrl = "$FALLBACK_URL$searchUrl"
+                    logDebug("EksiService: Using fallback URL: $fallbackUrl")
+                    
+                    val fallbackConnection = Jsoup.connect(fallbackUrl)
+                        .userAgent(USER_AGENT)
+                        .timeout(10000)
+                        .followRedirects(true)
+                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+                        .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
+                        .header("Accept-Encoding", "gzip, deflate, br")
+                        .header("Connection", "keep-alive")
+                        .header("Upgrade-Insecure-Requests", "1")
+                        .ignoreHttpErrors(true)
+                    
+                    val fallbackResponse = fallbackConnection.execute()
+                    
+                    if (fallbackResponse.statusCode() == 200) {
+                        logDebug("EksiService: Fallback URL successful")
+                        // Use the fallback response
+                        return@withContext processTopicResponse(fallbackResponse, query, page, searchUrl, FALLBACK_URL)
+                    } else {
+                        logDebug("EksiService: Fallback URL also failed: ${fallbackResponse.statusCode()}")
+                    }
+                }
+                
+                // If we get here, both main and fallback URLs failed
+                return@withContext Topic(
+                    title = query,
+                    url = "$BASE_URL$searchUrl",
+                    commentCount = 0,
+                    entries = listOf(Entry("HTTP error: ${response.statusCode()} - ${response.statusMessage()}")),
+                    entriesLoaded = true,
+                    redirectedUrl = searchUrl,
+                    totalPages = 1
+                )
+            }
+            
+            // Process the successful response
+            return@withContext processTopicResponse(response, query, page, searchUrl, BASE_URL)
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+            logDebug("EksiService: Exception in searchTopic: ${e.message}")
+            
+            // Return an error topic
+            return@withContext Topic(
+                title = "Error searching for: $query",
+                url = "",
+                commentCount = 0,
+                entries = listOf(Entry("Error: ${e.message ?: "Unknown error"}")),
+                entriesLoaded = true,
+                totalPages = 1
+            )
+        }
+    }
+    
+    // Helper method to process a topic response
+    private suspend fun processTopicResponse(
+        response: org.jsoup.Connection.Response,
+        query: String,
+        page: Int,
+        searchUrl: String,
+        baseUrl: String
+    ): Topic = withContext(Dispatchers.IO) {
+        try {
             // Get the final URL after redirection
-            val finalUrl = connection.url().toString()
+            val finalUrl = response.url().toString()
             logDebug("EksiService: Final URL after redirection: $finalUrl")
             
-            // Extract the redirected path from the final URL (without query parameters)
-            val redirectedPath = if (finalUrl.startsWith(BASE_URL)) {
-                val path = finalUrl.substring(BASE_URL.length)
-                // Remove query parameters if present
-                if (path.contains("?")) path.substring(0, path.indexOf("?")) else path
+            // Extract the redirected path from the final URL (including query parameters)
+            val redirectedPath = if (finalUrl.startsWith(baseUrl)) {
+                val fullPath = finalUrl.substring(baseUrl.length)
+                // Keep the full path including query parameters
+                fullPath
             } else {
                 searchUrl // Fallback to the original search URL
             }
             
             // Parse the document to get entries
-            val document = connection.parse()
+            val document = response.parse()
+            
+            // Try to get the actual topic title from the page
+            val pageTitle = document.select("h1.topic-title, h1.başlık, h1, title").firstOrNull()?.text() ?: query
+            val cleanTitle = pageTitle.replace(" - ekşi sözlük", "").trim()
             
             // Extract entries from the document
-            val entryElements = document.select("div.content")
+            val entryElements = document.select("div.content, div.entry-content, div.entry")
             logDebug("EksiService: Found ${entryElements.size} entries on page $page")
             
             // Try to determine the total number of pages
             var totalPages = 1
             
             // Method 1: Look for pager element with page numbers
-            val pagerElements = document.select("div.pager")
+            val pagerElements = document.select("div.pager, div.paginator, div.sub-title-container")
             if (pagerElements.isNotEmpty()) {
                 logDebug("EksiService: Found pager element")
                 
@@ -709,7 +812,7 @@ object EksiService {
             
             // Method 3: Check if there's a "next page" link
             if (totalPages == 1 && page == 1) {
-                val nextPageLink = document.select("a.next").firstOrNull()
+                val nextPageLink = document.select("a.next, a:contains(sonraki)").firstOrNull()
                 if (nextPageLink != null) {
                     // If there's a next page link on page 1, there are at least 2 pages
                     totalPages = 2
@@ -728,7 +831,7 @@ object EksiService {
             
             // If we couldn't detect more than 1 page but we have entries,
             // set a reasonable default to allow navigation (Ekşi Sözlük topics can have many pages)
-            if (totalPages == 1 && entryElements.isNotEmpty()) {
+            if (totalPages == 1 && entryElements.isNotEmpty() && entryElements.size >= 10) {
                 totalPages = 100 // Default to 100 pages when we can't detect the actual count
                 logDebug("EksiService: Setting default of 100 pages since detection failed")
             }
@@ -740,7 +843,14 @@ object EksiService {
             for (entryElement in entryElements.take(10)) {
                 val content = entryElement.text()
                 if (content.isNotEmpty()) {
-                    entries.add(Entry(content))
+                    // Try to extract author and date if available
+                    val authorElement = entryElement.parent()?.select("a.entry-author, a.author")?.firstOrNull()
+                    val author = authorElement?.text() ?: ""
+                    
+                    val dateElement = entryElement.parent()?.select("a.entry-date, span.date")?.firstOrNull()
+                    val date = dateElement?.text() ?: ""
+                    
+                    entries.add(Entry(content, author, date))
                 }
             }
             
@@ -755,8 +865,8 @@ object EksiService {
             
             // Create a topic with the search query and fetched entries
             val topic = Topic(
-                title = query,
-                url = "$BASE_URL$searchUrl",
+                title = cleanTitle,
+                url = "$baseUrl$searchUrl",
                 commentCount = entries.size,
                 entries = entries,
                 entriesLoaded = true,
@@ -768,15 +878,16 @@ object EksiService {
             return@withContext topic
         } catch (e: Exception) {
             e.printStackTrace()
-            logDebug("EksiService: Exception in searchTopic: ${e.message}")
+            logDebug("EksiService: Exception in processTopicResponse: ${e.message}")
             
             // Return an error topic
             return@withContext Topic(
-                title = "Error searching for: $query",
-                url = "",
+                title = query,
+                url = "$baseUrl$searchUrl",
                 commentCount = 0,
-                entries = listOf(Entry("Error: ${e.message ?: "Unknown error"}")),
+                entries = listOf(Entry("Error processing response: ${e.message ?: "Unknown error"}")),
                 entriesLoaded = true,
+                redirectedUrl = searchUrl,
                 totalPages = 1
             )
         }
@@ -829,6 +940,13 @@ class EksiViewModel : ViewModel() {
 
     private val _totalPages = mutableStateOf(1)
     val totalPages: State<Int> = _totalPages
+
+    // Add state for topic pagination
+    private val _topicCurrentPage = mutableStateOf(1)
+    val topicCurrentPage: State<Int> = _topicCurrentPage
+    
+    private val _topicTotalPages = mutableStateOf(1)
+    val topicTotalPages: State<Int> = _topicTotalPages
 
     init {
         fetchTopics()
@@ -888,64 +1006,138 @@ class EksiViewModel : ViewModel() {
         }
     }
     
-    // Add a method to set the selected topic directly from the list
-    fun selectTopic(index: Int) {
-        println("EksiViewModel: selectTopic called with index $index, topics size: ${_topics.value.size}")
+    // Add a method to set the selected topic directly from the list with pagination
+    fun selectTopic(index: Int, page: Int = 1) {
+        println("EksiViewModel: selectTopic called with index $index, page $page, topics size: ${_topics.value.size}")
         if (index >= 0 && index < _topics.value.size) {
             _selectedTopic.value = _topics.value[index]
-            println("EksiViewModel: Selected topic set to: ${_selectedTopic.value?.title}")
+            _topicCurrentPage.value = page
+            println("EksiViewModel: Selected topic set to: ${_selectedTopic.value?.title}, page: $page")
             
-            // Fetch entries if they haven't been loaded yet
-            if (_selectedTopic.value != null && !_selectedTopic.value!!.entriesLoaded) {
-                fetchEntriesForSelectedTopic()
+            // Fetch entries if they haven't been loaded yet or if we're changing pages
+            if (_selectedTopic.value != null) {
+                fetchEntriesForSelectedTopic(page)
             }
         } else {
             println("EksiViewModel: Invalid index $index for topics size ${_topics.value.size}")
         }
     }
     
-    // Fetch entries for the selected topic
-    private fun fetchEntriesForSelectedTopic() {
+    // Update to support pagination
+    private fun fetchEntriesForSelectedTopic(page: Int = 1) {
         val topic = _selectedTopic.value ?: return
         
         _isLoadingTopic.value = true
+        _topicCurrentPage.value = page
+        
         viewModelScope.launch {
             try {
-                println("EksiViewModel: Fetching entries for topic: ${topic.title}")
-                val baseUrl = if (topic.url.startsWith("http")) {
-                    // Extract base URL from the full URL
-                    val uri = java.net.URI(topic.url)
-                    "${uri.scheme}://${uri.host}"
+                println("EksiViewModel: Fetching entries for topic: ${topic.title}, page: $page")
+                
+                // Use the topic's original URL for fetching entries
+                if (topic.url.isNotEmpty()) {
+                    // Extract base URL and path from the topic's URL
+                    val baseUrl = if (topic.url.startsWith("http")) {
+                        val uri = java.net.URI(topic.url)
+                        "${uri.scheme}://${uri.host}"
+                    } else {
+                        "https://eksisozluk.com"
+                    }
+                    
+                    // Extract the path from the full URL or use the URL directly if it's just a path
+                    val path = if (topic.url.startsWith("http")) {
+                        java.net.URI(topic.url).path + java.net.URI(topic.url).query?.let { "?$it" } ?: ""
+                    } else {
+                        topic.url
+                    }
+                    
+                    // Preserve the original URL parameters (like ?a=popular)
+                    val originalPath = path
+                    
+                    // Modify the path to include page parameter if needed
+                    val pageParam = if (page > 1) {
+                        if (originalPath.contains("?")) {
+                            "&p=$page"
+                        } else {
+                            "?p=$page"
+                        }
+                    } else ""
+                    
+                    // Construct the final path with all parameters
+                    val pathWithPage = if (originalPath.contains("p=")) {
+                        // Replace existing page parameter
+                        originalPath.replaceFirst(Regex("p=\\d+"), "p=$page")
+                    } else {
+                        originalPath + pageParam
+                    }
+                    
+                    println("EksiViewModel: Using URL: $baseUrl$pathWithPage")
+                    
+                    // Use the searchTopic method with the exact original path
+                    val searchResult = EksiService.searchTopic(topic.title, page, originalPath)
+                    
+                    // Update total pages
+                    _topicTotalPages.value = searchResult.totalPages
+                    
+                    // Create a new topic with the loaded entries
+                    val updatedTopic = topic.copy(
+                        entries = searchResult.entries, 
+                        entriesLoaded = true,
+                        totalPages = searchResult.totalPages,
+                        redirectedUrl = searchResult.redirectedUrl.ifEmpty { originalPath }
+                    )
+                    
+                    // Update the selected topic
+                    _selectedTopic.value = updatedTopic
+                    
+                    // Also update the topic in the list
+                    val updatedTopics = _topics.value.toMutableList()
+                    val index = updatedTopics.indexOfFirst { it.title == topic.title }
+                    if (index != -1) {
+                        updatedTopics[index] = updatedTopic
+                        _topics.value = updatedTopics
+                    }
+                    
+                    println("EksiViewModel: Successfully fetched ${searchResult.entries.size} entries for topic: ${topic.title}, page: $page, totalPages: ${searchResult.totalPages}")
                 } else {
-                    "https://eksisozluk.com"
+                    // Fallback to search by title if URL is empty
+                    println("EksiViewModel: No URL available for topic, falling back to search by title")
+                    val searchResult = EksiService.searchTopic(topic.title, page)
+                    
+                    // Update total pages
+                    _topicTotalPages.value = searchResult.totalPages
+                    
+                    // Create a new topic with the loaded entries
+                    val updatedTopic = topic.copy(
+                        entries = searchResult.entries, 
+                        entriesLoaded = true,
+                        totalPages = searchResult.totalPages,
+                        redirectedUrl = searchResult.redirectedUrl
+                    )
+                    
+                    // Update the selected topic
+                    _selectedTopic.value = updatedTopic
+                    
+                    // Also update the topic in the list
+                    val updatedTopics = _topics.value.toMutableList()
+                    val index = updatedTopics.indexOfFirst { it.title == topic.title }
+                    if (index != -1) {
+                        updatedTopics[index] = updatedTopic
+                        _topics.value = updatedTopics
+                    }
+                    
+                    println("EksiViewModel: Successfully fetched ${searchResult.entries.size} entries for topic: ${topic.title}, page: $page, totalPages: ${searchResult.totalPages}")
                 }
-                
-                // Extract the path from the full URL or use the URL directly if it's just a path
-                val path = if (topic.url.startsWith("http")) {
-                    java.net.URI(topic.url).path
-                } else {
-                    topic.url
-                }
-                
-                val entries = EksiService.getEntriesForTopic(baseUrl, path)
-                
-                // Create a new topic with the loaded entries
-                val updatedTopic = topic.copy(entries = entries, entriesLoaded = true)
-                
-                // Update the selected topic
-                _selectedTopic.value = updatedTopic
-                
-                // Also update the topic in the list
-                val updatedTopics = _topics.value.toMutableList()
-                val index = updatedTopics.indexOfFirst { it.title == topic.title }
-                if (index != -1) {
-                    updatedTopics[index] = updatedTopic
-                    _topics.value = updatedTopics
-                }
-                
-                println("EksiViewModel: Successfully fetched ${entries.size} entries for topic: ${topic.title}")
             } catch (e: Exception) {
                 println("EksiViewModel: Error fetching entries: ${e.message}")
+                
+                // Update the selected topic with error message
+                val errorEntries = listOf(Entry("Error loading entries: ${e.message ?: "Unknown error"}"))
+                val updatedTopic = topic.copy(
+                    entries = errorEntries,
+                    entriesLoaded = true
+                )
+                _selectedTopic.value = updatedTopic
             } finally {
                 _isLoadingTopic.value = false
             }
@@ -1088,6 +1280,16 @@ class EksiViewModel : ViewModel() {
         }
         hidePageDialog()
     }
+
+    // Add method to navigate to a specific page for a topic
+    fun navigateTopicToPage(page: Int) {
+        if (page >= 1 && _selectedTopic.value != null) {
+            val topicIndex = _topics.value.indexOfFirst { it.title == _selectedTopic.value?.title }
+            if (topicIndex != -1) {
+                selectTopic(topicIndex, page)
+            }
+        }
+    }
 }
 
 // ======== MAIN ACTIVITY ========
@@ -1213,36 +1415,149 @@ fun MainApp(viewModel: EksiViewModel = viewModel()) {
 
     Scaffold(
         bottomBar = {
-            NavigationBar {
-                listOf(
-                    Screen.Home,
-                    Screen.Search,
-                    Screen.Profile
-                ).forEach { screen ->
-                    NavigationBarItem(
-                        icon = { Icon(screen.icon, contentDescription = screen.title) },
-                        label = { Text(screen.title) },
-                        selected = currentRoute == screen.route,
-                        onClick = {
-                            if (currentRoute != screen.route) {
-                            navController.navigate(screen.route) {
-                                    // Pop up to the start destination of the graph to
-                                    // avoid building up a large stack of destinations
-                                    popUpTo(navController.graph.startDestinationId) {
-                                        saveState = true
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    modifier = Modifier.wrapContentWidth(),
+                    shape = RoundedCornerShape(50.dp), // Keep the pill-like shape
+                    colors = CardDefaults.cardColors(
+                        // Use default Material You color instead of custom color with alpha
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 3.dp
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Home button - with selection indicator
+                        Box(
+                            modifier = Modifier.size(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Selection indicator
+                            if (currentRoute == Screen.Home.route) {
+                                Surface(
+                                    modifier = Modifier.size(48.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {}
+                            }
+                            
+                            IconButton(
+                                onClick = {
+                                    if (currentRoute != Screen.Home.route) {
+                                        navController.navigate(Screen.Home.route) {
+                                            popUpTo(navController.graph.startDestinationId) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
                                     }
-                                    // Avoid multiple copies of the same destination when
-                                    // reselecting the same item
-                                launchSingleTop = true
-                                    // Restore state when reselecting a previously selected item
-                                    restoreState = true
-                                }
-                            } else if (screen.route == Screen.Search.route) {
-                                // If already on Search screen and tapped again, clear the search
-                                viewModel.clearSearch()
+                                },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Screen.Home.icon,
+                                    contentDescription = Screen.Home.title,
+                                    tint = if (currentRoute == Screen.Home.route) 
+                                        MaterialTheme.colorScheme.onSecondaryContainer 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         }
-                    )
+                        
+                        // Search button - with selection indicator
+                        Box(
+                            modifier = Modifier.size(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Selection indicator
+                            if (currentRoute == Screen.Search.route) {
+                                Surface(
+                                    modifier = Modifier.size(48.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {}
+                            }
+                            
+                            IconButton(
+                                onClick = {
+                                    if (currentRoute != Screen.Search.route) {
+                                        navController.navigate(Screen.Search.route) {
+                                            popUpTo(navController.graph.startDestinationId) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    } else {
+                                        // If already on Search screen and tapped again, clear the search
+                                        viewModel.clearSearch()
+                                    }
+                                },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Screen.Search.icon,
+                                    contentDescription = Screen.Search.title,
+                                    tint = if (currentRoute == Screen.Search.route) 
+                                        MaterialTheme.colorScheme.onSecondaryContainer 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        
+                        // Profile button - with selection indicator
+                        Box(
+                            modifier = Modifier.size(48.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            // Selection indicator
+                            if (currentRoute == Screen.Profile.route) {
+                                Surface(
+                                    modifier = Modifier.size(48.dp),
+                                    shape = RoundedCornerShape(24.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer
+                                ) {}
+                            }
+                            
+                            IconButton(
+                                onClick = {
+                                    if (currentRoute != Screen.Profile.route) {
+                                        navController.navigate(Screen.Profile.route) {
+                                            popUpTo(navController.graph.startDestinationId) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Screen.Profile.icon,
+                                    contentDescription = Screen.Profile.title,
+                                    tint = if (currentRoute == Screen.Profile.route) 
+                                        MaterialTheme.colorScheme.onSecondaryContainer 
+                                    else 
+                                        MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1569,7 +1884,7 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Search Ekşi Sözlük",
+                        text = "Search",
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -1662,7 +1977,7 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                                 enabled = currentPage > 1
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                    imageVector = Icons.Default.ArrowBack,
                                     contentDescription = "Previous Page"
                                 )
                             }
@@ -1694,7 +2009,7 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                                 onClick = { viewModel.search(currentPage + 1) }
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                     contentDescription = "Next Page"
                                 )
                             }
@@ -1828,6 +2143,10 @@ fun TopicDetailScreen(
     val selectedTopic by viewModel.selectedTopic
     val isLoadingTopic by viewModel.isLoadingTopic
     val isLoading by viewModel.isLoading
+    val currentPage by viewModel.topicCurrentPage
+    val totalPages by viewModel.topicTotalPages
+    val isPageDialogVisible by viewModel.isPageDialogVisible
+    val selectedPage by viewModel.selectedPage
     
     println("TopicDetailScreen: Composed with topicIndex=$topicIndex, selectedTopic=${selectedTopic?.title}, topics.size=${topics.size}")
     
@@ -1835,6 +2154,98 @@ fun TopicDetailScreen(
     LaunchedEffect(topicIndex) {
         println("TopicDetailScreen: LaunchedEffect triggered with topicIndex=$topicIndex")
         viewModel.selectTopic(topicIndex)
+    }
+    
+    // Page selection dialog
+    if (isPageDialogVisible) {
+        AlertDialog(
+            onDismissRequest = { viewModel.hidePageDialog() },
+            title = { Text("Select Page") },
+            text = {
+                Column {
+                    Text("Current page: $currentPage")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Page input field
+                    var pageInput by remember { mutableStateOf(currentPage.toString()) }
+                    
+                    OutlinedTextField(
+                        value = pageInput,
+                        onValueChange = { 
+                            // Only allow numeric input
+                            if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                pageInput = it
+                                // Update selected page if valid
+                                it.toIntOrNull()?.let { num ->
+                                    if (num >= 1) { // Allow any page number >= 1
+                                        viewModel.updateSelectedPage(num)
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text("Page number") },
+                        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Quick navigation buttons - only First, Prev, Next
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        Button(
+                            onClick = { 
+                                viewModel.updateSelectedPage(1)
+                                pageInput = "1"
+                            },
+                            enabled = currentPage != 1
+                        ) {
+                            Text("First")
+                        }
+                        
+                        Button(
+                            onClick = { 
+                                val prev = (selectedPage - 1).coerceAtLeast(1)
+                                viewModel.updateSelectedPage(prev)
+                                pageInput = prev.toString()
+                            },
+                            enabled = selectedPage > 1
+                        ) {
+                            Text("Prev")
+                        }
+                        
+                        Button(
+                            onClick = { 
+                                val next = selectedPage + 1
+                                viewModel.updateSelectedPage(next)
+                                pageInput = next.toString()
+                            }
+                        ) {
+                            Text("Next")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        viewModel.hidePageDialog()
+                        viewModel.navigateTopicToPage(selectedPage)
+                    },
+                    enabled = selectedPage != currentPage && selectedPage >= 1
+                ) {
+                    Text("Go to Page")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.hidePageDialog() }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
     
     Scaffold(
@@ -1884,7 +2295,7 @@ fun TopicDetailScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                        Text(
+                    Text(
                         text = "Error: Topic not found",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.error
@@ -1895,26 +2306,85 @@ fun TopicDetailScreen(
             
             println("TopicDetailScreen: Displaying topic: ${topic.title}")
             
-            // Topic title
+            // Topic title with page selector - matching the SearchScreen UI
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
                 )
             ) {
-                Text(
-                    text = topic.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(16.dp)
-                )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = topic.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Page selector - simplified display
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Previous page button - just icon
+                        IconButton(
+                            onClick = { 
+                                if (currentPage > 1) {
+                                    viewModel.navigateTopicToPage(currentPage - 1)
+                                }
+                            },
+                            enabled = currentPage > 1
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Previous Page"
+                            )
+                        }
+                        
+                        // Page info and change page button
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "Page $currentPage",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                            
+                            // Page button that opens the dialog
+                            OutlinedButton(
+                                onClick = { viewModel.showPageDialog() },
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            ) {
+                                Text("Change Page")
+                            }
+                        }
+                        
+                        // Next page button - just icon
+                        IconButton(
+                            onClick = { viewModel.navigateTopicToPage(currentPage + 1) }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Next Page"
+                            )
+                        }
+                    }
+                }
             }
             
             // Entries
             LazyColumn(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
             ) {
                 if (topic.entries.isEmpty()) {
                     item {
@@ -1927,16 +2397,15 @@ fun TopicDetailScreen(
                             )
                         ) {
                             Text(
-                                text = "No entries available",
-                            style = MaterialTheme.typography.bodyMedium,
+                                text = "No entries found for \"${topic.title}\" on page $currentPage",
+                                style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.padding(16.dp)
-                        )
+                            )
                         }
                     }
                 } else {
                     itemsIndexed(topic.entries) { index, entry ->
-                        val currentPage: Int = 1
                         EntryItem(
                             entry = entry, 
                             index = ((currentPage - 1) * 10) + index + 1
