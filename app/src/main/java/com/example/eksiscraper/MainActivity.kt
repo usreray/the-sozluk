@@ -1517,18 +1517,18 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                         
                         Button(
                             onClick = { 
-                                val prev = (currentPage - 1).coerceAtLeast(1)
+                                val prev = (selectedPage - 1).coerceAtLeast(1)
                                 viewModel.updateSelectedPage(prev)
                                 pageInput = prev.toString()
                             },
-                            enabled = currentPage > 1
+                            enabled = selectedPage > 1
                         ) {
                             Text("Prev")
                         }
                         
                         Button(
                             onClick = { 
-                                val next = currentPage + 1
+                                val next = selectedPage + 1
                                 viewModel.updateSelectedPage(next)
                                 pageInput = next.toString()
                             }
@@ -1652,18 +1652,51 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "Page $currentPage",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                            
-                            // Page button that opens the dialog
-                            OutlinedButton(
-                                onClick = { viewModel.showPageDialog() },
-                                modifier = Modifier.padding(horizontal = 8.dp)
+                            // Previous page button - just icon
+                            IconButton(
+                                onClick = { 
+                                    if (currentPage > 1) {
+                                        viewModel.search(currentPage - 1)
+                                    }
+                                },
+                                enabled = currentPage > 1
                             ) {
-                                Text("Change Page")
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Previous Page"
+                                )
+                            }
+                            
+                            // Page info and change page button
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "Page $currentPage",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                                
+                                // Page button that opens the dialog
+                                OutlinedButton(
+                                    onClick = { viewModel.showPageDialog() },
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                ) {
+                                    Text("Change Page")
+                                }
+                            }
+                            
+                            // Next page button - just icon
+                            IconButton(
+                                onClick = { viewModel.search(currentPage + 1) }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Next Page"
+                                )
                             }
                         }
                     }
