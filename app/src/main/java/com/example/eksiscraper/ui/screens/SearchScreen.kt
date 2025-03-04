@@ -1,0 +1,199 @@
+package com.example.eksiscraper.ui.screens
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.eksiscraper.ui.components.EntriesDisplay
+import com.example.eksiscraper.ui.components.LoadingIndicator
+import com.example.eksiscraper.ui.components.PageSelectionDialog
+import com.example.eksiscraper.ui.components.TopicHeader
+import com.example.eksiscraper.viewmodel.EksiViewModel
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
+    val searchQuery by viewModel.searchQuery
+    val searchResult by viewModel.searchResult
+    val isSearching by viewModel.isSearching
+    val currentPage by viewModel.currentPage
+    val isPageDialogVisible by viewModel.isPageDialogVisible
+    val selectedPage by viewModel.selectedPage
+    val context = LocalContext.current
+    
+    // Get total pages from the search result, with a minimum of the current page
+    val totalPages = (searchResult?.totalPages ?: 1).coerceAtLeast(currentPage)
+    
+    // Page selection dialog
+    if (isPageDialogVisible) {
+        PageSelectionDialog(
+            currentPage = currentPage,
+            maxPages = totalPages,
+            selectedPage = selectedPage,
+            onPageSelected = { viewModel.updateSelectedPage(it) },
+            onConfirm = { viewModel.applySelectedPage() },
+            onDismiss = { viewModel.hidePageDialog() }
+        )
+    }
+    
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Only show search container if no results are displayed or if we're searching
+        if (searchResult == null || isSearching) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Search",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.updateSearchQuery(it) },
+                            label = { Text("Enter search term") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Search
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onSearch = { viewModel.search() }
+                            ),
+                            colors = TextFieldDefaults.outlinedTextFieldColors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                cursorColor = MaterialTheme.colorScheme.primary
+                            ),
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Search",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            }
+                        )
+                        
+                        Button(
+                            onClick = { viewModel.search() },
+                            enabled = searchQuery.isNotEmpty() && !isSearching,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Text("Search")
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Search results or loading indicator
+        if (isSearching) {
+            LoadingIndicator(message = "Searching for \"$searchQuery\"...")
+        } else if (searchResult != null) {
+            // Display search results
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                // Topic title with page selector
+                TopicHeader(
+                    title = searchResult?.title ?: "",
+                    currentPage = currentPage,
+                    maxPages = totalPages,
+                    onPreviousPage = { 
+                        if (currentPage > 1) {
+                            viewModel.search(currentPage - 1)
+                        }
+                    },
+                    onNextPage = { viewModel.search(currentPage + 1) },
+                    onShowPageDialog = { viewModel.showPageDialog() },
+                    isPreviousEnabled = currentPage > 1,
+                    isNextEnabled = true  // Always enable next page for search results
+                )
+                
+                // Entries
+                searchResult?.let { result ->
+                    EntriesDisplay(
+                        topic = result,
+                        currentPage = currentPage
+                    )
+                }
+            }
+        } else {
+            // Empty state - no search performed yet
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = "Search",
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Enter a search term and press Search",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            }
+        }
+    }
+} 

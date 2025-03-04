@@ -1,0 +1,415 @@
+package com.example.eksiscraper.viewmodel
+
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.eksiscraper.data.LocalDataSource
+import com.example.eksiscraper.model.Entry
+import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.network.EksiService
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+class EksiViewModel : ViewModel() {
+    private val _topics = mutableStateOf<List<Topic>>(emptyList())
+    val topics: State<List<Topic>> = _topics
+    
+    private val _isLoading = mutableStateOf(false)
+    val isLoading: State<Boolean> = _isLoading
+    
+    private val _error = mutableStateOf<String?>(null)
+    val error: State<String?> get() = _error
+    
+    private val _isUsingLocalData = mutableStateOf(false)
+    val isUsingLocalData: State<Boolean> get() = _isUsingLocalData
+    
+    // Add a new state for the currently selected topic
+    private val _selectedTopic = mutableStateOf<Topic?>(null)
+    val selectedTopic: State<Topic?> = _selectedTopic
+    
+    // Add a loading state specifically for the selected topic
+    private val _isLoadingTopic = mutableStateOf(false)
+    val isLoadingTopic: State<Boolean> = _isLoadingTopic
+
+    // Add state for search results
+    private val _searchQuery = mutableStateOf("")
+    val searchQuery: State<String> = _searchQuery
+    
+    private val _searchResult = mutableStateOf<Topic?>(null)
+    val searchResult: State<Topic?> = _searchResult
+    
+    private val _isSearching = mutableStateOf(false)
+    val isSearching: State<Boolean> = _isSearching
+
+    private val _currentPage = mutableStateOf(1)
+    val currentPage: State<Int> = _currentPage
+    
+    private val _isPageDialogVisible = mutableStateOf(false)
+    val isPageDialogVisible: State<Boolean> = _isPageDialogVisible
+    
+    private val _selectedPage = mutableStateOf(1)
+    val selectedPage: State<Int> = _selectedPage
+
+    private val _redirectedUrl = mutableStateOf("")
+    val redirectedUrl: State<String> = _redirectedUrl
+
+    private val _totalPages = mutableStateOf(1)
+    val totalPages: State<Int> = _totalPages
+
+    // Add state for topic pagination
+    private val _topicCurrentPage = mutableStateOf(1)
+    val topicCurrentPage: State<Int> = _topicCurrentPage
+    
+    private val _topicTotalPages = mutableStateOf(1)
+    val topicTotalPages: State<Int> = _topicTotalPages
+
+    // Add state for home page pagination
+    private val _homeCurrentPage = mutableStateOf(1)
+    val homeCurrentPage: State<Int> = _homeCurrentPage
+    
+    private val _canLoadMoreTopics = mutableStateOf(true)
+    val canLoadMoreTopics: State<Boolean> = _canLoadMoreTopics
+    
+    private val _isLoadingMoreTopics = mutableStateOf(false)
+    val isLoadingMoreTopics: State<Boolean> = _isLoadingMoreTopics
+
+    init {
+        fetchTopics()
+    }
+
+    fun loadLocalData() {
+        _topics.value = LocalDataSource.getLocalData().home
+        _isUsingLocalData.value = true
+        _isLoading.value = false
+        _error.value = null
+    }
+    
+    fun fetchTopics(page: Int = 1) {
+        if (page == 1) {
+            _isLoading.value = true
+            _error.value = null
+            _isUsingLocalData.value = false
+            _homeCurrentPage.value = 1
+            _topics.value = emptyList()
+        } else {
+            _isLoadingMoreTopics.value = true
+        }
+        
+        viewModelScope.launch {
+            try {
+                // Add a timeout mechanism
+                val timeoutJob = viewModelScope.launch {
+                    delay(30000) // 30 seconds timeout
+                    if (page == 1 && _isLoading.value) {
+                        _isLoading.value = false
+                        _error.value = "Request timed out. Loading local data instead."
+                        loadLocalData()
+                    } else if (page > 1 && _isLoadingMoreTopics.value) {
+                        _isLoadingMoreTopics.value = false
+                        _canLoadMoreTopics.value = false
+                    }
+                }
+                
+                println("EksiViewModel: Starting to fetch topics for page $page")
+                val result = EksiService.getPopularTopics(page)
+                
+                // Cancel the timeout job since we got a response
+                timeoutJob.cancel()
+                
+                if (result.isEmpty()) {
+                    println("EksiViewModel: No topics found for page $page")
+                    if (page == 1) {
+                        _error.value = "No topics found. Please try again later."
+                        loadLocalData()
+                    } else {
+                        _isLoadingMoreTopics.value = false
+                        _canLoadMoreTopics.value = false
+                    }
+                } else if (result.size == 1 && result[0].title.startsWith("Error fetching data")) {
+                    println("EksiViewModel: Error in fetched data for page $page: ${result[0].title}")
+                    if (page == 1) {
+                        _error.value = result[0].title
+                        loadLocalData()
+                    } else {
+                        _isLoadingMoreTopics.value = false
+                        _canLoadMoreTopics.value = false
+                    }
+                } else {
+                    println("EksiViewModel: Successfully fetched ${result.size} topics for page $page")
+                    if (page == 1) {
+                        _topics.value = result
+                        _homeCurrentPage.value = 1
+                    } else {
+                        _topics.value = _topics.value + result
+                        _homeCurrentPage.value = page
+                    }
+                    _isUsingLocalData.value = false
+                    
+                    // If we received fewer than 50 topics, we've reached the last page
+                    _canLoadMoreTopics.value = result.size >= 50
+                    println("EksiViewModel: Can load more topics: ${_canLoadMoreTopics.value} (received ${result.size} topics)")
+                }
+                
+                if (page == 1) {
+                    _isLoading.value = false
+                } else {
+                    _isLoadingMoreTopics.value = false
+                }
+            } catch (e: Exception) {
+                println("EksiViewModel: Error fetching topics for page $page: ${e.message}")
+                if (page == 1) {
+                    _error.value = "Failed to load data: ${e.message ?: "Unknown error"}"
+                    _isLoading.value = false
+                    // Fallback to local data if network request fails
+                    loadLocalData()
+                } else {
+                    _isLoadingMoreTopics.value = false
+                    _canLoadMoreTopics.value = false
+                }
+            }
+        }
+    }
+    
+    fun loadMoreTopics() {
+        if (!_isLoading.value && !_isLoadingMoreTopics.value && _canLoadMoreTopics.value) {
+            println("EksiViewModel: Loading more topics, current page: ${_homeCurrentPage.value}")
+            fetchTopics(_homeCurrentPage.value + 1)
+        } else {
+            println("EksiViewModel: Cannot load more topics. isLoading: ${_isLoading.value}, isLoadingMoreTopics: ${_isLoadingMoreTopics.value}, canLoadMoreTopics: ${_canLoadMoreTopics.value}")
+        }
+    }
+    
+    // Add a method to set the selected topic directly from the list with pagination
+    fun selectTopic(index: Int, page: Int = 1) {
+        println("EksiViewModel: selectTopic called with index $index, page $page, topics size: ${_topics.value.size}")
+        if (index >= 0 && index < _topics.value.size) {
+            _selectedTopic.value = _topics.value[index]
+            _topicCurrentPage.value = page
+            println("EksiViewModel: Selected topic set to: ${_selectedTopic.value?.title}, page: $page")
+            
+            // Fetch entries if they haven't been loaded yet or if we're changing pages
+            if (_selectedTopic.value != null) {
+                fetchEntriesForSelectedTopic(page)
+            }
+        } else {
+            println("EksiViewModel: Invalid index $index for topics size ${_topics.value.size}")
+        }
+    }
+    
+    // Update to support pagination
+    private fun fetchEntriesForSelectedTopic(page: Int = 1) {
+        val topic = _selectedTopic.value ?: return
+        
+        _isLoadingTopic.value = true
+        _topicCurrentPage.value = page
+        
+        viewModelScope.launch {
+            try {
+                println("EksiViewModel: Fetching entries for topic: ${topic.title}, page: $page")
+                
+                // Use the topic's original URL for fetching entries
+                if (topic.url.isNotEmpty()) {
+                    // Extract base URL and path from the topic's URL
+                    val baseUrl = if (topic.url.startsWith("http")) {
+                        val uri = java.net.URI(topic.url)
+                        "${uri.scheme}://${uri.host}"
+                    } else {
+                        "https://eksisozluk.com"
+                    }
+                    
+                    // Extract the path from the full URL or use the URL directly if it's just a path
+                    val path = if (topic.url.startsWith("http")) {
+                        java.net.URI(topic.url).path + java.net.URI(topic.url).query?.let { "?$it" } ?: ""
+                    } else {
+                        topic.url
+                    }
+                    
+                    // Preserve the original URL parameters (like ?a=popular)
+                    val originalPath = path
+                    
+                    // Modify the path to include page parameter if needed
+                    val pageParam = if (page > 1) {
+                        if (originalPath.contains("?")) {
+                            "&p=$page"
+                        } else {
+                            "?p=$page"
+                        }
+                    } else ""
+                    
+                    // Construct the final path with all parameters
+                    val pathWithPage = if (originalPath.contains("p=")) {
+                        // Replace existing page parameter
+                        originalPath.replaceFirst(Regex("p=\\d+"), "p=$page")
+                    } else {
+                        originalPath + pageParam
+                    }
+                    
+                    println("EksiViewModel: Using URL: $baseUrl$pathWithPage")
+                    
+                    // Use the searchTopic method with the exact original path
+                    val searchResult = EksiService.searchTopic(topic.title, page, originalPath)
+                    
+                    // Update total pages
+                    _topicTotalPages.value = searchResult.totalPages
+                    
+                    // Create a new topic with the loaded entries
+                    val updatedTopic = topic.copy(
+                        entries = searchResult.entries, 
+                        entriesLoaded = true,
+                        totalPages = 999,  // Set a high default value to allow many pages
+                        redirectedUrl = searchResult.redirectedUrl.ifEmpty { originalPath }
+                    )
+                    
+                    // Update the selected topic
+                    _selectedTopic.value = updatedTopic
+                    
+                    // Also update the topic in the list
+                    val updatedTopics = _topics.value.toMutableList()
+                    val index = updatedTopics.indexOfFirst { it.title == topic.title }
+                    if (index != -1) {
+                        updatedTopics[index] = updatedTopic
+                        _topics.value = updatedTopics
+                    }
+                    
+                    println("EksiViewModel: Successfully fetched ${searchResult.entries.size} entries for topic: ${topic.title}, page: $page, totalPages: ${searchResult.totalPages}")
+                } else {
+                    // Fallback to search by title if URL is empty
+                    println("EksiViewModel: No URL available for topic, falling back to search by title")
+                    val searchResult = EksiService.searchTopic(topic.title, page)
+                    
+                    // Update total pages
+                    _topicTotalPages.value = searchResult.totalPages
+                    
+                    // Create a new topic with the loaded entries
+                    val updatedTopic = topic.copy(
+                        entries = searchResult.entries, 
+                        entriesLoaded = true,
+                        totalPages = 999,  // Set a high default value to allow many pages
+                        redirectedUrl = searchResult.redirectedUrl
+                    )
+                    
+                    // Update the selected topic
+                    _selectedTopic.value = updatedTopic
+                    
+                    // Also update the topic in the list
+                    val updatedTopics = _topics.value.toMutableList()
+                    val index = updatedTopics.indexOfFirst { it.title == topic.title }
+                    if (index != -1) {
+                        updatedTopics[index] = updatedTopic
+                        _topics.value = updatedTopics
+                    }
+                    
+                    println("EksiViewModel: Successfully fetched ${searchResult.entries.size} entries for topic: ${topic.title}, page: $page, totalPages: ${searchResult.totalPages}")
+                }
+            } catch (e: Exception) {
+                println("EksiViewModel: Error fetching entries: ${e.message}")
+                
+                // Update the selected topic with error message
+                val errorEntries = listOf(Entry("Error loading entries: ${e.message ?: "Unknown error"}"))
+                val updatedTopic = topic.copy(
+                    entries = errorEntries,
+                    entriesLoaded = true
+                )
+                _selectedTopic.value = updatedTopic
+            } finally {
+                _isLoadingTopic.value = false
+            }
+        }
+    }
+    
+    // Add methods for search functionality
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+    
+    fun search(page: Int = 1) {
+        if (_searchQuery.value.isBlank()) return
+        
+        // If changing pages, update the redirectedUrl to match the correct page
+        val updatedRedirectedUrl = if (searchResult.value?.redirectedUrl?.isNotEmpty() == true) {
+            if (searchResult.value?.redirectedUrl?.contains("p=") == true) {
+                searchResult.value?.redirectedUrl?.replaceFirst(Regex("p=\\d+"), "p=$page") ?: ""
+            } else if (searchResult.value?.redirectedUrl?.contains("?") == true) {
+                "${searchResult.value?.redirectedUrl}&p=$page"
+            } else {
+                "${searchResult.value?.redirectedUrl}?p=$page"
+            }
+        } else {
+            ""
+        }
+        
+        // Then call searchTopic with the updated redirectedUrl
+        viewModelScope.launch {
+            _isSearching.value = true
+            _currentPage.value = page
+            _selectedPage.value = page
+            
+            try {
+                val result = EksiService.searchTopic(
+                    _searchQuery.value,
+                    page,
+                    updatedRedirectedUrl  // Use the updated redirectedUrl
+                )
+                _searchResult.value = result
+            } catch (e: Exception) {
+                // Handle error
+            } finally {
+                _isSearching.value = false
+            }
+        }
+    }
+    
+    fun clearSearch() {
+        _searchQuery.value = ""
+        _searchResult.value = null
+        _currentPage.value = 1
+        _redirectedUrl.value = ""
+    }
+    
+    // Add methods for page dialog
+    fun showPageDialog() {
+        _selectedPage.value = _currentPage.value
+        _isPageDialogVisible.value = true
+    }
+    
+    fun hidePageDialog() {
+        _isPageDialogVisible.value = false
+    }
+    
+    fun updateSelectedPage(page: Int) {
+        _selectedPage.value = page
+    }
+    
+    fun applySelectedPage() {
+        // For search results
+        if (_searchResult.value != null) {
+            search(_selectedPage.value)
+        } 
+        // For topic details
+        else if (_selectedTopic.value != null) {
+            navigateTopicToPage(_selectedPage.value)
+        }
+        hidePageDialog()
+    }
+    
+    // Add method to navigate to a specific page for a topic
+    fun navigateTopicToPage(page: Int) {
+        if (page >= 1 && _selectedTopic.value != null) {
+            val topicIndex = _topics.value.indexOfFirst { it.title == _selectedTopic.value?.title }
+            if (topicIndex != -1) {
+                selectTopic(topicIndex, page)
+            }
+        }
+    }
+    
+    // Add method to save logs
+    fun getDebugLog(): String {
+        return EksiService.getDebugLog()
+    }
+    
+    // Add method to get topics as JSON
+    fun getTopicsAsJson(): String {
+        return EksiService.getTopicsAsJson()
+    }
+} 
