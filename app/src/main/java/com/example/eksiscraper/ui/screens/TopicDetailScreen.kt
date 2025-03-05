@@ -119,7 +119,17 @@ fun TopicDetailScreen(
                     },
                     onShowPageDialog = { viewModel.showPageDialog() },
                     isPreviousEnabled = currentPage > 1,
-                    isNextEnabled = currentPage < maxPages
+                    isNextEnabled = currentPage < maxPages,
+                    isSaved = selectedTopic?.isSaved ?: false,
+                    onSaveToggle = {
+                        selectedTopic?.let { topic ->
+                            if (topic.isSaved) {
+                                viewModel.unsaveTopic(topic)
+                            } else {
+                                viewModel.saveTopic(topic)
+                            }
+                        }
+                    }
                 )
                 
                 // Entries

@@ -597,7 +597,11 @@ object EksiService {
             
             // Try to get the actual topic title from the page
             val pageTitle = document.select("h1.topic-title, h1.başlık, h1, title").firstOrNull()?.text() ?: query
-            val cleanTitle = pageTitle.replace(" - ekşi sözlük", "").trim()
+            // Remove both "- ekşi sözlük" and page information like "- sayfa 5"
+            val cleanTitle = pageTitle
+                .replace(" - ekşi sözlük", "")
+                .replace(Regex(" - sayfa \\d+"), "")  // Remove "- sayfa X" pattern
+                .trim()
             
             // Extract entries from the document
             val entryElements = document.select("div.content, div.entry-content, div.entry")

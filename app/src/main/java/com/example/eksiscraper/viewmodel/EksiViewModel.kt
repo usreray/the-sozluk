@@ -74,6 +74,10 @@ class EksiViewModel : ViewModel() {
     private val _isLoadingMoreTopics = mutableStateOf(false)
     val isLoadingMoreTopics: State<Boolean> = _isLoadingMoreTopics
 
+    // Add state for saved topics
+    private val _savedTopics = mutableStateOf<List<Topic>>(emptyList())
+    val savedTopics: State<List<Topic>> = _savedTopics
+
     init {
         fetchTopics()
     }
@@ -369,7 +373,12 @@ class EksiViewModel : ViewModel() {
     
     // Add methods for page dialog
     fun showPageDialog() {
-        _selectedPage.value = _currentPage.value
+        // For topic details, use topicCurrentPage
+        _selectedPage.value = if (_selectedTopic.value != null) {
+            _topicCurrentPage.value
+        } else {
+            _currentPage.value
+        }
         _isPageDialogVisible.value = true
     }
     
@@ -395,9 +404,12 @@ class EksiViewModel : ViewModel() {
     
     // Add method to navigate to a specific page for a topic
     fun navigateTopicToPage(page: Int) {
+        println("EksiViewModel: navigateTopicToPage called with page $page")
         if (page >= 1 && _selectedTopic.value != null) {
             val topicIndex = _topics.value.indexOfFirst { it.title == _selectedTopic.value?.title }
+            println("EksiViewModel: found topic index $topicIndex for ${_selectedTopic.value?.title}")
             if (topicIndex != -1) {
+                println("EksiViewModel: calling selectTopic with index $topicIndex, page $page")
                 selectTopic(topicIndex, page)
             }
         }
@@ -411,5 +423,60 @@ class EksiViewModel : ViewModel() {
     // Add method to get topics as JSON
     fun getTopicsAsJson(): String {
         return EksiService.getTopicsAsJson()
+    }
+
+    // Methods for saved topics
+    fun saveTopic(topic: Topic) {
+        println("EksiViewModel: Saving topic: ${topic.title}")
+        
+        // Check if the topic is already saved
+        if (_savedTopics.value.any { it.title == topic.title }) {
+            return
+        }
+        
+        // Create a copy of the topic with isSaved set to true
+        val savedTopic = topic.copy(isSaved = true)
+        
+        // Add to saved topics
+        _savedTopics.value = _savedTopics.value + savedTopic
+        
+        // Also update the topic in the main list and selected topic if needed
+        updateTopicSavedStatusInLists(topic.title, true)
+        
+        println("EksiViewModel: Total saved topics: ${_savedTopics.value.size}")
+    }
+
+    fun unsaveTopic(topic: Topic) {
+        println("EksiViewModel: Removing saved topic: ${topic.title}")
+        
+        // Remove from saved topics
+        _savedTopics.value = _savedTopics.value.filter { it.title != topic.title }
+        
+        // Update the topic in the main list and selected topic if needed
+        updateTopicSavedStatusInLists(topic.title, false)
+        
+        println("EksiViewModel: Total saved topics: ${_savedTopics.value.size}")
+    }
+
+    fun isTopicSaved(title: String): Boolean {
+        return _savedTopics.value.any { it.title == title }
+    }
+
+    private fun updateTopicSavedStatusInLists(title: String, isSaved: Boolean) {
+        // Update in the main topics list
+        val updatedTopics = _topics.value.map { 
+            if (it.title == title) it.copy(isSaved = isSaved) else it 
+        }
+        _topics.value = updatedTopics
+        
+        // Update selected topic if it's the same one
+        if (_selectedTopic.value?.title == title) {
+            _selectedTopic.value = _selectedTopic.value?.copy(isSaved = isSaved)
+        }
+        
+        // Update search result if it's the same one
+        if (_searchResult.value?.title == title) {
+            _searchResult.value = _searchResult.value?.copy(isSaved = isSaved)
+        }
     }
 } 

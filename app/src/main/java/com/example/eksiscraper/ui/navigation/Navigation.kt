@@ -32,7 +32,7 @@ fun Navigation(
         }
         
         composable(Screen.Profile.route) {
-            ProfileScreen()
+            ProfileScreen(navController, viewModel)
         }
         
         composable(

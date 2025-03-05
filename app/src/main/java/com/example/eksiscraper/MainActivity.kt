@@ -88,7 +88,7 @@ fun BottomNavigationBar(navController: NavController) {
             route = Screen.Search.route
         ),
         NavigationItem(
-            title = "Profile",
+            title = "You",
             icon = Icons.Default.Person,
             route = Screen.Profile.route
         )

@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -37,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.Topic
@@ -63,7 +66,7 @@ fun PageSelectionDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Page input field
-                var pageInput by remember { mutableStateOf(currentPage.toString()) }
+                var pageInput by remember { mutableStateOf(selectedPage.toString()) }
                 
                 OutlinedTextField(
                     value = pageInput,
@@ -170,7 +173,9 @@ fun TopicHeader(
     onNextPage: () -> Unit,
     onShowPageDialog: () -> Unit,
     isPreviousEnabled: Boolean,
-    isNextEnabled: Boolean
+    isNextEnabled: Boolean,
+    isSaved: Boolean = false,
+    onSaveToggle: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -181,11 +186,29 @@ fun TopicHeader(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Save/Unsave button
+                IconButton(onClick = onSaveToggle) {
+                    Icon(
+                        imageVector = if (isSaved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (isSaved) "Unsave Topic" else "Save Topic",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
             
             Spacer(modifier = Modifier.height(8.dp))
             

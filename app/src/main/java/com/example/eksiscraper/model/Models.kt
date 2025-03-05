@@ -11,7 +11,8 @@ data class Topic(
     val entries: List<Entry> = emptyList(),
     val entriesLoaded: Boolean = false,
     val redirectedUrl: String = "",
-    val totalPages: Int = 1
+    val totalPages: Int = 1,
+    val isSaved: Boolean = false
 )
 
 data class Entry(

@@ -157,7 +157,17 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                     onNextPage = { viewModel.search(currentPage + 1) },
                     onShowPageDialog = { viewModel.showPageDialog() },
                     isPreviousEnabled = currentPage > 1,
-                    isNextEnabled = true  // Always enable next page for search results
+                    isNextEnabled = true,  // Always enable next page for search results
+                    isSaved = searchResult?.isSaved ?: false,
+                    onSaveToggle = {
+                        searchResult?.let { topic ->
+                            if (topic.isSaved) {
+                                viewModel.unsaveTopic(topic)
+                            } else {
+                                viewModel.saveTopic(topic)
+                            }
+                        }
+                    }
                 )
                 
                 // Entries
