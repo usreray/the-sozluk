@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +49,13 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
     val isPageDialogVisible by viewModel.isPageDialogVisible
     val selectedPage by viewModel.selectedPage
     val context = LocalContext.current
+    
+    // Set the active screen
+    LaunchedEffect(Unit) {
+        println("SearchScreen: Setting active screen to search")
+        viewModel.setActiveScreen("search")
+        // No need to call clearSelectedTopic here as setActiveScreen already does it
+    }
     
     // Get total pages from the search result, with a minimum of the current page
     val totalPages = (searchResult?.totalPages ?: 1).coerceAtLeast(currentPage)

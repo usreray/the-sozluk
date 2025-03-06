@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +31,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +50,7 @@ import com.example.eksiscraper.ui.components.PageSelectionDialog
 import com.example.eksiscraper.ui.components.TopicHeader
 import com.example.eksiscraper.viewmodel.EksiViewModel
 import kotlin.math.ceil
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -63,16 +66,31 @@ fun TopicDetailScreen(
     val isPageDialogVisible by viewModel.isPageDialogVisible
     val selectedPage by viewModel.selectedPage
     val isLoadingTopic by viewModel.isLoadingTopic
+    val activeScreen by viewModel.activeScreen
+    
+    // Set the active screen
+    LaunchedEffect(Unit) {
+        println("TopicDetailScreen: Setting active screen to topic_detail")
+        viewModel.setActiveScreen("topic_detail")
+        
+        // Add a small delay to ensure the active screen state is updated before selecting a topic
+        kotlinx.coroutines.delay(100)
+        
+        // Ensure the topic is selected only if we're on the topic detail screen and no topic is currently selected
+        if (selectedTopic == null && topics.isNotEmpty() && topicIndex < topics.size && 
+            viewModel.activeScreen.value == "topic_detail") {
+            println("TopicDetailScreen: Selecting topic at index $topicIndex")
+            viewModel.selectTopic(topicIndex, 1)
+        } else if (selectedTopic != null) {
+            // If a topic is already selected, just ensure we're on the topic detail screen
+            println("TopicDetailScreen: Topic already selected: ${selectedTopic?.title ?: "Unknown"}, no need to reload")
+        }
+    }
     
     // Calculate max pages based on comment count (10 entries per page)
     val maxPages = selectedTopic?.let { 
         ceil(it.commentCount.toFloat() / 10).toInt().coerceAtLeast(1)
     } ?: 1
-    
-    // Ensure the topic is selected
-    if (selectedTopic == null && topics.isNotEmpty() && topicIndex < topics.size) {
-        viewModel.selectTopic(topicIndex, 1)
-    }
     
     // Page selection dialog
     if (isPageDialogVisible) {
@@ -87,6 +105,12 @@ fun TopicDetailScreen(
             },
             onDismiss = { viewModel.hidePageDialog() }
         )
+    }
+    
+    // Handle back press to return to home screen
+    BackHandler {
+        viewModel.clearSelectedTopic()
+        navController.popBackStack()
     }
     
     Column(
@@ -144,7 +168,9 @@ fun TopicDetailScreen(
             // No topic selected or loading
             if (isLoading) {
                 LoadingIndicator(message = "Loading...")
-            } else {
+            } else if (activeScreen == "topic_detail") {
+                // Only show error if we're actually on the topic detail screen
+                // This prevents the error from flashing during navigation
                 ErrorDisplay(message = "Topic not found")
             }
         }

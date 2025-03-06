@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
@@ -28,7 +30,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +42,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.ui.components.EntriesDisplay
+import com.example.eksiscraper.ui.components.LoadingIndicator
+import com.example.eksiscraper.ui.components.PageSelectionDialog
+import com.example.eksiscraper.ui.components.TopicHeader
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.viewmodel.EksiViewModel
 
@@ -46,32 +56,126 @@ fun ProfileScreen(
     viewModel: EksiViewModel = viewModel()
 ) {
     val savedTopics by viewModel.savedTopics
+    val isSearching by viewModel.isSearching
+    val viewingSavedTopic by viewModel.viewingSavedTopic
+    val isViewingSavedTopic by viewModel.isViewingSavedTopic
+    val savedTopicCurrentPage by viewModel.savedTopicCurrentPage
+    val isPageDialogVisible by viewModel.isPageDialogVisible
+    val selectedPage by viewModel.selectedPage
+    
+    // Set the active screen
+    LaunchedEffect(Unit) {
+        println("ProfileScreen: Setting active screen to profile")
+        viewModel.setActiveScreen("profile")
+        // No need to call clearSelectedTopic here as setActiveScreen already does it
+    }
+    
+    // Handle back press when viewing a saved topic
+    BackHandler(enabled = isViewingSavedTopic) {
+        viewModel.stopViewingSavedTopic()
+    }
+    
+    // Calculate total pages from the viewing topic
+    val totalPages = (viewingSavedTopic?.totalPages ?: 1).coerceAtLeast(savedTopicCurrentPage)
+    
+    // Page selection dialog
+    if (isPageDialogVisible) {
+        PageSelectionDialog(
+            currentPage = savedTopicCurrentPage,
+            maxPages = totalPages,
+            selectedPage = selectedPage,
+            onPageSelected = { viewModel.updateSelectedPage(it) },
+            onConfirm = { 
+                viewModel.applySelectedPage()
+                viewModel.hidePageDialog()
+            },
+            onDismiss = { viewModel.hidePageDialog() }
+        )
+    }
     
     Scaffold(
+        // Minimal top app bar with no title or navigation icons
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { 
-                    Text(
-                        "You",
-                        style = MaterialTheme.typography.headlineMedium
-                    ) 
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.onSurface
+            if (!isViewingSavedTopic) {
+                // Empty top app bar with no title when viewing saved topics list
+                CenterAlignedTopAppBar(
+                    title = { /* Empty title */ },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        titleContentColor = MaterialTheme.colorScheme.onSurface
+                    )
                 )
-            )
+            }
+            // No top app bar when viewing a topic
         }
     ) { paddingValues ->
-        if (savedTopics.isEmpty()) {
-            EmptySavedTopicsMessage(paddingValues)
+        if (isViewingSavedTopic) {
+            // Show topic content
+            if (isSearching) {
+                LoadingIndicator(message = "Loading topic entries...")
+            } else if (viewingSavedTopic != null) {
+                // Display topic details
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(paddingValues)
+                ) {
+                    // Topic title with page selector
+                    TopicHeader(
+                        title = viewingSavedTopic?.title ?: "",
+                        currentPage = savedTopicCurrentPage,
+                        maxPages = totalPages,
+                        onPreviousPage = { 
+                            if (savedTopicCurrentPage > 1) {
+                                viewingSavedTopic?.let { topic ->
+                                    viewModel.viewSavedTopic(topic, savedTopicCurrentPage - 1)
+                                }
+                            }
+                        },
+                        onNextPage = { 
+                            viewingSavedTopic?.let { topic ->
+                                viewModel.viewSavedTopic(topic, savedTopicCurrentPage + 1)
+                            }
+                        },
+                        onShowPageDialog = { viewModel.showPageDialog() },
+                        isPreviousEnabled = savedTopicCurrentPage > 1,
+                        isNextEnabled = true,  // Always enable next page
+                        isSaved = true,  // Always true since we're in the saved topics section
+                        onSaveToggle = {
+                            viewingSavedTopic?.let { topic ->
+                                viewModel.unsaveTopic(topic)
+                                // Return to the saved topics list if a topic is unsaved
+                                viewModel.stopViewingSavedTopic()
+                            }
+                        }
+                    )
+                    
+                    // Entries
+                    viewingSavedTopic?.let { topic ->
+                        EntriesDisplay(
+                            topic = topic,
+                            currentPage = savedTopicCurrentPage
+                        )
+                    }
+                }
+            }
         } else {
-            SavedTopicsList(
-                savedTopics = savedTopics,
-                navController = navController,
-                viewModel = viewModel,
-                paddingValues = paddingValues
-            )
+            // Show saved topics list
+            if (savedTopics.isEmpty()) {
+                EmptySavedTopicsMessage(paddingValues)
+            } else {
+                SavedTopicsList(
+                    savedTopics = savedTopics,
+                    onTopicSelected = { topic ->
+                        viewModel.viewSavedTopic(topic)
+                    },
+                    viewModel = viewModel,
+                    paddingValues = paddingValues,
+                    onBackToList = { 
+                        viewModel.stopViewingSavedTopic()
+                    }
+                )
+            }
         }
     }
 }
@@ -119,9 +223,10 @@ private fun EmptySavedTopicsMessage(paddingValues: PaddingValues) {
 @Composable
 private fun SavedTopicsList(
     savedTopics: List<Topic>,
-    navController: NavController,
+    onTopicSelected: (Topic) -> Unit,
     viewModel: EksiViewModel,
-    paddingValues: PaddingValues
+    paddingValues: PaddingValues,
+    onBackToList: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -131,12 +236,18 @@ private fun SavedTopicsList(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            Text(
-                text = "Saved Topics",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Saved Topics",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
             
             Divider(
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -146,13 +257,7 @@ private fun SavedTopicsList(
         
         items(savedTopics) { topic ->
             ElevatedCard(
-                onClick = {
-                    // Find the index in the full topics list
-                    val index = viewModel.topics.value.indexOfFirst { it.title == topic.title }
-                    if (index != -1) {
-                        navController.navigate(Screen.TopicDetail.createRoute(index))
-                    }
-                },
+                onClick = { onTopicSelected(topic) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surface

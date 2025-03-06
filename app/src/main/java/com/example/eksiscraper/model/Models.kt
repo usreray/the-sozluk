@@ -10,6 +10,7 @@ data class Topic(
     val commentCount: Int = 0,
     val entries: List<Entry> = emptyList(),
     val entriesLoaded: Boolean = false,
+    val loadedPages: Set<Int> = emptySet(),
     val redirectedUrl: String = "",
     val totalPages: Int = 1,
     val isSaved: Boolean = false

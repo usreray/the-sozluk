@@ -10,7 +10,6 @@ import java.util.HashMap
 
 object EksiService {
     private const val BASE_URL = "https://eksisozluk.com"
-    private const val FALLBACK_URL = "https://eksisozluk1923.com"
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
     
     // Add a flag to enable detailed logging to a file
@@ -85,18 +84,6 @@ object EksiService {
                 logDebug("EksiService: First topic title for page $page: ${result.first().title}")
                 if (result.size > 1) {
                     logDebug("EksiService: Last topic title for page $page: ${result.last().title}")
-                }
-            }
-            
-            // If that fails, try with the fallback URL
-            if (result.size == 1 && result[0].title.startsWith("Error fetching data")) {
-                logDebug("EksiService: Main URL failed, trying fallback URL for page $page")
-                val fallbackResult = tryFetchTopicsWithoutEntries(FALLBACK_URL, page)
-                if (fallbackResult.size > 1 || !fallbackResult[0].title.startsWith("Error fetching data")) {
-                    if (page == 1) {
-                        lastFetchedTopics = fallbackResult
-                    }
-                    return@withContext fallbackResult
                 }
             }
             
@@ -508,35 +495,7 @@ object EksiService {
             if (response.statusCode() != 200) {
                 logDebug("EksiService: HTTP error: ${response.statusCode()} - ${response.statusMessage()}")
                 
-                // Try fallback URL if main URL fails
-                if (BASE_URL == "https://eksisozluk.com") {
-                    logDebug("EksiService: Trying fallback URL")
-                    val fallbackUrl = "$FALLBACK_URL$searchUrl"
-                    logDebug("EksiService: Using fallback URL: $fallbackUrl")
-                    
-                    val fallbackConnection = Jsoup.connect(fallbackUrl)
-                        .userAgent(USER_AGENT)
-                        .timeout(10000)
-                        .followRedirects(true)
-                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-                        .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
-                        .header("Accept-Encoding", "gzip, deflate, br")
-                        .header("Connection", "keep-alive")
-                        .header("Upgrade-Insecure-Requests", "1")
-                        .ignoreHttpErrors(true)
-                    
-                    val fallbackResponse = fallbackConnection.execute()
-                    
-                    if (fallbackResponse.statusCode() == 200) {
-                        logDebug("EksiService: Fallback URL successful")
-                        // Use the fallback response
-                        return@withContext processTopicResponse(fallbackResponse, query, page, searchUrl, FALLBACK_URL)
-                    } else {
-                        logDebug("EksiService: Fallback URL also failed: ${fallbackResponse.statusCode()}")
-                    }
-                }
-                
-                // If we get here, both main and fallback URLs failed
+                // If we get here, the URL request failed
                 return@withContext Topic(
                     title = query,
                     url = "$BASE_URL$searchUrl",
@@ -549,7 +508,7 @@ object EksiService {
             }
             
             // Process the successful response
-            return@withContext processTopicResponse(response, query, page, searchUrl, BASE_URL)
+            return@withContext processTopicResponse(response, query, page, searchUrl)
             
         } catch (e: Exception) {
             e.printStackTrace()
@@ -572,8 +531,7 @@ object EksiService {
         response: org.jsoup.Connection.Response,
         query: String,
         page: Int,
-        searchUrl: String,
-        baseUrl: String
+        searchUrl: String
     ): Topic = withContext(Dispatchers.IO) {
         try {
             // Get the final URL after redirection
@@ -581,8 +539,8 @@ object EksiService {
             logDebug("EksiService: Final URL after redirection: $finalUrl")
             
             // Extract the redirected path from the final URL (including query parameters)
-            val redirectedPath = if (finalUrl.startsWith(baseUrl)) {
-                val fullPath = finalUrl.substring(baseUrl.length)
+            val redirectedPath = if (finalUrl.startsWith(BASE_URL)) {
+                val fullPath = finalUrl.substring(BASE_URL.length)
                 // Keep the full path including query parameters
                 fullPath
             } else {
@@ -638,7 +596,7 @@ object EksiService {
             // Create a topic with the search query and fetched entries
             val topic = Topic(
                 title = cleanTitle,
-                url = "$baseUrl$searchUrl",
+                url = "$BASE_URL$searchUrl",
                 commentCount = entries.size,
                 entries = entries,
                 entriesLoaded = true,
@@ -659,7 +617,7 @@ object EksiService {
             // Return an error topic
             return@withContext Topic(
                 title = query,
-                url = "$baseUrl$searchUrl",
+                url = "$BASE_URL$searchUrl",
                 commentCount = 0,
                 entries = listOf(Entry("Error processing response: ${e.message ?: "Unknown error"}")),
                 entriesLoaded = true,

@@ -97,6 +97,9 @@ fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     
+    // Get ViewModel reference
+    val viewModel: EksiViewModel = viewModel()
+    
     NavigationBar(
         modifier = Modifier.clip(RectangleShape),
         containerColor = MaterialTheme.colorScheme.surface,
@@ -117,7 +120,36 @@ fun BottomNavigationBar(navController: NavController) {
                 label = { Text(text = item.title) },
                 selected = selected,
                 onClick = {
+                    // Check if we're on a topic detail screen
+                    val isOnTopicDetail = currentRoute?.startsWith(Screen.TopicDetail.route.substringBefore("{")) == true
+                    
                     if (currentRoute != item.route) {
+                        println("MainActivity: Navigating to ${item.route}")
+                        
+                        // If navigating to Search or Profile screens, set the active screen first
+                        // The setActiveScreen method will handle clearing the selected topic
+                        if (item.route == Screen.Search.route || item.route == Screen.Profile.route) {
+                            viewModel.setActiveScreen(item.route.substringBefore("/"))
+                        } else {
+                            // For other screens, set the active screen normally
+                            viewModel.setActiveScreen(item.route.substringBefore("/"))
+                        }
+                        
+                        // If navigating to home from a topic detail, handle it specially
+                        if (item.route == Screen.Home.route && isOnTopicDetail) {
+                            println("MainActivity: Navigating from topic detail to home")
+                            // No need to call clearSelectedTopic here as setActiveScreen already did it
+                            navController.navigate(Screen.Home.route) {
+                                // Pop up to the start destination and clear all the back stack
+                                popUpTo(navController.graph.startDestinationId) {
+                                    inclusive = true
+                                }
+                            }
+                            return@NavigationBarItem
+                        }
+                        
+                        // No need to call clearSelectedTopic here as setActiveScreen already did it if needed
+                        
                         navController.navigate(item.route) {
                             // Pop up to the start destination of the graph to
                             // avoid building up a large stack of destinations
@@ -129,6 +161,13 @@ fun BottomNavigationBar(navController: NavController) {
                             launchSingleTop = true
                             // Restore state when reselecting a previously selected item
                             restoreState = true
+                        }
+                    } else {
+                        // If already on the screen and clicked again, reset to initial state
+                        when (item.route) {
+                            Screen.Home.route -> viewModel.resetHomeScreen()
+                            Screen.Search.route -> viewModel.clearSearch()
+                            Screen.Profile.route -> viewModel.resetProfileScreen()
                         }
                     }
                 },

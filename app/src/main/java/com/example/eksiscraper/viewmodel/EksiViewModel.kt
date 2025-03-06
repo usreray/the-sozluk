@@ -78,6 +78,20 @@ class EksiViewModel : ViewModel() {
     private val _savedTopics = mutableStateOf<List<Topic>>(emptyList())
     val savedTopics: State<List<Topic>> = _savedTopics
 
+    // Add a flag to track which screen is active
+    private val _activeScreen = mutableStateOf<String>("home")
+    val activeScreen: State<String> = _activeScreen
+    
+    // Separate state for saved topic viewing
+    private val _viewingSavedTopic = mutableStateOf<Topic?>(null)
+    val viewingSavedTopic: State<Topic?> = _viewingSavedTopic
+    
+    private val _isViewingSavedTopic = mutableStateOf(false)
+    val isViewingSavedTopic: State<Boolean> = _isViewingSavedTopic
+    
+    private val _savedTopicCurrentPage = mutableStateOf(1)
+    val savedTopicCurrentPage: State<Int> = _savedTopicCurrentPage
+
     init {
         fetchTopics()
     }
@@ -188,13 +202,23 @@ class EksiViewModel : ViewModel() {
     fun selectTopic(index: Int, page: Int = 1) {
         println("EksiViewModel: selectTopic called with index $index, page $page, topics size: ${_topics.value.size}")
         if (index >= 0 && index < _topics.value.size) {
-            _selectedTopic.value = _topics.value[index]
+            val topic = _topics.value[index]
+            
+            // Check if we're already viewing this topic and page
+            if (_selectedTopic.value?.title == topic.title && _topicCurrentPage.value == page) {
+                println("EksiViewModel: Already viewing topic '${topic.title}' on page $page, no need to reload")
+                return
+            }
+            
+            _selectedTopic.value = topic
             _topicCurrentPage.value = page
             println("EksiViewModel: Selected topic set to: ${_selectedTopic.value?.title}, page: $page")
             
             // Fetch entries if they haven't been loaded yet or if we're changing pages
-            if (_selectedTopic.value != null) {
+            if (_selectedTopic.value != null && (!topic.entriesLoaded || !topic.loadedPages.contains(page))) {
                 fetchEntriesForSelectedTopic(page)
+            } else {
+                println("EksiViewModel: Topic entries already loaded for page $page, no need to fetch again")
             }
         } else {
             println("EksiViewModel: Invalid index $index for topics size ${_topics.value.size}")
@@ -204,6 +228,12 @@ class EksiViewModel : ViewModel() {
     // Update to support pagination
     private fun fetchEntriesForSelectedTopic(page: Int = 1) {
         val topic = _selectedTopic.value ?: return
+        
+        // Check if entries are already loaded for this page
+        if (topic.entriesLoaded && topic.loadedPages.contains(page)) {
+            println("EksiViewModel: Entries already loaded for topic '${topic.title}' on page $page, skipping fetch")
+            return
+        }
         
         _isLoadingTopic.value = true
         _topicCurrentPage.value = page
@@ -261,6 +291,7 @@ class EksiViewModel : ViewModel() {
                     val updatedTopic = topic.copy(
                         entries = searchResult.entries, 
                         entriesLoaded = true,
+                        loadedPages = topic.loadedPages + page,
                         totalPages = 999,  // Set a high default value to allow many pages
                         redirectedUrl = searchResult.redirectedUrl.ifEmpty { originalPath }
                     )
@@ -289,6 +320,7 @@ class EksiViewModel : ViewModel() {
                     val updatedTopic = topic.copy(
                         entries = searchResult.entries, 
                         entriesLoaded = true,
+                        loadedPages = topic.loadedPages + page,
                         totalPages = 999,  // Set a high default value to allow many pages
                         redirectedUrl = searchResult.redirectedUrl
                     )
@@ -365,10 +397,13 @@ class EksiViewModel : ViewModel() {
     }
     
     fun clearSearch() {
+        println("EksiViewModel: Clearing search state")
         _searchQuery.value = ""
         _searchResult.value = null
         _currentPage.value = 1
         _redirectedUrl.value = ""
+        // Also clear any selected topic to prevent unwanted topic loading
+        clearSelectedTopic()
     }
     
     // Add methods for page dialog
@@ -393,7 +428,12 @@ class EksiViewModel : ViewModel() {
     fun applySelectedPage() {
         // For search results
         if (_searchResult.value != null) {
-            search(_selectedPage.value)
+            // If we're viewing a saved topic in the You tab
+            if (_searchResult.value?.isSaved == true) {
+                viewSavedTopic(_searchResult.value!!, _selectedPage.value)
+            } else {
+                search(_selectedPage.value)
+            }
         } 
         // For topic details
         else if (_selectedTopic.value != null) {
@@ -478,5 +518,138 @@ class EksiViewModel : ViewModel() {
         if (_searchResult.value?.title == title) {
             _searchResult.value = _searchResult.value?.copy(isSaved = isSaved)
         }
+    }
+
+    // Method to view a saved topic by using the same approach as search
+    fun viewSavedTopic(topic: Topic, page: Int = 1) {
+        println("EksiViewModel: Viewing saved topic: ${topic.title}")
+        
+        // Set the viewing saved topic state
+        _viewingSavedTopic.value = topic
+        _isViewingSavedTopic.value = true
+        _savedTopicCurrentPage.value = page
+        
+        // Use the topic's redirectedUrl if available, but clean it up first
+        var redirectedUrl = topic.redirectedUrl
+        
+        // Clean up the redirectedUrl by removing any query parameters
+        if (redirectedUrl.contains("?")) {
+            redirectedUrl = redirectedUrl.substringBefore("?")
+            println("EksiViewModel: Cleaned redirectedUrl: $redirectedUrl")
+        }
+        
+        // Call searchTopic with the cleaned redirectedUrl
+        viewModelScope.launch {
+            _isSearching.value = true
+            
+            try {
+                val result = EksiService.searchTopic(
+                    topic.title,
+                    page,
+                    redirectedUrl  // Use the cleaned redirectedUrl
+                )
+                
+                // Update the viewingSavedTopic with the fetched entries
+                _viewingSavedTopic.value = result.copy(isSaved = true)
+            } catch (e: Exception) {
+                // Handle error
+                println("EksiViewModel: Error viewing saved topic: ${e.message}")
+            } finally {
+                _isSearching.value = false
+            }
+        }
+    }
+    
+    // Method to stop viewing a saved topic
+    fun stopViewingSavedTopic() {
+        _viewingSavedTopic.value = null
+        _isViewingSavedTopic.value = false
+        _savedTopicCurrentPage.value = 1
+    }
+
+    // Method to set the active screen
+    fun setActiveScreen(screen: String) {
+        // If we're already on this screen, don't do anything
+        if (_activeScreen.value == screen) {
+            println("EksiViewModel: Already on screen $screen, ignoring redundant setActiveScreen call")
+            return
+        }
+        
+        println("EksiViewModel: Setting active screen to $screen (previous: ${_activeScreen.value})")
+        
+        val previousScreen = _activeScreen.value
+        
+        // Set the active screen first to prevent redundant calls
+        _activeScreen.value = screen
+        
+        // Always clear selected topic when navigating away from topic_detail
+        if (previousScreen == "topic_detail" && screen != "topic_detail") {
+            println("EksiViewModel: Clearing selected topic when navigating away from topic_detail")
+            clearSelectedTopic()
+        }
+        
+        // Always clear selected topic when navigating to search or profile
+        else if (screen == "search" || screen == "profile") {
+            println("EksiViewModel: Clearing selected topic when navigating to $screen")
+            clearSelectedTopic()
+        }
+        
+        // Additional cleanup based on the target screen
+        when (screen) {
+            "search" -> {
+                // Don't clear search results to preserve search state
+            }
+            "profile" -> {
+                // Don't clear saved topics state
+            }
+            "home" -> {
+                // Don't clear home state
+                // But ensure no topic is selected if coming from topic_detail
+                if (previousScreen == "topic_detail") {
+                    // Already handled above
+                }
+            }
+        }
+    }
+
+    // Method to reset the Home screen to its initial state
+    fun resetHomeScreen() {
+        println("EksiViewModel: Resetting Home screen")
+        
+        // Clear any selected topic first
+        clearSelectedTopic()
+        
+        // Reset to page 1
+        _homeCurrentPage.value = 1
+        _currentPage.value = 1
+        
+        // Only fetch fresh topics if the list is empty
+        if (_topics.value.isEmpty()) {
+            fetchTopics(1)
+        }
+    }
+    
+    
+    // Method to reset the Profile screen to its initial state
+    fun resetProfileScreen() {
+        println("EksiViewModel: Resetting Profile screen")
+        stopViewingSavedTopic()
+        // Ensure we don't trigger any topic selection
+        clearSelectedTopic()
+    }
+
+    // Method to clear the selected topic
+    fun clearSelectedTopic() {
+        // Only clear if there's actually a topic selected
+        if (_selectedTopic.value == null) {
+            println("EksiViewModel: No topic selected, ignoring clearSelectedTopic call")
+            return
+        }
+        
+        println("EksiViewModel: Clearing selected topic")
+        _selectedTopic.value = null
+        _isLoadingTopic.value = false
+        _topicCurrentPage.value = 1
+        _redirectedUrl.value = ""  // Clear the redirected URL as well
     }
 } 
