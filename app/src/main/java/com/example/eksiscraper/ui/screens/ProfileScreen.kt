@@ -94,68 +94,60 @@ fun ProfileScreen(
     }
     
     Scaffold(
-        // Minimal top app bar with no title or navigation icons
-        topBar = {
-            if (!isViewingSavedTopic) {
-                // Empty top app bar with no title when viewing saved topics list
-                CenterAlignedTopAppBar(
-                    title = { /* Empty title */ },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        titleContentColor = MaterialTheme.colorScheme.onSurface
-                    )
-                )
-            }
-            // No top app bar when viewing a topic
-        }
+        // No top app bar to match Home and Search screens
     ) { paddingValues ->
         if (isViewingSavedTopic) {
             // Show topic content
             if (isSearching) {
                 LoadingIndicator(message = "Loading topic entries...")
             } else if (viewingSavedTopic != null) {
-                // Display topic details
+                // Display topic details - match the exact structure of TopicDetailScreen
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(paddingValues)
+                        .fillMaxSize()
                 ) {
-                    // Topic title with page selector
-                    TopicHeader(
-                        title = viewingSavedTopic?.title ?: "",
-                        currentPage = savedTopicCurrentPage,
-                        maxPages = totalPages,
-                        onPreviousPage = { 
-                            if (savedTopicCurrentPage > 1) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f)
+                    ) {
+                        // Topic title with page selector
+                        TopicHeader(
+                            title = viewingSavedTopic?.title ?: "",
+                            currentPage = savedTopicCurrentPage,
+                            maxPages = totalPages,
+                            onPreviousPage = { 
+                                if (savedTopicCurrentPage > 1) {
+                                    viewingSavedTopic?.let { topic ->
+                                        viewModel.viewSavedTopic(topic, savedTopicCurrentPage - 1)
+                                    }
+                                }
+                            },
+                            onNextPage = { 
                                 viewingSavedTopic?.let { topic ->
-                                    viewModel.viewSavedTopic(topic, savedTopicCurrentPage - 1)
+                                    viewModel.viewSavedTopic(topic, savedTopicCurrentPage + 1)
+                                }
+                            },
+                            onShowPageDialog = { viewModel.showPageDialog() },
+                            isPreviousEnabled = savedTopicCurrentPage > 1,
+                            isNextEnabled = true,  // Always enable next page
+                            isSaved = true,  // Always true since we're in the saved topics section
+                            onSaveToggle = {
+                                viewingSavedTopic?.let { topic ->
+                                    viewModel.unsaveTopic(topic)
+                                    // Return to the saved topics list if a topic is unsaved
+                                    viewModel.stopViewingSavedTopic()
                                 }
                             }
-                        },
-                        onNextPage = { 
-                            viewingSavedTopic?.let { topic ->
-                                viewModel.viewSavedTopic(topic, savedTopicCurrentPage + 1)
-                            }
-                        },
-                        onShowPageDialog = { viewModel.showPageDialog() },
-                        isPreviousEnabled = savedTopicCurrentPage > 1,
-                        isNextEnabled = true,  // Always enable next page
-                        isSaved = true,  // Always true since we're in the saved topics section
-                        onSaveToggle = {
-                            viewingSavedTopic?.let { topic ->
-                                viewModel.unsaveTopic(topic)
-                                // Return to the saved topics list if a topic is unsaved
-                                viewModel.stopViewingSavedTopic()
-                            }
-                        }
-                    )
-                    
-                    // Entries
-                    viewingSavedTopic?.let { topic ->
-                        EntriesDisplay(
-                            topic = topic,
-                            currentPage = savedTopicCurrentPage
                         )
+                        
+                        // Entries - directly match TopicDetailScreen structure
+                        viewingSavedTopic?.let { topic ->
+                            EntriesDisplay(
+                                topic = topic,
+                                currentPage = savedTopicCurrentPage
+                            )
+                        }
                     }
                 }
             }

@@ -92,6 +92,10 @@ class EksiViewModel : ViewModel() {
     private val _savedTopicCurrentPage = mutableStateOf(1)
     val savedTopicCurrentPage: State<Int> = _savedTopicCurrentPage
 
+    // Add state for scroll to top
+    private val _homeScrollToTop = mutableStateOf(false)
+    val homeScrollToTop: State<Boolean> = _homeScrollToTop
+
     init {
         fetchTopics()
     }
@@ -402,8 +406,8 @@ class EksiViewModel : ViewModel() {
         _searchResult.value = null
         _currentPage.value = 1
         _redirectedUrl.value = ""
-        // Also clear any selected topic to prevent unwanted topic loading
-        clearSelectedTopic()
+        // Don't clear the selected topic to preserve the topic detail view
+        // when navigating back to home
     }
     
     // Add methods for page dialog
@@ -582,33 +586,33 @@ class EksiViewModel : ViewModel() {
         // Set the active screen first to prevent redundant calls
         _activeScreen.value = screen
         
-        // Always clear selected topic when navigating away from topic_detail
-        if (previousScreen == "topic_detail" && screen != "topic_detail") {
-            println("EksiViewModel: Clearing selected topic when navigating away from topic_detail")
-            clearSelectedTopic()
+        // Special handling for navigating to home screen
+        if (screen == "home") {
+            // If coming from topic_detail, we want to preserve the selected topic
+            // so we can show it when navigating back to home
+            if (previousScreen == "topic_detail") {
+                println("EksiViewModel: Preserving selected topic when navigating from topic_detail to home")
+                // Don't clear the selected topic
+            } else if (_selectedTopic.value != null && previousScreen != "topic_detail") {
+                // If we have a selected topic but we're not coming from topic_detail,
+                // we should preserve it
+                println("EksiViewModel: Preserving selected topic when navigating to home from ${previousScreen}")
+            }
+            
+            return
         }
         
-        // Always clear selected topic when navigating to search or profile
-        else if (screen == "search" || screen == "profile") {
-            println("EksiViewModel: Clearing selected topic when navigating to $screen")
-            clearSelectedTopic()
+        // When navigating to topic_detail, we want to preserve the selected topic
+        if (screen == "topic_detail") {
+            println("EksiViewModel: Navigating to topic_detail, preserving selected topic")
+            return
         }
         
-        // Additional cleanup based on the target screen
-        when (screen) {
-            "search" -> {
-                // Don't clear search results to preserve search state
-            }
-            "profile" -> {
-                // Don't clear saved topics state
-            }
-            "home" -> {
-                // Don't clear home state
-                // But ensure no topic is selected if coming from topic_detail
-                if (previousScreen == "topic_detail") {
-                    // Already handled above
-                }
-            }
+        // When navigating to search or profile, we don't want to clear the selected topic
+        // so it can be restored when navigating back to home
+        if (screen == "search" || screen == "profile") {
+            println("EksiViewModel: Navigating to $screen, preserving selected topic")
+            return
         }
     }
 
@@ -616,12 +620,19 @@ class EksiViewModel : ViewModel() {
     fun resetHomeScreen() {
         println("EksiViewModel: Resetting Home screen")
         
-        // Clear any selected topic first
-        clearSelectedTopic()
+        // When the Home tab is pressed again, we want to go to the home page
+        // regardless of whether a topic is selected
+        if (_selectedTopic.value != null) {
+            println("EksiViewModel: Clearing selected topic to return to home page")
+            clearSelectedTopic()
+        }
         
         // Reset to page 1
         _homeCurrentPage.value = 1
         _currentPage.value = 1
+        
+        // Ensure we're on the home screen
+        _activeScreen.value = "home"
         
         // Only fetch fresh topics if the list is empty
         if (_topics.value.isEmpty()) {
@@ -634,8 +645,8 @@ class EksiViewModel : ViewModel() {
     fun resetProfileScreen() {
         println("EksiViewModel: Resetting Profile screen")
         stopViewingSavedTopic()
-        // Ensure we don't trigger any topic selection
-        clearSelectedTopic()
+        // Don't clear the selected topic to preserve the topic detail view
+        // when navigating back to home
     }
 
     // Method to clear the selected topic
@@ -651,5 +662,19 @@ class EksiViewModel : ViewModel() {
         _isLoadingTopic.value = false
         _topicCurrentPage.value = 1
         _redirectedUrl.value = ""  // Clear the redirected URL as well
+    }
+
+    // Method to scroll to the top of the home screen without reloading data
+    fun scrollHomeToTop() {
+        println("EksiViewModel: Scrolling home screen to top")
+        
+        // We don't need to reload data, just signal that we want to scroll to top
+        // This will be observed in the HomeScreen composable
+        _homeScrollToTop.value = true
+    }
+    
+    // Reset the scroll to top flag after it's been consumed
+    fun resetHomeScrollToTop() {
+        _homeScrollToTop.value = false
     }
 } 

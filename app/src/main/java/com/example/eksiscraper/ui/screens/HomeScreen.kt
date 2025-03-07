@@ -69,10 +69,20 @@ fun HomeScreen(
     val isLoadingMoreTopics by viewModel.isLoadingMoreTopics
     val canLoadMoreTopics by viewModel.canLoadMoreTopics
     val swipeRefreshState = rememberSwipeRefreshState(isLoading)
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val lazyListState = rememberLazyListState()
+    
+    // Observe the homeScrollToTop state and scroll to top when it changes to true
+    val homeScrollToTop by viewModel.homeScrollToTop
+    LaunchedEffect(homeScrollToTop) {
+        if (homeScrollToTop) {
+            // Scroll to the top of the list
+            lazyListState.animateScrollToItem(0)
+            // Reset the flag
+            viewModel.resetHomeScrollToTop()
+        }
+    }
     
     // Show FAB only when scrolled down
     val showFab by remember {
@@ -124,22 +134,6 @@ fun HomeScreen(
     }
     
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { 
-                    Text(
-                        "Ekşi Sözlük",
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    titleContentColor = MaterialTheme.colorScheme.primary
-                )
-            )
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             AnimatedVisibility(

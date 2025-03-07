@@ -73,12 +73,8 @@ fun TopicDetailScreen(
         println("TopicDetailScreen: Setting active screen to topic_detail")
         viewModel.setActiveScreen("topic_detail")
         
-        // Add a small delay to ensure the active screen state is updated before selecting a topic
-        kotlinx.coroutines.delay(100)
-        
-        // Ensure the topic is selected only if we're on the topic detail screen and no topic is currently selected
-        if (selectedTopic == null && topics.isNotEmpty() && topicIndex < topics.size && 
-            viewModel.activeScreen.value == "topic_detail") {
+        // Check if we need to select a topic
+        if (selectedTopic == null && topics.isNotEmpty() && topicIndex < topics.size) {
             println("TopicDetailScreen: Selecting topic at index $topicIndex")
             viewModel.selectTopic(topicIndex, 1)
         } else if (selectedTopic != null) {

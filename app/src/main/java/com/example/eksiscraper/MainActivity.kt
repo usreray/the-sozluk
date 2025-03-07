@@ -123,33 +123,84 @@ fun BottomNavigationBar(navController: NavController) {
                     // Check if we're on a topic detail screen
                     val isOnTopicDetail = currentRoute?.startsWith(Screen.TopicDetail.route.substringBefore("{")) == true
                     
-                    if (currentRoute != item.route) {
-                        println("MainActivity: Navigating to ${item.route}")
-                        
-                        // If navigating to Search or Profile screens, set the active screen first
-                        // The setActiveScreen method will handle clearing the selected topic
-                        if (item.route == Screen.Search.route || item.route == Screen.Profile.route) {
-                            viewModel.setActiveScreen(item.route.substringBefore("/"))
-                        } else {
-                            // For other screens, set the active screen normally
-                            viewModel.setActiveScreen(item.route.substringBefore("/"))
-                        }
-                        
-                        // If navigating to home from a topic detail, handle it specially
-                        if (item.route == Screen.Home.route && isOnTopicDetail) {
-                            println("MainActivity: Navigating from topic detail to home")
-                            // No need to call clearSelectedTopic here as setActiveScreen already did it
-                            navController.navigate(Screen.Home.route) {
-                                // Pop up to the start destination and clear all the back stack
-                                popUpTo(navController.graph.startDestinationId) {
-                                    inclusive = true
+                    // Special handling for Home tab
+                    if (item.route == Screen.Home.route) {
+                        // If we're already on the Home tab (which includes topic detail)
+                        if (selected) {
+                            println("MainActivity: Already on Home tab, resetting to home page")
+                            
+                            // If we're on a topic detail screen, navigate back to home
+                            if (isOnTopicDetail) {
+                                viewModel.resetHomeScreen()
+                                navController.navigate(Screen.Home.route) {
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        inclusive = true
+                                    }
                                 }
+                            } else {
+                                // If we're already on the home screen, just scroll to top
+                                // without reloading data
+                                println("MainActivity: Already on home screen, scrolling to top")
+                                viewModel.scrollHomeToTop()
                             }
                             return@NavigationBarItem
                         }
                         
-                        // No need to call clearSelectedTopic here as setActiveScreen already did it if needed
+                        // If we're not on the Home tab but have a selected topic
+                        if (viewModel.selectedTopic.value != null) {
+                            println("MainActivity: Topic is selected, navigating to topic detail instead of home")
+                            
+                            // Find the index of the selected topic
+                            val topicIndex = viewModel.topics.value.indexOfFirst { 
+                                it.title == viewModel.selectedTopic.value?.title 
+                            }
+                            
+                            if (topicIndex != -1) {
+                                // Navigate to topic detail
+                                val topicDetailRoute = "${Screen.TopicDetail.route.substringBefore("{")}" +
+                                        "$topicIndex"
+                                
+                                // Set the active screen to topic_detail
+                                viewModel.setActiveScreen("topic_detail")
+                                
+                                navController.navigate(topicDetailRoute) {
+                                    popUpTo(navController.graph.startDestinationId) {
+                                        saveState = false
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = false
+                                }
+                                return@NavigationBarItem
+                            }
+                        }
                         
+                        // If no topic is selected or we couldn't find the topic index,
+                        // navigate to home as usual
+                        viewModel.setActiveScreen("home")
+                        
+                        // Navigate to home
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(navController.graph.startDestinationId) {
+                                saveState = false
+                            }
+                            launchSingleTop = true
+                            restoreState = false
+                        }
+                        return@NavigationBarItem
+                    }
+                    
+                    // For other tabs, check if we're already on that tab
+                    if (currentRoute != item.route) {
+                        println("MainActivity: Navigating to ${item.route}")
+                        
+                        // If navigating to Search or Profile screens
+                        if (item.route == Screen.Search.route || item.route == Screen.Profile.route) {
+                            // Don't clear the selected topic when navigating to Search or Profile
+                            // Just set the active screen
+                            viewModel.setActiveScreen(item.route.substringBefore("/"))
+                        }
+                        
+                        // Navigate to the destination
                         navController.navigate(item.route) {
                             // Pop up to the start destination of the graph to
                             // avoid building up a large stack of destinations
@@ -165,7 +216,6 @@ fun BottomNavigationBar(navController: NavController) {
                     } else {
                         // If already on the screen and clicked again, reset to initial state
                         when (item.route) {
-                            Screen.Home.route -> viewModel.resetHomeScreen()
                             Screen.Search.route -> viewModel.clearSearch()
                             Screen.Profile.route -> viewModel.resetProfileScreen()
                         }
