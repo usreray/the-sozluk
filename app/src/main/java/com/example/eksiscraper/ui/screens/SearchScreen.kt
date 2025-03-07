@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
@@ -34,9 +36,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.eksiscraper.ui.components.EntriesDisplay
+import com.example.eksiscraper.ui.components.EntriesSkeleton
 import com.example.eksiscraper.ui.components.LoadingIndicator
 import com.example.eksiscraper.ui.components.PageSelectionDialog
 import com.example.eksiscraper.ui.components.TopicHeader
+import com.example.eksiscraper.ui.components.TopicListSkeleton
 import com.example.eksiscraper.viewmodel.EksiViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -57,6 +61,12 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
         // No need to call clearSelectedTopic here as setActiveScreen already does it
     }
     
+    // Handle back gesture when search results are displayed
+    BackHandler(enabled = searchResult != null) {
+        println("SearchScreen: Back pressed, clearing search results")
+        viewModel.clearSearch()
+    }
+    
     // Get total pages from the search result, with a minimum of the current page
     val totalPages = (searchResult?.totalPages ?: 1).coerceAtLeast(currentPage)
     
@@ -75,8 +85,9 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Only show search container if no results are displayed or if we're searching
-        if (searchResult == null || isSearching) {
+        // Only show search container if no results are displayed
+        // Don't show it when changing pages of an existing search result
+        if (searchResult == null) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -127,12 +138,22 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                             }
                         )
                         
-                        Button(
+                        OutlinedButton(
                             onClick = { viewModel.search() },
                             enabled = searchQuery.isNotEmpty() && !isSearching,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                brush = androidx.compose.ui.graphics.SolidColor(
+                                    if (searchQuery.isNotEmpty() && !isSearching) 
+                                        MaterialTheme.colorScheme.primary 
+                                    else 
+                                        MaterialTheme.colorScheme.outline
+                                )
+                            ),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = if (searchQuery.isNotEmpty() && !isSearching)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                             )
                         ) {
                             Text("Search")
@@ -140,12 +161,13 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                     }
                 }
             }
-        }
-        
-        // Search results or loading indicator
-        if (isSearching) {
-            LoadingIndicator(message = "Searching for \"$searchQuery\"...")
-        } else if (searchResult != null) {
+            
+            // Show loading indicator for initial search
+            if (isSearching) {
+                // Replace LoadingIndicator with TopicListSkeleton for initial search
+                TopicListSkeleton(itemCount = 5)
+            }
+        } else {
             // Display search results
             Column(
                 modifier = Modifier
@@ -178,38 +200,18 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                     }
                 )
                 
-                // Entries
-                searchResult?.let { result ->
-                    EntriesDisplay(
-                        topic = result,
-                        currentPage = currentPage
-                    )
-                }
-            }
-        } else {
-            // Empty state - no search performed yet
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "Enter a search term and press Search",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
+                // Show loading indicator or entries
+                if (isSearching) {
+                    // Replace LoadingIndicator with EntriesSkeleton for loading entries
+                    EntriesSkeleton(itemCount = 5)
+                } else {
+                    // Entries
+                    searchResult?.let { result ->
+                        EntriesDisplay(
+                            topic = result,
+                            currentPage = currentPage
+                        )
+                    }
                 }
             }
         }

@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.eksiscraper.ui.components.TopicListItem
+import com.example.eksiscraper.ui.components.TopicListSkeleton
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.viewmodel.EksiViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
@@ -307,9 +308,7 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            TopicListSkeleton(itemCount = 10)
                         }
                     }
                 }

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.ui.components.EntriesDisplay
+import com.example.eksiscraper.ui.components.EntriesSkeleton
 import com.example.eksiscraper.ui.components.ErrorDisplay
 import com.example.eksiscraper.ui.components.LoadingIndicator
 import com.example.eksiscraper.ui.components.PageSelectionDialog
@@ -114,7 +115,8 @@ fun TopicDetailScreen(
     ) {
         // Loading indicator
         if (isLoadingTopic) {
-            LoadingIndicator(message = "Loading entries...")
+            // Replace the LoadingIndicator with the skeleton loading UI
+            EntriesSkeleton(itemCount = 5)
         } else if (selectedTopic != null) {
             // Display topic details
             Column(
@@ -163,7 +165,8 @@ fun TopicDetailScreen(
         } else {
             // No topic selected or loading
             if (isLoading) {
-                LoadingIndicator(message = "Loading...")
+                // Replace the LoadingIndicator with the skeleton loading UI
+                EntriesSkeleton(itemCount = 5)
             } else if (activeScreen == "topic_detail") {
                 // Only show error if we're actually on the topic detail screen
                 // This prevents the error from flashing during navigation

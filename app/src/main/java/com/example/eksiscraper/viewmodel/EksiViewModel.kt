@@ -218,12 +218,8 @@ class EksiViewModel : ViewModel() {
             _topicCurrentPage.value = page
             println("EksiViewModel: Selected topic set to: ${_selectedTopic.value?.title}, page: $page")
             
-            // Fetch entries if they haven't been loaded yet or if we're changing pages
-            if (_selectedTopic.value != null && (!topic.entriesLoaded || !topic.loadedPages.contains(page))) {
-                fetchEntriesForSelectedTopic(page)
-            } else {
-                println("EksiViewModel: Topic entries already loaded for page $page, no need to fetch again")
-            }
+            // Always fetch entries for the selected topic and page
+            fetchEntriesForSelectedTopic(page)
         } else {
             println("EksiViewModel: Invalid index $index for topics size ${_topics.value.size}")
         }
@@ -232,12 +228,6 @@ class EksiViewModel : ViewModel() {
     // Update to support pagination
     private fun fetchEntriesForSelectedTopic(page: Int = 1) {
         val topic = _selectedTopic.value ?: return
-        
-        // Check if entries are already loaded for this page
-        if (topic.entriesLoaded && topic.loadedPages.contains(page)) {
-            println("EksiViewModel: Entries already loaded for topic '${topic.title}' on page $page, skipping fetch")
-            return
-        }
         
         _isLoadingTopic.value = true
         _topicCurrentPage.value = page
@@ -406,8 +396,10 @@ class EksiViewModel : ViewModel() {
         _searchResult.value = null
         _currentPage.value = 1
         _redirectedUrl.value = ""
-        // Don't clear the selected topic to preserve the topic detail view
-        // when navigating back to home
+        // Make sure we stay on the search screen
+        if (_activeScreen.value != "search") {
+            _activeScreen.value = "search"
+        }
     }
     
     // Add methods for page dialog

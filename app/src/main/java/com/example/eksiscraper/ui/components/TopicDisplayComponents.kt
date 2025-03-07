@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -28,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
@@ -43,6 +45,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.Topic
+import androidx.compose.ui.text.style.TextAlign
+
+/**
+ * Helper function to clean topic titles by removing entry numbers at the end
+ */
+private fun cleanTopicTitle(title: String): String {
+    // Pattern to match a number at the end of the title, possibly with spaces before it
+    val numberPattern = Regex("\\s+\\d+$")
+    return title.replace(numberPattern, "")
+}
 
 /**
  * Shared page selection dialog used in both TopicDetailScreen and SearchScreen
@@ -177,6 +189,9 @@ fun TopicHeader(
     isSaved: Boolean = false,
     onSaveToggle: () -> Unit = {}
 ) {
+    // Clean the title by removing entry numbers at the end
+    val cleanTitle = cleanTopicTitle(title)
+    
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -192,7 +207,7 @@ fun TopicHeader(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = title,
+                    text = cleanTitle,
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     maxLines = 2,
@@ -221,11 +236,15 @@ fun TopicHeader(
                 // Previous page button - just icon
                 IconButton(
                     onClick = onPreviousPage,
-                    enabled = isPreviousEnabled
+                    enabled = isPreviousEnabled,
+                    modifier = Modifier.padding(4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Previous Page"
+                        contentDescription = "Previous Page",
+                        tint = if (isPreviousEnabled) 
+                               MaterialTheme.colorScheme.primary 
+                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     )
                 }
                 
@@ -254,11 +273,15 @@ fun TopicHeader(
                 // Next page button - just icon
                 IconButton(
                     onClick = onNextPage,
-                    enabled = isNextEnabled
+                    enabled = isNextEnabled,
+                    modifier = Modifier.padding(4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Filled.ArrowForward,
-                        contentDescription = "Next Page"
+                        contentDescription = "Next Page",
+                        tint = if (isNextEnabled) 
+                               MaterialTheme.colorScheme.primary 
+                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     )
                 }
             }
@@ -301,32 +324,53 @@ fun EntriesDisplay(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 8.dp)
+            .padding(horizontal = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         if (topic.entries.isEmpty()) {
             item {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
+                        .padding(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 2.dp
                     )
                 ) {
-                    Text(
-                        text = "No entries found for \"${topic.title}\" on page $currentPage",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(16.dp)
-                    )
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "No entries",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "No entries found for \"${topic.title}\" on page $currentPage",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         } else {
+            // Display entries
             itemsIndexed(topic.entries) { index, entry ->
                 EntryItem(
                     entry = entry, 
                     index = ((currentPage - 1) * 10) + index + 1
                 )
+            }
+            
+            // Bottom spacing
+            item {
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }
