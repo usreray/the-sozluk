@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -172,44 +173,80 @@ fun EntriesSkeleton(itemCount: Int = 5) {
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Title placeholder
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.8f)
-                    .height(28.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(brush)
-            )
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            // Page controls placeholder
+            // Title and Save button row
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                // Title placeholder
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(28.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(brush)
+                )
+                
+                // Save/Unsave button placeholder
+                Spacer(modifier = Modifier.width(8.dp))
                 Box(
                     modifier = Modifier
                         .size(24.dp)
                         .clip(CircleShape)
                         .background(brush)
                 )
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
-                Box(
-                    modifier = Modifier
-                        .width(100.dp)
-                        .height(16.dp)
-                        .clip(MaterialTheme.shapes.small)
-                        .background(brush)
-                )
-                
-                Spacer(modifier = Modifier.width(16.dp))
-                
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Page controls row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Previous page button placeholder
                 Box(
                     modifier = Modifier
                         .size(24.dp)
+                        .padding(4.dp)
+                        .clip(CircleShape)
+                        .background(brush)
+                )
+                
+                // Page info and change page button
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Page info text placeholder
+                    Box(
+                        modifier = Modifier
+                            .width(80.dp)
+                            .height(16.dp)
+                            .padding(horizontal = 8.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .background(brush)
+                    )
+                    
+                    // Change Page button placeholder
+                    Box(
+                        modifier = Modifier
+                            .width(100.dp)
+                            .height(28.dp)
+                            .padding(horizontal = 8.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .background(brush)
+                    )
+                }
+                
+                // Next page button placeholder
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .padding(4.dp)
                         .clip(CircleShape)
                         .background(brush)
                 )
@@ -310,6 +347,125 @@ fun EntryItemSkeleton(brush: Brush) {
                         .background(brush)
                 )
             }
+        }
+    }
+}
+
+/**
+ * Skeleton screen for saved topics list in the Profile screen
+ */
+@Composable
+fun SavedTopicsListSkeleton(itemCount: Int = 5) {
+    val shimmerColors = listOf(
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+    )
+    
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, delayMillis = 300),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+    
+    val brush = Brush.linearGradient(
+        colors = shimmerColors,
+        start = Offset(10f, 10f),
+        end = Offset(translateAnim, translateAnim)
+    )
+    
+    Column(
+        modifier = Modifier.padding(16.dp)
+    ) {
+        // Header placeholder
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(120.dp)
+                    .height(28.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(brush)
+            )
+        }
+        
+        // Divider placeholder
+        Spacer(modifier = Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Saved topic items
+        repeat(itemCount) {
+            SavedTopicItemSkeleton(brush = brush)
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * Skeleton for a single saved topic item
+ */
+@Composable
+fun SavedTopicItemSkeleton(brush: Brush) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Title placeholder
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(24.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .background(brush)
+                )
+                
+                // Favorite icon placeholder
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(brush)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // Entry count placeholder
+            Box(
+                modifier = Modifier
+                    .width(80.dp)
+                    .height(16.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .background(brush)
+            )
         }
     }
 } 

@@ -84,6 +84,7 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
     
     Column(
         modifier = Modifier.fillMaxSize()
+        // No paddingValues applied here to ensure consistent positioning across all screens
     ) {
         // Only show search container if no results are displayed
         // Don't show it when changing pages of an existing search result
@@ -174,37 +175,36 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                // Topic title with page selector
-                TopicHeader(
-                    title = searchResult?.title ?: "",
-                    currentPage = currentPage,
-                    maxPages = totalPages,
-                    onPreviousPage = { 
-                        if (currentPage > 1) {
-                            viewModel.search(currentPage - 1)
-                        }
-                    },
-                    onNextPage = { viewModel.search(currentPage + 1) },
-                    onShowPageDialog = { viewModel.showPageDialog() },
-                    isPreviousEnabled = currentPage > 1,
-                    isNextEnabled = true,  // Always enable next page for search results
-                    isSaved = searchResult?.isSaved ?: false,
-                    onSaveToggle = {
-                        searchResult?.let { topic ->
-                            if (topic.isSaved) {
-                                viewModel.unsaveTopic(topic)
-                            } else {
-                                viewModel.saveTopic(topic)
-                            }
-                        }
-                    }
-                )
-                
-                // Show loading indicator or entries
                 if (isSearching) {
-                    // Replace LoadingIndicator with EntriesSkeleton for loading entries
+                    // Use the same approach as TopicDetailScreen and ProfileScreen for skeleton loading
                     EntriesSkeleton(itemCount = 5)
                 } else {
+                    // Topic title with page selector - no nested Column
+                    TopicHeader(
+                        title = searchResult?.title ?: "",
+                        currentPage = currentPage,
+                        maxPages = totalPages,
+                        onPreviousPage = { 
+                            if (currentPage > 1) {
+                                viewModel.search(currentPage - 1)
+                            }
+                        },
+                        onNextPage = { viewModel.search(currentPage + 1) },
+                        onShowPageDialog = { viewModel.showPageDialog() },
+                        isPreviousEnabled = currentPage > 1,
+                        isNextEnabled = true,  // Always enable next page for search results
+                        isSaved = searchResult?.isSaved ?: false,
+                        onSaveToggle = {
+                            searchResult?.let { topic ->
+                                if (topic.isSaved) {
+                                    viewModel.unsaveTopic(topic)
+                                } else {
+                                    viewModel.saveTopic(topic)
+                                }
+                            }
+                        }
+                    )
+                    
                     // Entries
                     searchResult?.let { result ->
                         EntriesDisplay(

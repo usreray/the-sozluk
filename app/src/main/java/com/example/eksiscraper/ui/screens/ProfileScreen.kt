@@ -43,8 +43,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.ui.components.EntriesDisplay
+import com.example.eksiscraper.ui.components.EntriesSkeleton
 import com.example.eksiscraper.ui.components.LoadingIndicator
 import com.example.eksiscraper.ui.components.PageSelectionDialog
+import com.example.eksiscraper.ui.components.SavedTopicsListSkeleton
 import com.example.eksiscraper.ui.components.TopicHeader
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.viewmodel.EksiViewModel
@@ -97,64 +99,72 @@ fun ProfileScreen(
         // No top app bar to match Home and Search screens
     ) { paddingValues ->
         if (isViewingSavedTopic) {
-            // Show topic content
-            if (isSearching) {
-                LoadingIndicator(message = "Loading topic entries...")
-            } else if (viewingSavedTopic != null) {
-                // Display topic details - match the exact structure of TopicDetailScreen
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .weight(1f)
-                    ) {
-                        // Topic title with page selector
-                        TopicHeader(
-                            title = viewingSavedTopic?.title ?: "",
-                            currentPage = savedTopicCurrentPage,
-                            maxPages = totalPages,
-                            onPreviousPage = { 
-                                if (savedTopicCurrentPage > 1) {
-                                    viewingSavedTopic?.let { topic ->
-                                        viewModel.viewSavedTopic(topic, savedTopicCurrentPage - 1)
-                                    }
-                                }
-                            },
-                            onNextPage = { 
+            // Show topic content without applying paddingValues to match TopicDetailScreen
+            Column(
+                modifier = Modifier.fillMaxSize()
+                // Removed paddingValues to match TopicDetailScreen structure
+            ) {
+                if (isSearching) {
+                    // Use the same approach as TopicDetailScreen for skeleton loading
+                    EntriesSkeleton(itemCount = 5)
+                } else if (viewingSavedTopic != null) {
+                    // Topic title with page selector - no nested Column
+                    TopicHeader(
+                        title = viewingSavedTopic?.title ?: "",
+                        currentPage = savedTopicCurrentPage,
+                        maxPages = totalPages,
+                        onPreviousPage = { 
+                            if (savedTopicCurrentPage > 1) {
                                 viewingSavedTopic?.let { topic ->
-                                    viewModel.viewSavedTopic(topic, savedTopicCurrentPage + 1)
-                                }
-                            },
-                            onShowPageDialog = { viewModel.showPageDialog() },
-                            isPreviousEnabled = savedTopicCurrentPage > 1,
-                            isNextEnabled = true,  // Always enable next page
-                            isSaved = true,  // Always true since we're in the saved topics section
-                            onSaveToggle = {
-                                viewingSavedTopic?.let { topic ->
-                                    viewModel.unsaveTopic(topic)
-                                    // Return to the saved topics list if a topic is unsaved
-                                    viewModel.stopViewingSavedTopic()
+                                    viewModel.viewSavedTopic(topic, savedTopicCurrentPage - 1)
                                 }
                             }
-                        )
-                        
-                        // Entries - directly match TopicDetailScreen structure
-                        viewingSavedTopic?.let { topic ->
-                            EntriesDisplay(
-                                topic = topic,
-                                currentPage = savedTopicCurrentPage
-                            )
+                        },
+                        onNextPage = { 
+                            viewingSavedTopic?.let { topic ->
+                                viewModel.viewSavedTopic(topic, savedTopicCurrentPage + 1)
+                            }
+                        },
+                        onShowPageDialog = { viewModel.showPageDialog() },
+                        isPreviousEnabled = savedTopicCurrentPage > 1,
+                        isNextEnabled = true,  // Always enable next page
+                        isSaved = true,  // Always true since we're in the saved topics section
+                        onSaveToggle = {
+                            viewingSavedTopic?.let { topic ->
+                                viewModel.unsaveTopic(topic)
+                                // Return to the saved topics list if a topic is unsaved
+                                viewModel.stopViewingSavedTopic()
+                            }
                         }
+                    )
+                    
+                    // Entries - directly match TopicDetailScreen structure
+                    viewingSavedTopic?.let { topic ->
+                        EntriesDisplay(
+                            topic = topic,
+                            currentPage = savedTopicCurrentPage
+                        )
                     }
                 }
             }
         } else {
-            // Show saved topics list
+            // Show saved topics list or loading skeleton
             if (savedTopics.isEmpty()) {
-                EmptySavedTopicsMessage(paddingValues)
+                // Check if we're loading or truly empty
+                val isLoading by viewModel.isLoading
+                if (isLoading) {
+                    // Show skeleton loading for saved topics
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                    ) {
+                        SavedTopicsListSkeleton(itemCount = 5)
+                    }
+                } else {
+                    // Show empty state message
+                    EmptySavedTopicsMessage(paddingValues)
+                }
             } else {
                 SavedTopicsList(
                     savedTopics = savedTopics,

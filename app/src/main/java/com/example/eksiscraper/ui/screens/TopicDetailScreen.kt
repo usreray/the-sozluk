@@ -112,55 +112,49 @@ fun TopicDetailScreen(
     
     Column(
         modifier = Modifier.fillMaxSize()
+        // No paddingValues applied here to ensure consistent positioning across all screens
     ) {
         // Loading indicator
         if (isLoadingTopic) {
             // Replace the LoadingIndicator with the skeleton loading UI
             EntriesSkeleton(itemCount = 5)
         } else if (selectedTopic != null) {
-            // Display topic details
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f)
-            ) {
-                // Topic title with page selector
-                TopicHeader(
-                    title = selectedTopic?.title ?: "",
-                    currentPage = currentPage,
-                    maxPages = maxPages,
-                    onPreviousPage = { 
-                        if (currentPage > 1) {
-                            viewModel.selectTopic(topicIndex, currentPage - 1)
-                        }
-                    },
-                    onNextPage = { 
-                        if (currentPage < maxPages) {
-                            viewModel.selectTopic(topicIndex, currentPage + 1)
-                        }
-                    },
-                    onShowPageDialog = { viewModel.showPageDialog() },
-                    isPreviousEnabled = currentPage > 1,
-                    isNextEnabled = currentPage < maxPages,
-                    isSaved = selectedTopic?.isSaved ?: false,
-                    onSaveToggle = {
-                        selectedTopic?.let { topic ->
-                            if (topic.isSaved) {
-                                viewModel.unsaveTopic(topic)
-                            } else {
-                                viewModel.saveTopic(topic)
-                            }
+            // Topic title with page selector - no nested Column
+            TopicHeader(
+                title = selectedTopic?.title ?: "",
+                currentPage = currentPage,
+                maxPages = maxPages,
+                onPreviousPage = { 
+                    if (currentPage > 1) {
+                        viewModel.selectTopic(topicIndex, currentPage - 1)
+                    }
+                },
+                onNextPage = { 
+                    if (currentPage < maxPages) {
+                        viewModel.selectTopic(topicIndex, currentPage + 1)
+                    }
+                },
+                onShowPageDialog = { viewModel.showPageDialog() },
+                isPreviousEnabled = currentPage > 1,
+                isNextEnabled = currentPage < maxPages,
+                isSaved = selectedTopic?.isSaved ?: false,
+                onSaveToggle = {
+                    selectedTopic?.let { topic ->
+                        if (topic.isSaved) {
+                            viewModel.unsaveTopic(topic)
+                        } else {
+                            viewModel.saveTopic(topic)
                         }
                     }
-                )
-                
-                // Entries
-                selectedTopic?.let { topic ->
-                    EntriesDisplay(
-                        topic = topic,
-                        currentPage = currentPage
-                    )
                 }
+            )
+            
+            // Entries
+            selectedTopic?.let { topic ->
+                EntriesDisplay(
+                    topic = topic,
+                    currentPage = currentPage
+                )
             }
         } else {
             // No topic selected or loading
