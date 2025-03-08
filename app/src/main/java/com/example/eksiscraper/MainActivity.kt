@@ -36,8 +36,11 @@ import com.example.eksiscraper.ui.navigation.Navigation
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.ui.theme.EksiScraperTheme
 import com.example.eksiscraper.viewmodel.EksiViewModel
+import com.example.eksiscraper.viewmodel.EksiViewModelFactory
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import kotlin.math.ceil
+import android.app.Application
+import androidx.compose.ui.platform.LocalContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,14 +62,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen() {
     val navController = rememberNavController()
-    val viewModel: EksiViewModel = viewModel()
+    val viewModel: EksiViewModel = viewModel(
+        factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
 
     Scaffold(
-        bottomBar = { BottomNavigationBar(navController) }
+        bottomBar = { BottomNavigationBar(navController, viewModel) }
     ) { innerPadding ->
         Box(
-                        modifier = Modifier
-                            .fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
                 .padding(innerPadding)
         ) {
             Navigation(navController, viewModel)
@@ -75,7 +80,7 @@ fun MainScreen() {
 }
 
 @Composable
-fun BottomNavigationBar(navController: NavController) {
+fun BottomNavigationBar(navController: NavController, viewModel: EksiViewModel) {
     val items = listOf(
         NavigationItem(
             title = "Home",
@@ -96,9 +101,6 @@ fun BottomNavigationBar(navController: NavController) {
     
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    
-    // Get ViewModel reference
-    val viewModel: EksiViewModel = viewModel()
     
     NavigationBar(
         modifier = Modifier.clip(RectangleShape),

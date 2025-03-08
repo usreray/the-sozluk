@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp") version "2.1.10-1.0.29"
 }
 
 android {
@@ -40,11 +41,18 @@ android {
 }
 
 dependencies {
-    implementation ("androidx.compose.material3:material3:1.2.0")
-    implementation ("org.jsoup:jsoup:1.15.3")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
-    implementation ("androidx.navigation:navigation-compose:2.7.7")
-    implementation ("com.google.accompanist:accompanist-swiperefresh:0.27.0")
+    implementation (libs.androidx.material3)
+    implementation (libs.jsoup)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation (libs.androidx.navigation.compose)
+    implementation (libs.accompanist.swiperefresh)
+    
+    // Room dependencies
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    annotationProcessor(libs.androidx.room.compiler)
+    ksp(libs.androidx.room.compiler)
+    
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

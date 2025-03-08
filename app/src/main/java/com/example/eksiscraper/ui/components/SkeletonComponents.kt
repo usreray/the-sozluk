@@ -445,7 +445,7 @@ fun SavedTopicItemSkeleton(brush: Brush) {
                         .clip(MaterialTheme.shapes.small)
                         .background(brush)
                 )
-                
+
                 // Favorite icon placeholder
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(
@@ -455,9 +455,9 @@ fun SavedTopicItemSkeleton(brush: Brush) {
                         .background(brush)
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             // Entry count placeholder
             Box(
                 modifier = Modifier
@@ -468,4 +468,4 @@ fun SavedTopicItemSkeleton(brush: Brush) {
             )
         }
     }
-} 
+}

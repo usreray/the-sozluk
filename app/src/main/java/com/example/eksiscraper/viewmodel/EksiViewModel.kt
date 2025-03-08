@@ -1,17 +1,25 @@
 package com.example.eksiscraper.viewmodel
 
+import android.app.Application
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.eksiscraper.data.LocalDataSource
+import com.example.eksiscraper.data.room.EksiDatabase
+import com.example.eksiscraper.data.room.SavedTopicRepository
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.network.EksiService
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class EksiViewModel : ViewModel() {
+class EksiViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository: SavedTopicRepository
+    
     private val _topics = mutableStateOf<List<Topic>>(emptyList())
     val topics: State<List<Topic>> = _topics
     
@@ -97,7 +105,61 @@ class EksiViewModel : ViewModel() {
     val homeScrollToTop: State<Boolean> = _homeScrollToTop
 
     init {
+        val database = EksiDatabase.getDatabase(application)
+        repository = SavedTopicRepository(database.savedTopicDao())
+        
+        // Load saved topics from the database
+        viewModelScope.launch {
+            repository.allSavedTopics.collectLatest { savedTopics ->
+                _savedTopics.value = savedTopics
+                
+                // Update saved status in the main topics list
+                updateSavedStatusInTopicsList()
+            }
+        }
+        
         fetchTopics()
+    }
+    
+    // Update saved status in the main topics list
+    private fun updateSavedStatusInTopicsList() {
+        val savedTopicTitles = _savedTopics.value.map { it.title }
+        
+        // Update topics in the main list
+        _topics.value = _topics.value.map { topic ->
+            if (savedTopicTitles.contains(topic.title)) {
+                topic.copy(isSaved = true)
+            } else {
+                topic.copy(isSaved = false)
+            }
+        }
+        
+        // Update selected topic if needed
+        _selectedTopic.value = _selectedTopic.value?.let { topic ->
+            if (savedTopicTitles.contains(topic.title)) {
+                topic.copy(isSaved = true)
+            } else {
+                topic.copy(isSaved = false)
+            }
+        }
+        
+        // Update search result if needed
+        _searchResult.value = _searchResult.value?.let { topic ->
+            if (savedTopicTitles.contains(topic.title)) {
+                topic.copy(isSaved = true)
+            } else {
+                topic.copy(isSaved = false)
+            }
+        }
+        
+        // Update viewing saved topic if needed
+        _viewingSavedTopic.value = _viewingSavedTopic.value?.let { topic ->
+            if (savedTopicTitles.contains(topic.title)) {
+                topic.copy(isSaved = true)
+            } else {
+                topic.copy(isSaved = false)
+            }
+        }
     }
 
     fun loadLocalData() {
@@ -159,11 +221,17 @@ class EksiViewModel : ViewModel() {
                     }
                 } else {
                     println("EksiViewModel: Successfully fetched ${result.size} topics for page $page")
+                    
+                    // Update saved status for each topic
+                    val updatedResult = result.map { topic ->
+                        updateTopicSavedStatus(topic)
+                    }
+                    
                     if (page == 1) {
-                        _topics.value = result
+                        _topics.value = updatedResult
                         _homeCurrentPage.value = 1
                     } else {
-                        _topics.value = _topics.value + result
+                        _topics.value = _topics.value + updatedResult
                         _homeCurrentPage.value = page
                     }
                     _isUsingLocalData.value = false
@@ -208,13 +276,16 @@ class EksiViewModel : ViewModel() {
         if (index >= 0 && index < _topics.value.size) {
             val topic = _topics.value[index]
             
+            // Update saved status before setting as selected topic
+            val updatedTopic = updateTopicSavedStatus(topic)
+            
             // Check if we're already viewing this topic and page
-            if (_selectedTopic.value?.title == topic.title && _topicCurrentPage.value == page) {
-                println("EksiViewModel: Already viewing topic '${topic.title}' on page $page, no need to reload")
+            if (_selectedTopic.value?.title == updatedTopic.title && _topicCurrentPage.value == page) {
+                println("EksiViewModel: Already viewing topic '${updatedTopic.title}' on page $page, no need to reload")
                 return
             }
             
-            _selectedTopic.value = topic
+            _selectedTopic.value = updatedTopic
             _topicCurrentPage.value = page
             println("EksiViewModel: Selected topic set to: ${_selectedTopic.value?.title}, page: $page")
             
@@ -465,36 +536,34 @@ class EksiViewModel : ViewModel() {
     fun saveTopic(topic: Topic) {
         println("EksiViewModel: Saving topic: ${topic.title}")
         
-        // Check if the topic is already saved
-        if (_savedTopics.value.any { it.title == topic.title }) {
-            return
-        }
-        
-        // Create a copy of the topic with isSaved set to true
-        val savedTopic = topic.copy(isSaved = true)
-        
-        // Add to saved topics
-        _savedTopics.value = _savedTopics.value + savedTopic
-        
-        // Also update the topic in the main list and selected topic if needed
+        // Update the topic in the UI immediately
         updateTopicSavedStatusInLists(topic.title, true)
         
-        println("EksiViewModel: Total saved topics: ${_savedTopics.value.size}")
+        // Save to Room database via repository
+        viewModelScope.launch {
+            repository.saveTopic(topic)
+        }
     }
 
     fun unsaveTopic(topic: Topic) {
         println("EksiViewModel: Removing saved topic: ${topic.title}")
         
-        // Remove from saved topics
-        _savedTopics.value = _savedTopics.value.filter { it.title != topic.title }
-        
-        // Update the topic in the main list and selected topic if needed
+        // Update the topic in the UI immediately
         updateTopicSavedStatusInLists(topic.title, false)
         
-        println("EksiViewModel: Total saved topics: ${_savedTopics.value.size}")
+        // Remove from Room database via repository
+        viewModelScope.launch {
+            repository.unsaveTopic(topic)
+            
+            // If we're viewing this topic in the You tab, stop viewing it
+            if (_isViewingSavedTopic.value && _viewingSavedTopic.value?.title == topic.title) {
+                stopViewingSavedTopic()
+            }
+        }
     }
 
     fun isTopicSaved(title: String): Boolean {
+        // This is now just a UI helper - the actual data comes from the database
         return _savedTopics.value.any { it.title == title }
     }
 
@@ -513,6 +582,11 @@ class EksiViewModel : ViewModel() {
         // Update search result if it's the same one
         if (_searchResult.value?.title == title) {
             _searchResult.value = _searchResult.value?.copy(isSaved = isSaved)
+        }
+        
+        // Update viewing saved topic if it's the same one
+        if (_viewingSavedTopic.value?.title == title) {
+            _viewingSavedTopic.value = _viewingSavedTopic.value?.copy(isSaved = isSaved)
         }
     }
 
@@ -668,5 +742,14 @@ class EksiViewModel : ViewModel() {
     // Reset the scroll to top flag after it's been consumed
     fun resetHomeScrollToTop() {
         _homeScrollToTop.value = false
+    }
+
+    // Add this method to ensure topics are updated when they're loaded
+    fun updateTopicSavedStatus(topic: Topic): Topic {
+        return if (_savedTopics.value.any { it.title == topic.title }) {
+            topic.copy(isSaved = true)
+        } else {
+            topic.copy(isSaved = false)
+        }
     }
 } 
