@@ -637,6 +637,18 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         _savedTopicCurrentPage.value = 1
     }
 
+    // Method to check and update the saved status of the search result
+    fun checkAndUpdateSearchResultSavedStatus() {
+        viewModelScope.launch {
+            _searchResult.value?.let { result ->
+                val isSaved = repository.isTopicSaved(result.title)
+                if (result.isSaved != isSaved) {
+                    _searchResult.value = result.copy(isSaved = isSaved)
+                }
+            }
+        }
+    }
+
     // Method to set the active screen
     fun setActiveScreen(screen: String) {
         // If we're already on this screen, don't do anything

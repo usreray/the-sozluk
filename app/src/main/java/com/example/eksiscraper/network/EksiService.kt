@@ -58,7 +58,13 @@ object EksiService {
         logDebug("EksiService: Total entries: ${entries.size}")
         entries.take(5).forEachIndexed { index, entry ->
             logDebug("EksiService: Entry ${index + 1}:")
-            logDebug("EksiService:   Content: ${entry.content.take(100)}${if (entry.content.length > 100) "..." else ""}")
+            
+            // Log content with visible line prefixes to make spacing issues obvious
+            val lines = entry.content.split("\n")
+            lines.forEachIndexed { lineIndex, line ->
+                logDebug("EksiService: [LINE ${lineIndex+1}] \"$line\"")
+            }
+            
             logDebug("EksiService:   Author: ${entry.author}")
             logDebug("EksiService:   Date: ${entry.date}")
         }
@@ -576,7 +582,35 @@ object EksiService {
             // Process entries
             val entries = mutableListOf<Entry>()
             for (entryElement in entryElements.take(10)) {
-                val content = entryElement.text()
+                // Instead of just text(), preserve paragraph structure by replacing <br> and <p> tags with newlines
+                val htmlContent = entryElement.html()
+                
+                // First, normalize all possible paragraph/line break tags to consistent markers
+                val contentWithMarkers = htmlContent
+                    .replace("<br>", "[SINGLE_BREAK]")
+                    .replace("<br/>", "[SINGLE_BREAK]")
+                    .replace("<br />", "[SINGLE_BREAK]")
+                    .replace("</p><p>", "[DOUBLE_BREAK]") // Paragraphs should have double breaks
+                    .replace("<p>", "")
+                    .replace("</p>", "[SINGLE_BREAK]")
+                
+                // Convert to plain text - this will strip all remaining HTML tags
+                val plainText = Jsoup.parse(contentWithMarkers).text()
+                
+                // Replace our markers with actual newlines
+                val contentWithProperBreaks = plainText
+                    .replace("[SINGLE_BREAK]", "\n")
+                    .replace("[DOUBLE_BREAK]", "\n\n") // Double newlines for paragraph breaks
+                
+                // Clean up any excessive consecutive newlines but preserve doubles
+                val contentWithNormalizedBreaks = contentWithProperBreaks
+                    .replace(Regex("\n{3,}"), "\n\n") // Replace 3+ newlines with double newlines
+                
+                // Trim each line to remove leading/trailing spaces
+                val lines = contentWithNormalizedBreaks.lines()
+                val trimmedLines = lines.map { it.trim() }
+                val content = trimmedLines.joinToString("\n").trim()
+                
                 if (content.isNotEmpty()) {
                     // Try to extract author and date if available
                     val authorElement = entryElement.parent()?.select("a.entry-author, a.author")?.firstOrNull()

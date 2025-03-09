@@ -67,6 +67,14 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
         viewModel.clearSearch()
     }
     
+    // Update saved status when search result changes
+    LaunchedEffect(searchResult?.title) {
+        if (searchResult != null) {
+            // This will trigger a recomposition with the correct saved status
+            viewModel.checkAndUpdateSearchResultSavedStatus()
+        }
+    }
+    
     // Get total pages from the search result, with a minimum of the current page
     val totalPages = (searchResult?.totalPages ?: 1).coerceAtLeast(currentPage)
     

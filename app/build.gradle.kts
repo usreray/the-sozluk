@@ -41,18 +41,6 @@ android {
 }
 
 dependencies {
-    implementation (libs.androidx.material3)
-    implementation (libs.jsoup)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation (libs.androidx.navigation.compose)
-    implementation (libs.accompanist.swiperefresh)
-    
-    // Room dependencies
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    annotationProcessor(libs.androidx.room.compiler)
-    ksp(libs.androidx.room.compiler)
-    
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -61,6 +49,16 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.jsoup)
+    implementation(libs.accompanist.swiperefresh)
+    
+    // Room dependencies
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+    
     implementation(libs.generativeai)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

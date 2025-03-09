@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.Topic
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.runtime.mutableStateMapOf
 
 /**
  * Helper function to clean topic titles by removing entry numbers at the end
@@ -321,6 +322,9 @@ fun EntriesDisplay(
     topic: Topic,
     currentPage: Int
 ) {
+    // Keep track of expanded entries
+    val expandedEntries = remember { mutableStateMapOf<Int, Boolean>() }
+    
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -362,15 +366,22 @@ fun EntriesDisplay(
         } else {
             // Display entries
             itemsIndexed(topic.entries) { index, entry ->
+                // Generate a unique key for each entry
+                val entryKey = ((currentPage - 1) * 10) + index + 1
+                
                 EntryItem(
                     entry = entry, 
-                    index = ((currentPage - 1) * 10) + index + 1
+                    index = entryKey,
+                    isExpanded = expandedEntries[entryKey] ?: false,
+                    onExpandToggle = { 
+                        expandedEntries[entryKey] = !(expandedEntries[entryKey] ?: false)
+                    }
                 )
             }
             
-            // Bottom spacing
+            // Add empty entry card-sized space at the bottom to match the spacing
             item {
-                Spacer(modifier = Modifier.height(80.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }

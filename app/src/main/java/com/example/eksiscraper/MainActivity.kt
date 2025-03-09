@@ -3,13 +3,19 @@ package com.example.eksiscraper
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -37,14 +43,31 @@ import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.ui.theme.EksiScraperTheme
 import com.example.eksiscraper.viewmodel.EksiViewModel
 import com.example.eksiscraper.viewmodel.EksiViewModelFactory
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import kotlin.math.ceil
 import android.app.Application
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxWidth
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Enable edge-to-edge display using the modern approach
+        // Use the surface color for the navigation bar to match the navbar
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.auto(
+                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.TRANSPARENT
+            ),
+            navigationBarStyle = androidx.activity.SystemBarStyle.auto(
+                lightScrim = android.graphics.Color.TRANSPARENT,
+                darkScrim = android.graphics.Color.TRANSPARENT
+            )
+        )
+        
         setContent {
             EksiScraperTheme {
                 // A surface container using the 'background' color from the theme
@@ -66,15 +89,35 @@ fun MainScreen() {
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
 
-    Scaffold(
-        bottomBar = { BottomNavigationBar(navController, viewModel) }
-    ) { innerPadding ->
+    // Create a container with the surface color that extends behind the navigation bar
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        // Apply the surface color to the bottom portion of the screen
+        // This will be visible through the transparent navigation bar
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            Navigation(navController, viewModel)
+                .align(Alignment.BottomCenter)
+                .height(80.dp) // Height of the navbar plus some extra for the gesture area
+                .fillMaxWidth() // Make it full width
+                .background(MaterialTheme.colorScheme.surface)
+        )
+        
+        // Main content scaffold
+        Scaffold(
+            bottomBar = { BottomNavigationBar(navController, viewModel) },
+            contentWindowInsets = WindowInsets(0, 0, 0, 0), // Remove default insets
+            containerColor = MaterialTheme.colorScheme.background // Main content background
+        ) { innerPadding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .statusBarsPadding() // Add padding only for status bar
+            ) {
+                Navigation(navController, viewModel)
+            }
         }
     }
 }
@@ -103,7 +146,8 @@ fun BottomNavigationBar(navController: NavController, viewModel: EksiViewModel) 
     val currentRoute = navBackStackEntry?.destination?.route
     
     NavigationBar(
-        modifier = Modifier.clip(RectangleShape),
+        modifier = Modifier
+            .clip(RectangleShape),
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp
     ) {
