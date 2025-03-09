@@ -155,7 +155,7 @@ fun TopicDetailScreen(
                     topic = topic,
                     currentPage = currentPage,
                     viewModel = viewModel,
-                    scrollState = viewModel.homeScrollState
+                    scrollState = viewModel.topicDetailScrollState
                 )
             }
         } else {

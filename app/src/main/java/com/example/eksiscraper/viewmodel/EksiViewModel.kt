@@ -114,6 +114,8 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     val homeScrollState = LazyListState()
     val searchScrollState = LazyListState()
     val profileScrollState = LazyListState()
+    // Add a separate scroll state for topic details
+    val topicDetailScrollState = LazyListState()
 
     init {
         val database = EksiDatabase.getDatabase(application)
@@ -302,8 +304,13 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                 
                 // Reset scroll position to top when changing pages within the same topic
                 viewModelScope.launch {
-                    homeScrollState.scrollToItem(0)
+                    topicDetailScrollState.scrollToItem(0)
                 }
+            }
+            
+            // Always reset scroll position to top when selecting a topic
+            viewModelScope.launch {
+                topicDetailScrollState.scrollToItem(0)
             }
             
             _selectedTopic.value = updatedTopic
@@ -555,7 +562,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                     
                     // Reset scroll position to top when changing pages
                     viewModelScope.launch {
-                        homeScrollState.scrollToItem(0)
+                        topicDetailScrollState.scrollToItem(0)
                     }
                 }
                 

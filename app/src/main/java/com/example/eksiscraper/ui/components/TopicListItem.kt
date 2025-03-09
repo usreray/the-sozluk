@@ -27,8 +27,7 @@ import kotlin.math.ceil
 
 @Composable
 fun TopicListItem(topic: Topic, onClick: () -> Unit) {
-    // Calculate max pages based on comment count (10 entries per page)
-    val maxPages = ceil(topic.commentCount.toFloat() / 10f).coerceAtLeast(1f).toInt()
+    // We no longer calculate or display the total pages on the home screen
     
     Card(
         modifier = Modifier
@@ -83,7 +82,7 @@ fun TopicListItem(topic: Topic, onClick: () -> Unit) {
                     )
                     
                     Text(
-                        text = "${topic.commentCount} entries ($maxPages pages)",
+                        text = "${topic.commentCount} entries",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 4.dp)

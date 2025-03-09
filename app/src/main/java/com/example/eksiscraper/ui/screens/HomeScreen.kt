@@ -264,6 +264,7 @@ fun HomeScreen(
                                 TopicListItem(
                                     topic = topic,
                                     onClick = { 
+                                        // Reset scroll position before navigating
                                         viewModel.selectTopic(index, 1)
                                         navController.navigate(Screen.TopicDetail.createRoute(index)) 
                                     }
