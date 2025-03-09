@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -47,6 +48,7 @@ import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.Topic
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.mutableStateMapOf
+import com.example.eksiscraper.viewmodel.EksiViewModel
 
 /**
  * Helper function to clean topic titles by removing entry numbers at the end
@@ -320,12 +322,12 @@ fun LoadingIndicator(message: String) {
 @Composable
 fun EntriesDisplay(
     topic: Topic,
-    currentPage: Int
+    currentPage: Int,
+    viewModel: EksiViewModel,
+    scrollState: LazyListState
 ) {
-    // Keep track of expanded entries
-    val expandedEntries = remember { mutableStateMapOf<Int, Boolean>() }
-    
     LazyColumn(
+        state = scrollState,
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 4.dp),
@@ -372,10 +374,8 @@ fun EntriesDisplay(
                 EntryItem(
                     entry = entry, 
                     index = entryKey,
-                    isExpanded = expandedEntries[entryKey] ?: false,
-                    onExpandToggle = { 
-                        expandedEntries[entryKey] = !(expandedEntries[entryKey] ?: false)
-                    }
+                    isExpanded = viewModel.isEntryExpanded(entryKey),
+                    onExpandToggle = { viewModel.toggleEntryExpansion(entryKey) }
                 )
             }
             

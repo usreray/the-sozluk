@@ -217,7 +217,9 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                     searchResult?.let { result ->
                         EntriesDisplay(
                             topic = result,
-                            currentPage = currentPage
+                            currentPage = currentPage,
+                            viewModel = viewModel,
+                            scrollState = viewModel.searchScrollState
                         )
                     }
                 }

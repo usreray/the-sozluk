@@ -67,18 +67,21 @@ fun HomeScreen(
 ) {
     val topics by viewModel.topics
     val isLoading by viewModel.isLoading
+    val error by viewModel.error
     val isUsingLocalData by viewModel.isUsingLocalData
     val isLoadingMoreTopics by viewModel.isLoadingMoreTopics
     val canLoadMoreTopics by viewModel.canLoadMoreTopics
+    val scrollToTop by viewModel.homeScrollToTop
+    
+    // Use ViewModel's scroll state to maintain position across tab switches
+    val lazyListState = viewModel.homeScrollState
     val swipeRefreshState = rememberSwipeRefreshState(isLoading)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val lazyListState = rememberLazyListState()
     
-    // Observe the homeScrollToTop state and scroll to top when it changes to true
-    val homeScrollToTop by viewModel.homeScrollToTop
-    LaunchedEffect(homeScrollToTop) {
-        if (homeScrollToTop) {
+    // Observe the scrollToTop state and scroll to top when it changes to true
+    LaunchedEffect(scrollToTop) {
+        if (scrollToTop) {
             // Scroll to the top of the list
             lazyListState.animateScrollToItem(0)
             // Reset the flag

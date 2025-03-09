@@ -142,7 +142,9 @@ fun ProfileScreen(
                     viewingSavedTopic?.let { topic ->
                         EntriesDisplay(
                             topic = topic,
-                            currentPage = savedTopicCurrentPage
+                            currentPage = savedTopicCurrentPage,
+                            viewModel = viewModel,
+                            scrollState = viewModel.profileScrollState
                         )
                     }
                 }
@@ -231,6 +233,7 @@ private fun SavedTopicsList(
     onBackToList: () -> Unit
 ) {
     LazyColumn(
+        state = viewModel.profileScrollState,
         modifier = Modifier
             .fillMaxSize()
             .padding(paddingValues),

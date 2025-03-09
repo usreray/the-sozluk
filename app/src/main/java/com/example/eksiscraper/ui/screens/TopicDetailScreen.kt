@@ -153,7 +153,9 @@ fun TopicDetailScreen(
             selectedTopic?.let { topic ->
                 EntriesDisplay(
                     topic = topic,
-                    currentPage = currentPage
+                    currentPage = currentPage,
+                    viewModel = viewModel,
+                    scrollState = viewModel.homeScrollState
                 )
             }
         } else {

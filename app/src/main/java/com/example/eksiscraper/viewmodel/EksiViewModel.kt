@@ -1,8 +1,10 @@
 package com.example.eksiscraper.viewmodel
 
 import android.app.Application
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -100,9 +102,18 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     private val _savedTopicCurrentPage = mutableStateOf(1)
     val savedTopicCurrentPage: State<Int> = _savedTopicCurrentPage
 
+    // Track expanded entries across the entire app
+    private val _expandedEntries = mutableStateMapOf<Int, Boolean>()
+    val expandedEntries: Map<Int, Boolean> = _expandedEntries
+    
     // Add state for scroll to top
     private val _homeScrollToTop = mutableStateOf(false)
     val homeScrollToTop: State<Boolean> = _homeScrollToTop
+    
+    // Add rememberLazyListState for each screen to maintain scroll position across tab switches
+    val homeScrollState = LazyListState()
+    val searchScrollState = LazyListState()
+    val profileScrollState = LazyListState()
 
     init {
         val database = EksiDatabase.getDatabase(application)
@@ -285,6 +296,16 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                 return
             }
             
+            // Clear expanded entries when switching to a different page
+            if (_selectedTopic.value?.title == updatedTopic.title && _topicCurrentPage.value != page) {
+                clearExpandedEntries()
+                
+                // Reset scroll position to top when changing pages within the same topic
+                viewModelScope.launch {
+                    homeScrollState.scrollToItem(0)
+                }
+            }
+            
             _selectedTopic.value = updatedTopic
             _topicCurrentPage.value = page
             println("EksiViewModel: Selected topic set to: ${_selectedTopic.value?.title}, page: $page")
@@ -427,6 +448,16 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     fun search(page: Int = 1) {
         if (_searchQuery.value.isBlank()) return
         
+        // Clear expanded entries when changing pages
+        if (_currentPage.value != page) {
+            clearExpandedEntries()
+            
+            // Reset scroll position to top when changing pages
+            viewModelScope.launch {
+                searchScrollState.scrollToItem(0)
+            }
+        }
+        
         // If changing pages, update the redirectedUrl to match the correct page
         val updatedRedirectedUrl = if (searchResult.value?.redirectedUrl?.isNotEmpty() == true) {
             if (searchResult.value?.redirectedUrl?.contains("p=") == true) {
@@ -517,6 +548,17 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
             println("EksiViewModel: found topic index $topicIndex for ${_selectedTopic.value?.title}")
             if (topicIndex != -1) {
                 println("EksiViewModel: calling selectTopic with index $topicIndex, page $page")
+                
+                // Clear expanded entries when changing pages
+                if (_topicCurrentPage.value != page) {
+                    clearExpandedEntries()
+                    
+                    // Reset scroll position to top when changing pages
+                    viewModelScope.launch {
+                        homeScrollState.scrollToItem(0)
+                    }
+                }
+                
                 selectTopic(topicIndex, page)
             }
         }
@@ -593,6 +635,16 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     // Method to view a saved topic by using the same approach as search
     fun viewSavedTopic(topic: Topic, page: Int = 1) {
         println("EksiViewModel: Viewing saved topic: ${topic.title}")
+        
+        // Clear expanded entries when changing pages
+        if (_savedTopicCurrentPage.value != page || _viewingSavedTopic.value?.title != topic.title) {
+            clearExpandedEntries()
+            
+            // Reset scroll position to top when changing pages
+            viewModelScope.launch {
+                profileScrollState.scrollToItem(0)
+            }
+        }
         
         // Set the viewing saved topic state
         _viewingSavedTopic.value = topic
@@ -763,5 +815,21 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             topic.copy(isSaved = false)
         }
+    }
+
+    // Method to toggle entry expansion state
+    fun toggleEntryExpansion(entryKey: Int) {
+        _expandedEntries[entryKey] = !(_expandedEntries[entryKey] ?: false)
+    }
+
+    // Method to check if an entry is expanded
+    fun isEntryExpanded(entryKey: Int): Boolean {
+        return _expandedEntries[entryKey] ?: false
+    }
+    
+    // Method to clear all expanded entries
+    fun clearExpandedEntries() {
+        println("EksiViewModel: Clearing all expanded entries")
+        _expandedEntries.clear()
     }
 } 
