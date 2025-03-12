@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.eksiscraper.ui.components.CategoryTabBar
 import com.example.eksiscraper.ui.components.TopicListItem
 import com.example.eksiscraper.ui.components.TopicListSkeleton
 import com.example.eksiscraper.ui.navigation.Screen
@@ -58,6 +59,14 @@ import com.example.eksiscraper.viewmodel.EksiViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.PagerDefaults
+import androidx.compose.foundation.pager.PagerSnapDistance
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,16 +77,86 @@ fun HomeScreen(
     val topics by viewModel.topics
     val isLoading by viewModel.isLoading
     val error by viewModel.error
-    val isUsingLocalData by viewModel.isUsingLocalData
     val isLoadingMoreTopics by viewModel.isLoadingMoreTopics
     val canLoadMoreTopics by viewModel.canLoadMoreTopics
     val scrollToTop by viewModel.homeScrollToTop
+    val selectedCategory by viewModel.selectedHomeCategory
     
     // Use ViewModel's scroll state to maintain position across tab switches
     val lazyListState = viewModel.homeScrollState
     val swipeRefreshState = rememberSwipeRefreshState(isLoading)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    
+    // Define categories
+    val categories = listOf(
+        "popular" to "Popular",
+        "today" to "Today",
+        "stream" to "Stream"
+    )
+    
+    // Find the initial page based on the selected category
+    val initialPage = categories.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
+    
+    // Create pager state for horizontal swipes with custom fling behavior
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { categories.size }
+    )
+    
+    // Custom fling behavior to ensure we only change pages when swipe is completed
+    val flingBehavior = PagerDefaults.flingBehavior(
+        state = pagerState,
+        pagerSnapDistance = PagerSnapDistance.atMost(1)
+    )
+    
+    // Track if a swipe is in progress
+    val isSwipeInProgress by remember {
+        derivedStateOf {
+            pagerState.currentPageOffsetFraction != 0f
+        }
+    }
+    
+    // Monitor swipe progress to detect direction and preload content
+    LaunchedEffect(isSwipeInProgress, pagerState.currentPageOffsetFraction) {
+        if (isSwipeInProgress) {
+            // If offset is positive, we're swiping from right to left (to see the next page)
+            // If offset is negative, we're swiping from left to right (to see the previous page)
+            val targetPage = if (pagerState.currentPageOffsetFraction > 0) {
+                // Swiping to next page (right to left)
+                (pagerState.currentPage + 1).coerceAtMost(categories.size - 1)
+            } else {
+                // Swiping to previous page (left to right)
+                (pagerState.currentPage - 1).coerceAtLeast(0)
+            }
+            
+            // Get the category for the target page and preload its content
+            val targetCategory = categories[targetPage].first
+            viewModel.preloadCategoryContent(targetCategory)
+        }
+    }
+    
+    // Sync pager state with selected category when the selected category changes externally
+    LaunchedEffect(selectedCategory) {
+        val index = categories.indexOfFirst { it.first == selectedCategory }
+        if (index >= 0 && index != pagerState.currentPage) {
+            pagerState.animateScrollToPage(index)
+        }
+    }
+
+    // Only update the selected category when page change has settled
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage to pagerState.currentPageOffsetFraction }
+            .collect { (page, offset) ->
+                // Only update when the swipe has settled (offset is 0)
+                if (offset == 0f) {
+                    val category = categories.getOrNull(page)?.first ?: return@collect
+                    if (category != selectedCategory) {
+                        viewModel.changeHomeCategory(category)
+                    }
+                }
+            }
+    }
     
     // Observe the scrollToTop state and scroll to top when it changes to true
     LaunchedEffect(scrollToTop) {
@@ -129,15 +208,6 @@ fun HomeScreen(
         }
     }
     
-    // Show a snackbar when using local data
-    LaunchedEffect(isUsingLocalData) {
-        if (isUsingLocalData) {
-            scope.launch {
-                snackbarHostState.showSnackbar("Using cached data. Pull to refresh.")
-            }
-        }
-    }
-    
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
@@ -167,157 +237,137 @@ fun HomeScreen(
             }
         }
     ) { innerPadding ->
-        SwipeRefresh(
-            state = swipeRefreshState,
-            onRefresh = { viewModel.fetchTopics() },
-            modifier = Modifier.padding(innerPadding)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize()
+            // Add the CategoryTabBar at the top
+            CategoryTabBar(
+                selectedCategory = selectedCategory,
+                onCategorySelected = { category -> viewModel.changeHomeCategory(category) },
+                pagerState = pagerState
+            )
+            
+            // Use HorizontalPager for the main content
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f),
+                flingBehavior = flingBehavior
+            ) { page ->
+                // The content inside each page is the same, it's just filtered by the selected category
+                SwipeRefresh(
+                    state = swipeRefreshState,
+                    onRefresh = { viewModel.fetchTopics() },
                 ) {
-                    // Show loading indicator at the top while loading
-                    AnimatedVisibility(
-                        visible = isLoading && topics.isNotEmpty(),
-                        enter = fadeIn(),
-                        exit = fadeOut()
+                    Box(
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        LinearProgressIndicator(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    }
-                    
-                    // Local data warning
-                    AnimatedVisibility(
-                        visible = isUsingLocalData,
-                        enter = fadeIn() + slideInVertically { -it },
-                        exit = fadeOut() + slideOutVertically { -it }
-                    ) {
-                        ElevatedCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            ),
-                            elevation = CardDefaults.elevatedCardElevation(4.dp)
+                        Column(
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = "Using local data",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
+                            // Show loading indicator at the top while loading
+                            AnimatedVisibility(
+                                visible = isLoading && topics.isNotEmpty(),
+                                enter = fadeIn(),
+                                exit = fadeOut()
+                            ) {
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                                 )
-                                Text(
-                                    text = "Could not connect to eksisozluk.com. Showing cached data instead.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(
-                                    onClick = { viewModel.fetchTopics() },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.error,
-                                        contentColor = MaterialTheme.colorScheme.onError
+                            }
+                            
+                            // Topic list
+                            if (topics.isEmpty() && !isLoading) {
+                                // Empty state
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No topics available.\nPull down to refresh.",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            } else {
+                                LazyColumn(
+                                    state = lazyListState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(
+                                        start = 16.dp,
+                                        end = 16.dp,
+                                        top = 8.dp,
+                                        bottom = 88.dp // Extra padding for bottom nav
                                     )
                                 ) {
-                                    Text("Try Again")
-                                }
-                            }
-                        }
-                    }
-
-                    // Topic list
-                    if (topics.isEmpty() && !isLoading) {
-                        // Empty state
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No topics available.\nPull down to refresh.",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    } else {
-                        LazyColumn(
-                            state = lazyListState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = 8.dp,
-                                bottom = 88.dp // Extra padding for bottom nav
-                            )
-                        ) {
-                            itemsIndexed(topics) { index, topic ->
-                                TopicListItem(
-                                    topic = topic,
-                                    onClick = { 
-                                        // Reset scroll position before navigating
-                                        viewModel.selectTopic(index, 1)
-                                        navController.navigate(Screen.TopicDetail.createRoute(index)) 
-                                    }
-                                )
-                            }
-                            
-                            // Show loading indicator at the bottom when loading more topics
-                            if (isLoadingMoreTopics) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(32.dp),
-                                            color = MaterialTheme.colorScheme.primary,
-                                            strokeWidth = 2.dp
+                                    itemsIndexed(topics) { index, topic ->
+                                        TopicListItem(
+                                            topic = topic,
+                                            onClick = { 
+                                                // Reset scroll position before navigating
+                                                viewModel.selectTopic(index, 1)
+                                                navController.navigate(Screen.TopicDetail.createRoute(index)) 
+                                            }
                                         )
                                     }
-                                }
-                            }
-                            
-                            // Show end of list message when no more topics can be loaded
-                            if (!canLoadMoreTopics && topics.isNotEmpty() && !isLoadingMoreTopics) {
-                                item {
-                                    Text(
-                                        text = "End of topics reached",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(16.dp)
-                                    )
+                                    
+                                    // Show loading indicator at the bottom when loading more topics
+                                    if (isLoadingMoreTopics) {
+                                        item {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(16.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                CircularProgressIndicator(
+                                                    modifier = Modifier.size(32.dp),
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    strokeWidth = 2.dp
+                                                )
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Show end of list message when no more topics can be loaded
+                                    if (!canLoadMoreTopics && topics.isNotEmpty() && !isLoadingMoreTopics) {
+                                        item {
+                                            Text(
+                                                text = "End of topics reached",
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(16.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                }
-                
-                // Center loading indicator when initially loading
-                if (isLoading && topics.isEmpty()) {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            TopicListSkeleton(itemCount = 10)
+                        
+                        // Center loading indicator when initially loading
+                        if (isLoading && topics.isEmpty()) {
+                            Surface(
+                                modifier = Modifier.fillMaxSize(),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    TopicListSkeleton(itemCount = 10)
+                                }
+                            }
                         }
                     }
                 }

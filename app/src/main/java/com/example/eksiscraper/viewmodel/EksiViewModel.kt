@@ -9,7 +9,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.eksiscraper.data.LocalDataSource
 import com.example.eksiscraper.data.room.EksiDatabase
 import com.example.eksiscraper.data.room.SavedTopicRepository
 import com.example.eksiscraper.model.Entry
@@ -30,9 +29,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     
     private val _error = mutableStateOf<String?>(null)
     val error: State<String?> get() = _error
-    
-    private val _isUsingLocalData = mutableStateOf(false)
-    val isUsingLocalData: State<Boolean> get() = _isUsingLocalData
     
     // Add a new state for the currently selected topic
     private val _selectedTopic = mutableStateOf<Topic?>(null)
@@ -110,6 +106,10 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     private val _homeScrollToTop = mutableStateOf(false)
     val homeScrollToTop: State<Boolean> = _homeScrollToTop
     
+    // Add state for home screen categories
+    private val _selectedHomeCategory = mutableStateOf("popular")
+    val selectedHomeCategory: State<String> = _selectedHomeCategory
+    
     // Add rememberLazyListState for each screen to maintain scroll position across tab switches
     val homeScrollState = LazyListState()
     val searchScrollState = LazyListState()
@@ -175,18 +175,10 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadLocalData() {
-        _topics.value = LocalDataSource.getLocalData().home
-        _isUsingLocalData.value = true
-        _isLoading.value = false
-        _error.value = null
-    }
-    
     fun fetchTopics(page: Int = 1) {
         if (page == 1) {
             _isLoading.value = true
             _error.value = null
-            _isUsingLocalData.value = false
             _homeCurrentPage.value = 1
             _topics.value = emptyList()
         } else {
@@ -200,41 +192,34 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                     delay(30000) // 30 seconds timeout
                     if (page == 1 && _isLoading.value) {
                         _isLoading.value = false
-                        _error.value = "Request timed out. Loading local data instead."
-                        loadLocalData()
+                        _error.value = "Request timed out."
                     } else if (page > 1 && _isLoadingMoreTopics.value) {
                         _isLoadingMoreTopics.value = false
                         _canLoadMoreTopics.value = false
                     }
                 }
                 
-                println("EksiViewModel: Starting to fetch topics for page $page")
-                val result = EksiService.getPopularTopics(page)
+                // Pass the selected category to getPopularTopics
+                val result = EksiService.getPopularTopics(page, _selectedHomeCategory.value)
                 
                 // Cancel the timeout job since we got a response
                 timeoutJob.cancel()
                 
                 if (result.isEmpty()) {
-                    println("EksiViewModel: No topics found for page $page")
                     if (page == 1) {
                         _error.value = "No topics found. Please try again later."
-                        loadLocalData()
                     } else {
                         _isLoadingMoreTopics.value = false
                         _canLoadMoreTopics.value = false
                     }
                 } else if (result.size == 1 && result[0].title.startsWith("Error fetching data")) {
-                    println("EksiViewModel: Error in fetched data for page $page: ${result[0].title}")
                     if (page == 1) {
                         _error.value = result[0].title
-                        loadLocalData()
                     } else {
                         _isLoadingMoreTopics.value = false
                         _canLoadMoreTopics.value = false
                     }
                 } else {
-                    println("EksiViewModel: Successfully fetched ${result.size} topics for page $page")
-                    
                     // Update saved status for each topic
                     val updatedResult = result.map { topic ->
                         updateTopicSavedStatus(topic)
@@ -247,11 +232,9 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                         _topics.value = _topics.value + updatedResult
                         _homeCurrentPage.value = page
                     }
-                    _isUsingLocalData.value = false
                     
                     // If we received fewer than 50 topics, we've reached the last page
                     _canLoadMoreTopics.value = result.size >= 50
-                    println("EksiViewModel: Can load more topics: ${_canLoadMoreTopics.value} (received ${result.size} topics)")
                 }
                 
                 if (page == 1) {
@@ -260,12 +243,9 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                     _isLoadingMoreTopics.value = false
                 }
             } catch (e: Exception) {
-                println("EksiViewModel: Error fetching topics for page $page: ${e.message}")
                 if (page == 1) {
                     _error.value = "Failed to load data: ${e.message ?: "Unknown error"}"
                     _isLoading.value = false
-                    // Fallback to local data if network request fails
-                    loadLocalData()
                 } else {
                     _isLoadingMoreTopics.value = false
                     _canLoadMoreTopics.value = false
@@ -276,16 +256,12 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     
     fun loadMoreTopics() {
         if (!_isLoading.value && !_isLoadingMoreTopics.value && _canLoadMoreTopics.value) {
-            println("EksiViewModel: Loading more topics, current page: ${_homeCurrentPage.value}")
             fetchTopics(_homeCurrentPage.value + 1)
-        } else {
-            println("EksiViewModel: Cannot load more topics. isLoading: ${_isLoading.value}, isLoadingMoreTopics: ${_isLoadingMoreTopics.value}, canLoadMoreTopics: ${_canLoadMoreTopics.value}")
         }
     }
     
     // Add a method to set the selected topic directly from the list with pagination
     fun selectTopic(index: Int, page: Int = 1) {
-        println("EksiViewModel: selectTopic called with index $index, page $page, topics size: ${_topics.value.size}")
         if (index >= 0 && index < _topics.value.size) {
             val topic = _topics.value[index]
             
@@ -294,7 +270,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
             
             // Check if we're already viewing this topic and page
             if (_selectedTopic.value?.title == updatedTopic.title && _topicCurrentPage.value == page) {
-                println("EksiViewModel: Already viewing topic '${updatedTopic.title}' on page $page, no need to reload")
                 return
             }
             
@@ -315,12 +290,9 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
             
             _selectedTopic.value = updatedTopic
             _topicCurrentPage.value = page
-            println("EksiViewModel: Selected topic set to: ${_selectedTopic.value?.title}, page: $page")
             
             // Always fetch entries for the selected topic and page
             fetchEntriesForSelectedTopic(page)
-        } else {
-            println("EksiViewModel: Invalid index $index for topics size ${_topics.value.size}")
         }
     }
     
@@ -333,8 +305,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         
         viewModelScope.launch {
             try {
-                println("EksiViewModel: Fetching entries for topic: ${topic.title}, page: $page")
-                
                 // Use the topic's original URL for fetching entries
                 if (topic.url.isNotEmpty()) {
                     // Extract base URL and path from the topic's URL
@@ -372,8 +342,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                         originalPath + pageParam
                     }
                     
-                    println("EksiViewModel: Using URL: $baseUrl$pathWithPage")
-                    
                     // Use the searchTopic method with the exact original path
                     val searchResult = EksiService.searchTopic(topic.title, page, originalPath)
                     
@@ -399,11 +367,8 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                         updatedTopics[index] = updatedTopic
                         _topics.value = updatedTopics
                     }
-                    
-                    println("EksiViewModel: Successfully fetched ${searchResult.entries.size} entries for topic: ${topic.title}, page: $page, totalPages: ${searchResult.totalPages}")
                 } else {
                     // Fallback to search by title if URL is empty
-                    println("EksiViewModel: No URL available for topic, falling back to search by title")
                     val searchResult = EksiService.searchTopic(topic.title, page)
                     
                     // Update total pages
@@ -428,12 +393,8 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                         updatedTopics[index] = updatedTopic
                         _topics.value = updatedTopics
                     }
-                    
-                    println("EksiViewModel: Successfully fetched ${searchResult.entries.size} entries for topic: ${topic.title}, page: $page, totalPages: ${searchResult.totalPages}")
                 }
             } catch (e: Exception) {
-                println("EksiViewModel: Error fetching entries: ${e.message}")
-                
                 // Update the selected topic with error message
                 val errorEntries = listOf(Entry("Error loading entries: ${e.message ?: "Unknown error"}"))
                 val updatedTopic = topic.copy(
@@ -455,18 +416,23 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     fun search(page: Int = 1) {
         if (_searchQuery.value.isBlank()) return
         
-        // Clear expanded entries when changing pages
-        if (_currentPage.value != page) {
+        // Check if this is a new search or just a page change
+        val isNewSearch = _searchResult.value == null || 
+                         (_searchResult.value != null && page == 1 && 
+                          _searchResult.value?.title?.lowercase() != _searchQuery.value.lowercase().trim())
+                          
+        // Clear expanded entries when changing pages or performing a new search
+        if (_currentPage.value != page || isNewSearch) {
             clearExpandedEntries()
             
-            // Reset scroll position to top when changing pages
+            // Reset scroll position to top when changing pages or performing a new search
             viewModelScope.launch {
                 searchScrollState.scrollToItem(0)
             }
         }
         
         // If changing pages, update the redirectedUrl to match the correct page
-        val updatedRedirectedUrl = if (searchResult.value?.redirectedUrl?.isNotEmpty() == true) {
+        val updatedRedirectedUrl = if (searchResult.value?.redirectedUrl?.isNotEmpty() == true && !isNewSearch) {
             if (searchResult.value?.redirectedUrl?.contains("p=") == true) {
                 searchResult.value?.redirectedUrl?.replaceFirst(Regex("p=\\d+"), "p=$page") ?: ""
             } else if (searchResult.value?.redirectedUrl?.contains("?") == true) {
@@ -500,7 +466,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun clearSearch() {
-        println("EksiViewModel: Clearing search state")
         _searchQuery.value = ""
         _searchResult.value = null
         _currentPage.value = 1
@@ -549,13 +514,9 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     
     // Add method to navigate to a specific page for a topic
     fun navigateTopicToPage(page: Int) {
-        println("EksiViewModel: navigateTopicToPage called with page $page")
         if (page >= 1 && _selectedTopic.value != null) {
             val topicIndex = _topics.value.indexOfFirst { it.title == _selectedTopic.value?.title }
-            println("EksiViewModel: found topic index $topicIndex for ${_selectedTopic.value?.title}")
             if (topicIndex != -1) {
-                println("EksiViewModel: calling selectTopic with index $topicIndex, page $page")
-                
                 // Clear expanded entries when changing pages
                 if (_topicCurrentPage.value != page) {
                     clearExpandedEntries()
@@ -571,11 +532,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     
-    // Add method to save logs
-    fun getDebugLog(): String {
-        return EksiService.getDebugLog()
-    }
-    
     // Add method to get topics as JSON
     fun getTopicsAsJson(): String {
         return EksiService.getTopicsAsJson()
@@ -583,8 +539,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
 
     // Methods for saved topics
     fun saveTopic(topic: Topic) {
-        println("EksiViewModel: Saving topic: ${topic.title}")
-        
         // Update the topic in the UI immediately
         updateTopicSavedStatusInLists(topic.title, true)
         
@@ -595,8 +549,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun unsaveTopic(topic: Topic) {
-        println("EksiViewModel: Removing saved topic: ${topic.title}")
-        
         // Update the topic in the UI immediately
         updateTopicSavedStatusInLists(topic.title, false)
         
@@ -641,8 +593,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
 
     // Method to view a saved topic by using the same approach as search
     fun viewSavedTopic(topic: Topic, page: Int = 1) {
-        println("EksiViewModel: Viewing saved topic: ${topic.title}")
-        
         // Clear expanded entries when changing pages
         if (_savedTopicCurrentPage.value != page || _viewingSavedTopic.value?.title != topic.title) {
             clearExpandedEntries()
@@ -664,7 +614,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         // Clean up the redirectedUrl by removing any query parameters
         if (redirectedUrl.contains("?")) {
             redirectedUrl = redirectedUrl.substringBefore("?")
-            println("EksiViewModel: Cleaned redirectedUrl: $redirectedUrl")
         }
         
         // Call searchTopic with the cleaned redirectedUrl
@@ -682,7 +631,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                 _viewingSavedTopic.value = result.copy(isSaved = true)
             } catch (e: Exception) {
                 // Handle error
-                println("EksiViewModel: Error viewing saved topic: ${e.message}")
             } finally {
                 _isSearching.value = false
             }
@@ -712,11 +660,8 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     fun setActiveScreen(screen: String) {
         // If we're already on this screen, don't do anything
         if (_activeScreen.value == screen) {
-            println("EksiViewModel: Already on screen $screen, ignoring redundant setActiveScreen call")
             return
         }
-        
-        println("EksiViewModel: Setting active screen to $screen (previous: ${_activeScreen.value})")
         
         val previousScreen = _activeScreen.value
         
@@ -728,12 +673,10 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
             // If coming from topic_detail, we want to preserve the selected topic
             // so we can show it when navigating back to home
             if (previousScreen == "topic_detail") {
-                println("EksiViewModel: Preserving selected topic when navigating from topic_detail to home")
                 // Don't clear the selected topic
             } else if (_selectedTopic.value != null && previousScreen != "topic_detail") {
                 // If we have a selected topic but we're not coming from topic_detail,
                 // we should preserve it
-                println("EksiViewModel: Preserving selected topic when navigating to home from ${previousScreen}")
             }
             
             return
@@ -741,26 +684,21 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         
         // When navigating to topic_detail, we want to preserve the selected topic
         if (screen == "topic_detail") {
-            println("EksiViewModel: Navigating to topic_detail, preserving selected topic")
             return
         }
         
         // When navigating to search or profile, we don't want to clear the selected topic
         // so it can be restored when navigating back to home
         if (screen == "search" || screen == "profile") {
-            println("EksiViewModel: Navigating to $screen, preserving selected topic")
             return
         }
     }
 
     // Method to reset the Home screen to its initial state
     fun resetHomeScreen() {
-        println("EksiViewModel: Resetting Home screen")
-        
         // When the Home tab is pressed again, we want to go to the home page
         // regardless of whether a topic is selected
         if (_selectedTopic.value != null) {
-            println("EksiViewModel: Clearing selected topic to return to home page")
             clearSelectedTopic()
         }
         
@@ -780,7 +718,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     
     // Method to reset the Profile screen to its initial state
     fun resetProfileScreen() {
-        println("EksiViewModel: Resetting Profile screen")
         stopViewingSavedTopic()
         // Don't clear the selected topic to preserve the topic detail view
         // when navigating back to home
@@ -790,11 +727,9 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     fun clearSelectedTopic() {
         // Only clear if there's actually a topic selected
         if (_selectedTopic.value == null) {
-            println("EksiViewModel: No topic selected, ignoring clearSelectedTopic call")
             return
         }
         
-        println("EksiViewModel: Clearing selected topic")
         _selectedTopic.value = null
         _isLoadingTopic.value = false
         _topicCurrentPage.value = 1
@@ -803,8 +738,6 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
 
     // Method to scroll to the top of the home screen without reloading data
     fun scrollHomeToTop() {
-        println("EksiViewModel: Scrolling home screen to top")
-        
         // We don't need to reload data, just signal that we want to scroll to top
         // This will be observed in the HomeScreen composable
         _homeScrollToTop.value = true
@@ -813,6 +746,25 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     // Reset the scroll to top flag after it's been consumed
     fun resetHomeScrollToTop() {
         _homeScrollToTop.value = false
+    }
+
+    // Method to change the selected home category
+    fun changeHomeCategory(category: String) {
+        if (_selectedHomeCategory.value != category) {
+            _selectedHomeCategory.value = category
+            
+            // Reset page and fetch new topics for the selected category
+            _homeCurrentPage.value = 1
+            _topics.value = emptyList()
+            
+            // Reset scroll position to top
+            viewModelScope.launch {
+                homeScrollState.scrollToItem(0)
+            }
+            
+            // Fetch topics for the selected category
+            fetchTopics(1)
+        }
     }
 
     // Add this method to ensure topics are updated when they're loaded
@@ -836,7 +788,32 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     
     // Method to clear all expanded entries
     fun clearExpandedEntries() {
-        println("EksiViewModel: Clearing all expanded entries")
         _expandedEntries.clear()
+    }
+    
+    // Method to preload content for a category without updating the UI
+    fun preloadCategoryContent(category: String) {
+        // Don't preload if it's the current category
+        if (category == _selectedHomeCategory.value) {
+            return
+        }
+        
+        // Don't preload if we're already loading something
+        if (_isLoading.value || _isLoadingMoreTopics.value) {
+            return
+        }
+        
+        // Start a background task to load the content
+        viewModelScope.launch {
+            try {
+                // Fetch the data but don't update the UI
+                val preloadedTopics = EksiService.getPopularTopics(1, category)
+                
+                // Store the preloaded data in a cache (if needed)
+                // You could add a preloadedTopicsCache map here if you want to store and reuse this data
+            } catch (e: Exception) {
+                // Just log errors, don't show to the user since this is a background operation
+            }
+        }
     }
 } 

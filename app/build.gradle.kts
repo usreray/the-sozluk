@@ -54,12 +54,16 @@ dependencies {
     implementation(libs.jsoup)
     implementation(libs.accompanist.swiperefresh)
     
+    // Replace Accompanist Pager with official Jetpack Compose Pager
+    implementation("androidx.compose.foundation:foundation")
+    
     // Room dependencies
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     
     implementation(libs.generativeai)
+    implementation("com.google.code.gson:gson:2.10.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

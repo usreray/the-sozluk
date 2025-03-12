@@ -31,12 +31,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +54,15 @@ import com.example.eksiscraper.model.Topic
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.runtime.mutableStateMapOf
 import com.example.eksiscraper.viewmodel.EksiViewModel
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
 /**
  * Helper function to clean topic titles by removing entry numbers at the end
@@ -403,5 +417,77 @@ fun ErrorDisplay(message: String) {
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.error
         )
+    }
+}
+
+/**
+ * Category tab bar for the home screen to switch between different topic categories
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CategoryTabBar(
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit,
+    pagerState: PagerState,
+    modifier: Modifier = Modifier
+) {
+    val categories = listOf(
+        "popular" to "Popular",
+        "today" to "Today",
+        "stream" to "Stream"
+    )
+    
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Determine if a swipe is in progress
+    val isSwipeInProgress by remember {
+        derivedStateOf {
+            pagerState.currentPageOffsetFraction != 0f
+        }
+    }
+    
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 4.dp,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Tab row for the category tabs
+            TabRow(
+                selectedTabIndex = pagerState.currentPage,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary,
+                indicator = { tabPositions ->
+                    if (pagerState.currentPage < tabPositions.size) {
+                        TabRowDefaults.Indicator(
+                            modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
+                            color = MaterialTheme.colorScheme.primary,
+                            height = 3.dp
+                        )
+                    }
+                }
+            ) {
+                categories.forEachIndexed { index, (key, label) ->
+                    Tab(
+                        selected = pagerState.currentPage == index,
+                        onClick = {
+                            // Only allow tab selection when not swiping
+                            if (!isSwipeInProgress) {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(index)
+                                }
+                            }
+                        },
+                        text = {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (pagerState.currentPage == index) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    )
+                }
+            }
+        }
     }
 } 
