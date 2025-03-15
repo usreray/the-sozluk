@@ -265,9 +265,10 @@ private fun SavedTopicsList(
                 onClick = { onTopicSelected(topic) },
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    contentColor = MaterialTheme.colorScheme.onSurface
                 ),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp)

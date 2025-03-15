@@ -116,6 +116,25 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     val profileScrollState = LazyListState()
     // Add a separate scroll state for topic details
     val topicDetailScrollState = LazyListState()
+    
+    // Add persistent scroll states for each category tab
+    val popularScrollState = LazyListState()
+    val todayScrollState = LazyListState()
+    val streamScrollState = LazyListState()
+    
+    // Function to get the appropriate scroll state for a given category
+    fun getCategoryScrollState(category: String): LazyListState {
+        return when (category) {
+            "popular" -> popularScrollState
+            "today" -> todayScrollState
+            "stream" -> streamScrollState
+            else -> homeScrollState // Fallback
+        }
+    }
+    
+    // Add a flag to track if the first page has been loaded
+    private val _hasInitializedHomePage = mutableStateOf(false)
+    val hasInitializedHomePage: State<Boolean> = _hasInitializedHomePage
 
     init {
         val database = EksiDatabase.getDatabase(application)
@@ -131,7 +150,8 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         
-        fetchTopics()
+        // We don't auto-fetch topics anymore - this will now be initiated by the UI
+        // when the app is first visible
     }
     
     // Update saved status in the main topics list
@@ -456,6 +476,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                     page,
                     updatedRedirectedUrl  // Use the updated redirectedUrl
                 )
+                
                 _searchResult.value = result
             } catch (e: Exception) {
                 // Handle error
@@ -757,9 +778,9 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
             _homeCurrentPage.value = 1
             _topics.value = emptyList()
             
-            // Reset scroll position to top
+            // Reset scroll position to top for this specific category
             viewModelScope.launch {
-                homeScrollState.scrollToItem(0)
+                getCategoryScrollState(category).scrollToItem(0)
             }
             
             // Fetch topics for the selected category
@@ -786,11 +807,42 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         return _expandedEntries[entryKey] ?: false
     }
     
+    // Method to toggle entry favorite state
+    fun toggleEntryFavorite(entryId: String, isFavorited: Boolean = false) {
+        // Don't update local state, just send the request to the appropriate endpoint
+        viewModelScope.launch {
+            try {
+                val success = EksiService.toggleEntryFavorite(entryId, isFavorited)
+                // We don't update any local state - we'll rely on the server data
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+    
+    // For backward compatibility
+    fun toggleEntryFavorite(entryId: String) {
+        toggleEntryFavorite(entryId, false)
+    }
+    
+    // Method to check if an entry is favorited
+    fun isEntryFavorited(entryId: String): Boolean {
+        return false  // Always return false - we'll use the Entry.isFavorited from server instead
+    }
+    
     // Method to clear all expanded entries
     fun clearExpandedEntries() {
         _expandedEntries.clear()
     }
     
+    // Method to initialize the home page if it hasn't been loaded yet
+    fun initializeHomePageIfNeeded() {
+        if (!_hasInitializedHomePage.value) {
+            _hasInitializedHomePage.value = true
+            fetchTopics()
+        }
+    }
+
     // Method to preload content for a category without updating the UI
     fun preloadCategoryContent(category: String) {
         // Don't preload if it's the current category
@@ -800,6 +852,12 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         
         // Don't preload if we're already loading something
         if (_isLoading.value || _isLoadingMoreTopics.value) {
+            return
+        }
+        
+        // Don't eagerly preload during initial app launch
+        // Only preload if the home page has been initialized
+        if (!_hasInitializedHomePage.value) {
             return
         }
         

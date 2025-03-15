@@ -19,5 +19,8 @@ data class Topic(
 data class Entry(
     val content: String,
     val author: String = "",
-    val date: String = ""
+    val date: String = "",
+    val favoriteCount: Int = 0,
+    val entryId: String = "",
+    val isFavorited: Boolean = false
 ) 

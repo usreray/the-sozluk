@@ -117,22 +117,31 @@ fun HomeScreen(
         }
     }
     
+    // Get the current scroll state based on the selected category
+    val currentScrollState = viewModel.getCategoryScrollState(selectedCategory)
+    
     // Monitor swipe progress to detect direction and preload content
     LaunchedEffect(isSwipeInProgress, pagerState.currentPageOffsetFraction) {
         if (isSwipeInProgress) {
-            // If offset is positive, we're swiping from right to left (to see the next page)
-            // If offset is negative, we're swiping from left to right (to see the previous page)
-            val targetPage = if (pagerState.currentPageOffsetFraction > 0) {
-                // Swiping to next page (right to left)
-                (pagerState.currentPage + 1).coerceAtMost(categories.size - 1)
-            } else {
-                // Swiping to previous page (left to right)
-                (pagerState.currentPage - 1).coerceAtLeast(0)
-            }
+            // Only preload when the user has swiped at least 50% of the way to the next page
+            // This prevents unnecessary API calls during small scrolls
+            val significantSwipe = Math.abs(pagerState.currentPageOffsetFraction) > 0.5
             
-            // Get the category for the target page and preload its content
-            val targetCategory = categories[targetPage].first
-            viewModel.preloadCategoryContent(targetCategory)
+            if (significantSwipe) {
+                // If offset is positive, we're swiping from right to left (to see the next page)
+                // If offset is negative, we're swiping from left to right (to see the previous page)
+                val targetPage = if (pagerState.currentPageOffsetFraction > 0) {
+                    // Swiping to next page (right to left)
+                    (pagerState.currentPage + 1).coerceAtMost(categories.size - 1)
+                } else {
+                    // Swiping to previous page (left to right)
+                    (pagerState.currentPage - 1).coerceAtLeast(0)
+                }
+                
+                // Get the category for the target page and preload its content
+                val targetCategory = categories[targetPage].first
+                viewModel.preloadCategoryContent(targetCategory)
+            }
         }
     }
     
@@ -158,11 +167,21 @@ fun HomeScreen(
             }
     }
     
+    // Initialize the first page of content when the screen becomes visible
+    LaunchedEffect(Unit) {
+        viewModel.initializeHomePageIfNeeded()
+    }
+    
     // Observe the scrollToTop state and scroll to top when it changes to true
     LaunchedEffect(scrollToTop) {
         if (scrollToTop) {
+            // Get the correct scroll state for the current page
+            val currentCategory = categories[pagerState.currentPage].first
+            val scrollState = viewModel.getCategoryScrollState(currentCategory)
+            
             // Scroll to the top of the list
-            lazyListState.animateScrollToItem(0)
+            scrollState.animateScrollToItem(0)
+            
             // Reset the flag
             viewModel.resetHomeScrollToTop()
         }
@@ -171,17 +190,25 @@ fun HomeScreen(
     // Show FAB only when scrolled down
     val showFab by remember {
         derivedStateOf {
-            lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0
+            // Get the correct scroll state for the current page
+            val currentCategory = categories[pagerState.currentPage].first
+            val scrollState = viewModel.getCategoryScrollState(currentCategory)
+            
+            scrollState.firstVisibleItemIndex > 0 || scrollState.firstVisibleItemScrollOffset > 0
         }
     }
     
     // Detect when we've scrolled to the bottom of the list
     val isAtBottom by remember {
         derivedStateOf {
+            // Get the correct scroll state for the current page
+            val currentCategory = categories[pagerState.currentPage].first
+            val scrollState = viewModel.getCategoryScrollState(currentCategory)
+            
             if (topics.isEmpty()) {
                 false
             } else {
-                val layoutInfo = lazyListState.layoutInfo
+                val layoutInfo = scrollState.layoutInfo
                 val visibleItemsInfo = layoutInfo.visibleItemsInfo
                 
                 if (visibleItemsInfo.isEmpty()) {
@@ -208,6 +235,18 @@ fun HomeScreen(
         }
     }
     
+    // Method to scroll to the top of the home screen without reloading data
+    fun scrollHomeToTop() {
+        // Get the correct scroll state for the current category
+        val currentCategory = categories[pagerState.currentPage].first
+        val scrollState = viewModel.getCategoryScrollState(currentCategory)
+        
+        // Scroll to the top of the list
+        scope.launch {
+            scrollState.animateScrollToItem(0)
+        }
+    }
+    
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
@@ -218,9 +257,7 @@ fun HomeScreen(
             ) {
                 FloatingActionButton(
                     onClick = { 
-                        scope.launch {
-                            lazyListState.animateScrollToItem(0)
-                        }
+                        scrollHomeToTop()
                     },
                     containerColor = MaterialTheme.colorScheme.surface,
                     contentColor = MaterialTheme.colorScheme.primary,
@@ -255,6 +292,12 @@ fun HomeScreen(
                 modifier = Modifier.weight(1f),
                 flingBehavior = flingBehavior
             ) { page ->
+                // Get the category for this page
+                val pageCategory = categories[page].first
+                
+                // Get the scroll state directly from the ViewModel
+                val pageScrollState = viewModel.getCategoryScrollState(pageCategory)
+                
                 // The content inside each page is the same, it's just filtered by the selected category
                 SwipeRefresh(
                     state = swipeRefreshState,
@@ -299,7 +342,7 @@ fun HomeScreen(
                                 }
                             } else {
                                 LazyColumn(
-                                    state = lazyListState,
+                                    state = pageScrollState,  // Use the ViewModel's scroll state
                                     modifier = Modifier.fillMaxSize(),
                                     contentPadding = PaddingValues(
                                         start = 16.dp,

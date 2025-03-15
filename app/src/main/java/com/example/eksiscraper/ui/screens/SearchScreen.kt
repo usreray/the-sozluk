@@ -132,9 +132,9 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                             keyboardActions = KeyboardActions(
                                 onSearch = { viewModel.search() }
                             ),
-                            colors = TextFieldDefaults.outlinedTextFieldColors(
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                                unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
                                 focusedLabelColor = MaterialTheme.colorScheme.primary,
                                 cursorColor = MaterialTheme.colorScheme.primary
                             ),

@@ -64,6 +64,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 
+
 /**
  * Helper function to clean topic titles by removing entry numbers at the end
  */
@@ -115,9 +116,9 @@ fun PageSelectionDialog(
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                    colors = TextFieldDefaults.colors(
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                        unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
                         focusedLabelColor = MaterialTheme.colorScheme.primary,
                         cursorColor = MaterialTheme.colorScheme.primary
                     )
@@ -389,7 +390,9 @@ fun EntriesDisplay(
                     entry = entry, 
                     index = entryKey,
                     isExpanded = viewModel.isEntryExpanded(entryKey),
-                    onExpandToggle = { viewModel.toggleEntryExpansion(entryKey) }
+                    onExpandToggle = { viewModel.toggleEntryExpansion(entryKey) },
+                    isFavorite = entry.isFavorited,
+                    onFavoriteToggle = { entryId -> viewModel.toggleEntryFavorite(entryId, entry.isFavorited) }
                 )
             }
             

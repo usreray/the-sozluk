@@ -13,8 +13,99 @@ object EksiService {
     private const val BASE_URL = "https://eksisozluk.com"
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
     
+    // Add the cookie string
+    private const val COOKIE_STRING = ""
+    
     // Store the last fetched topics for JSON export
     private var lastFetchedTopics = listOf<Topic>()
+    
+    // Helper function to add cookies to every connection
+    private fun applyCommonConnectionSettings(connection: org.jsoup.Connection): org.jsoup.Connection {
+        return connection
+            .userAgent(USER_AGENT)
+            .timeout(10000)
+            .followRedirects(true)
+            .header("Cookie", COOKIE_STRING)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
+            .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
+            .header("Accept-Encoding", "gzip, deflate, br")
+            .header("Connection", "keep-alive")
+            .header("Upgrade-Insecure-Requests", "1")
+            .ignoreHttpErrors(true)
+    }
+    
+    // Function to favorite an entry
+    suspend fun favoriteEntry(entryId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // URL for favoriting an entry
+            val favlaUrl = "$BASE_URL/entry/favla"
+            
+            // Set up the connection for POST request
+            val connection = applyCommonConnectionSettings(Jsoup.connect(favlaUrl))
+                .method(org.jsoup.Connection.Method.POST)
+                .referrer("$BASE_URL/")
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                // Add CSRF protection headers if needed
+                .header("X-Requested-With", "XMLHttpRequest")
+            
+            // Add the entry ID as form data
+            connection.data("entryId", entryId)
+            
+            // Execute the request
+            val response = connection.execute()
+            
+            // Check if the request was successful (status code 200)
+            return@withContext response.statusCode() == 200
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext false
+        }
+    }
+    
+    // Function to unfavorite an entry
+    suspend fun unfavoriteEntry(entryId: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            // URL for unfavoriting an entry
+            val favlamaUrl = "$BASE_URL/entry/favlama"
+            
+            // Set up the connection for POST request
+            val connection = applyCommonConnectionSettings(Jsoup.connect(favlamaUrl))
+                .method(org.jsoup.Connection.Method.POST)
+                .referrer("$BASE_URL/")
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                // Add CSRF protection headers if needed
+                .header("X-Requested-With", "XMLHttpRequest")
+            
+            // Add the entry ID as form data
+            connection.data("entryId", entryId)
+            
+            // Execute the request
+            val response = connection.execute()
+            
+            // Check if the request was successful (status code 200)
+            return@withContext response.statusCode() == 200
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext false
+        }
+    }
+    
+    // Function to toggle entry favorite state (for backward compatibility)
+    suspend fun toggleEntryFavorite(entryId: String): Boolean = withContext(Dispatchers.IO) {
+        // Default to favoriting if we don't know the state
+        return@withContext favoriteEntry(entryId)
+    }
+    
+    // Function to toggle entry favorite state based on current state
+    suspend fun toggleEntryFavorite(entryId: String, isFavorited: Boolean): Boolean = withContext(Dispatchers.IO) {
+        return@withContext if (isFavorited) {
+            // If already favorited, call unfavorite
+            unfavoriteEntry(entryId)
+        } else {
+            // If not favorited, call favorite
+            favoriteEntry(entryId)
+        }
+    }
     
     suspend fun getPopularTopics(page: Int = 1, category: String = "popular"): List<Topic> = withContext(Dispatchers.IO) {
         try {
@@ -61,15 +152,16 @@ object EksiService {
                 delay(randomDelayMs)
             }
             
-            // Construct the URL
-            val pageParam = if (page > 1) "?p=$page" else ""
-            val url = "$baseUrl/$urlPath$pageParam"
+            // Construct the URL with special handling for "bugun" category
+            val url = if (urlPath == "basliklar/bugun" && page > 1) {
+                "$baseUrl/$urlPath/$page"
+            } else {
+                val pageParam = if (page > 1) "?p=$page" else ""
+                "$baseUrl/$urlPath$pageParam"
+            }
             
-            // Connect to the URL
-            val connection = Jsoup.connect(url)
-                .userAgent(USER_AGENT)
-                .timeout(10000)  // Use shorter timeout for lightweight requests
-                .followRedirects(true)
+            // Connect to the URL with cookie
+            val connection = applyCommonConnectionSettings(Jsoup.connect(url))
             
             // Execute the request
             val response = connection.execute()
@@ -184,13 +276,10 @@ object EksiService {
                 "$baseUrl/mobil/$urlPath"
             }
             
-            val connection = Jsoup.connect(mobileUrl)
+            // Use the helper function to set up the connection with cookie
+            val connection = applyCommonConnectionSettings(Jsoup.connect(mobileUrl))
                 .userAgent("Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.0 Mobile/15E148 Safari/604.1")
-                .timeout(10000) // Reduced timeout to 10 seconds
                 .referrer("https://www.google.com/search?q=eksisozluk+mobil")
-                .followRedirects(true)
-                .ignoreHttpErrors(true)
-                .ignoreContentType(true)
                 .maxBodySize(0)
             
             val response = connection.execute()
@@ -318,24 +407,8 @@ object EksiService {
             // Store the corrected URL for logging
             val correctedRedirectedUrl = searchUrl
             
-            // Connect to the URL and follow redirections
-            val connection = Jsoup.connect("$BASE_URL$searchUrl")
-                .userAgent(USER_AGENT)
-                .timeout(10000)
-                .followRedirects(true)
-                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-                .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
-                .header("Accept-Encoding", "gzip, deflate, br")
-                .header("Connection", "keep-alive")
-                .header("Upgrade-Insecure-Requests", "1")
-                .header("Sec-Fetch-Dest", "document")
-                .header("Sec-Fetch-Mode", "navigate")
-                .header("Sec-Fetch-Site", "same-origin")
-                .header("Sec-Fetch-User", "?1")
-                .header("Pragma", "no-cache")
-                .header("Cache-Control", "no-cache")
-                .header("DNT", "1")
-                .ignoreHttpErrors(true) // Important: ignore HTTP errors to handle them gracefully
+            // Connect to the URL and follow redirections with cookie
+            val connection = applyCommonConnectionSettings(Jsoup.connect("$BASE_URL$searchUrl"))
             
             val response = connection.execute()
             
@@ -345,7 +418,10 @@ object EksiService {
                     title = query,
                     url = "$BASE_URL$searchUrl",
                     commentCount = 0,
-                    entries = listOf(Entry("HTTP error: ${response.statusCode()} - ${response.statusMessage()}")),
+                    entries = listOf(Entry(
+                        content = "HTTP error: ${response.statusCode()} - ${response.statusMessage()}",
+                        entryId = "error_http_${response.statusCode()}"
+                    )),
                     entriesLoaded = true,
                     redirectedUrl = searchUrl,
                     totalPages = 1
@@ -401,62 +477,83 @@ object EksiService {
                 .replace(Regex(" - sayfa \\d+"), "")  // Remove "- sayfa X" pattern
                 .trim()
             
-            // Extract entries from the document
-            val entryElements = document.select("div.content, div.entry-content, div.entry")
+            // Extract entry list items directly instead of just content divs
+            val entryListItems = document.select("li[data-id]")
             
             // Use a simple approach: if we're on page X and got entries, there are at least X pages
             var totalPages = page
-            if (entryElements.isEmpty() && page > 1) {
+            if (entryListItems.isEmpty() && page > 1) {
                 // If no entries found and we're beyond page 1, adjust totalPages
                 totalPages = page - 1
             }
             
             // Process entries
             val entries = mutableListOf<Entry>()
-            for (entryElement in entryElements.take(10)) {
-                // Instead of just text(), preserve paragraph structure by replacing <br> and <p> tags with newlines
-                val htmlContent = entryElement.html()
-                
-                // First, normalize all possible paragraph/line break tags to consistent markers
-                val contentWithMarkers = htmlContent
-                    .replace("<br>", "[SINGLE_BREAK]")
-                    .replace("<br/>", "[SINGLE_BREAK]")
-                    .replace("<br />", "[SINGLE_BREAK]")
-                    .replace("</p><p>", "[DOUBLE_BREAK]") // Paragraphs should have double breaks
-                    .replace("<p>", "")
-                    .replace("</p>", "[SINGLE_BREAK]")
-                
-                // Convert to plain text - this will strip all remaining HTML tags
-                val plainText = Jsoup.parse(contentWithMarkers).text()
-                
-                // Replace our markers with actual newlines
-                val contentWithProperBreaks = plainText
-                    .replace("[SINGLE_BREAK]", "\n")
-                    .replace("[DOUBLE_BREAK]", "\n\n") // Double newlines for paragraph breaks
-                
-                // Clean up any excessive consecutive newlines but preserve doubles
-                val contentWithNormalizedBreaks = contentWithProperBreaks
-                    .replace(Regex("\n{3,}"), "\n\n") // Replace 3+ newlines with double newlines
-                
-                // Trim each line to remove leading/trailing spaces
-                val lines = contentWithNormalizedBreaks.lines()
-                val trimmedLines = lines.map { it.trim() }
-                val content = trimmedLines.joinToString("\n").trim()
-                
-                if (content.isNotEmpty()) {
-                    // Try to extract author and date if available
-                    val authorElement = entryElement.parent()?.select("a.entry-author, a.author")?.firstOrNull()
-                    val author = authorElement?.text() ?: ""
+            for (entryLi in entryListItems.take(10)) {
+                // Get the content div inside the li
+                val entryElement = entryLi.select("div.content, div.entry-content, div.entry").firstOrNull()
+                if (entryElement != null) {
+                    // Instead of just text(), preserve paragraph structure by replacing <br> and <p> tags with newlines
+                    val htmlContent = entryElement.html()
                     
-                    val dateElement = entryElement.parent()?.select("a.entry-date, span.date")?.firstOrNull()
-                    val date = dateElement?.text() ?: ""
+                    // First, normalize all possible paragraph/line break tags to consistent markers
+                    val contentWithMarkers = htmlContent
+                        .replace("<br>", "[SINGLE_BREAK]")
+                        .replace("<br/>", "[SINGLE_BREAK]")
+                        .replace("<br />", "[SINGLE_BREAK]")
+                        .replace("</p><p>", "[DOUBLE_BREAK]") // Paragraphs should have double breaks
+                        .replace("<p>", "")
+                        .replace("</p>", "[SINGLE_BREAK]")
                     
-                    entries.add(Entry(content, author, date))
+                    // Convert to plain text - this will strip all remaining HTML tags
+                    val plainText = Jsoup.parse(contentWithMarkers).text()
+                    
+                    // Replace our markers with actual newlines
+                    val contentWithProperBreaks = plainText
+                        .replace("[SINGLE_BREAK]", "\n")
+                        .replace("[DOUBLE_BREAK]", "\n\n") // Double newlines for paragraph breaks
+                    
+                    // Clean up any excessive consecutive newlines but preserve doubles
+                    val contentWithNormalizedBreaks = contentWithProperBreaks
+                        .replace(Regex("\n{3,}"), "\n\n") // Replace 3+ newlines with double newlines
+                    
+                    // Trim each line to remove leading/trailing spaces
+                    val lines = contentWithNormalizedBreaks.lines()
+                    val trimmedLines = lines.map { it.trim() }
+                    val content = trimmedLines.joinToString("\n").trim()
+                    
+                    if (content.isNotEmpty()) {
+                        // Extract author, date, and favorite count
+                        val author = entryLi.select("a.entry-author, a.author").firstOrNull()?.text() ?: ""
+                        val date = entryLi.select("a.entry-date, span.date").firstOrNull()?.text() ?: ""
+                        
+                        // Extract favorite count from data attribute of the li element
+                        val favoriteCountStr = entryLi.attr("data-favorite-count") ?: "0"
+                        val favoriteCount = favoriteCountStr.toIntOrNull() ?: 0
+                        
+                        // Extract entry ID from data-id attribute
+                        val entryId = entryLi.attr("data-id") ?: ""
+                        
+                        // Extract if the entry is already favorited
+                        val isFavorited = entryLi.attr("data-isfavorite").equals("true", ignoreCase = true)
+                        
+                        entries.add(Entry(
+                            content = content,
+                            author = author,
+                            date = date,
+                            favoriteCount = favoriteCount,
+                            entryId = entryId,
+                            isFavorited = isFavorited
+                        ))
+                    }
                 }
             }
             
             if (entries.isEmpty()) {
-                entries.add(Entry("No entries found for this topic on page $page"))
+                entries.add(Entry(
+                    content = "No entries found for this topic on page $page",
+                    entryId = "error_no_entries_${System.currentTimeMillis()}"
+                ))
             }
             
             // Create a topic with the search query and fetched entries
@@ -542,30 +639,44 @@ object EksiService {
                 url
             }
             
-            val connection = Jsoup.connect(pageUrl)
-                .userAgent(USER_AGENT)
-                .timeout(10000)
-                .followRedirects(true)
-                .ignoreHttpErrors(true)
+            // Use the helper function to apply common settings including cookie
+            val connection = applyCommonConnectionSettings(Jsoup.connect(pageUrl))
             
             val response = connection.execute()
             val document = response.parse()
             
-            // Extract entries from the document
-            val entryElements = document.select("div.content")
+            // Extract entry list items directly instead of just content divs
+            val entryListItems = document.select("li[data-id]")
             
             val entries = mutableListOf<Entry>()
             
-            for (entryElement in entryElements) {
-                val content = entryElement.html()
-                val author = entryElement.parent()?.select("a.entry-author")?.text() ?: "Unknown"
-                val date = entryElement.parent()?.select("a.entry-date")?.text() ?: ""
-                
-                entries.add(Entry(
-                    content = content,
-                    author = author,
-                    date = date
-                ))
+            for (entryLi in entryListItems) {
+                // Get the content div inside the li
+                val entryElement = entryLi.select("div.content").firstOrNull()
+                if (entryElement != null) {
+                    val content = entryElement.html()
+                    val author = entryLi.select("a.entry-author").text() ?: "Unknown"
+                    val date = entryLi.select("a.entry-date").text() ?: ""
+                    
+                    // Extract favorite count from data attribute of the li element
+                    val favoriteCountStr = entryLi.attr("data-favorite-count") ?: "0"
+                    val favoriteCount = favoriteCountStr.toIntOrNull() ?: 0
+                    
+                    // Extract entry ID from data-id attribute
+                    val entryId = entryLi.attr("data-id") ?: ""
+                    
+                    // Extract if the entry is already favorited
+                    val isFavorited = entryLi.attr("data-isfavorite").equals("true", ignoreCase = true)
+                    
+                    entries.add(Entry(
+                        content = content,
+                        author = author,
+                        date = date,
+                        favoriteCount = favoriteCount,
+                        entryId = entryId,
+                        isFavorited = isFavorited
+                    ))
+                }
             }
             
             // Try to determine the total number of pages

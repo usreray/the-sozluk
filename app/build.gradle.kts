@@ -53,6 +53,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.jsoup)
     implementation(libs.accompanist.swiperefresh)
+    implementation ("androidx.compose.runtime:runtime-saveable:1.7.8")
     
     // Replace Accompanist Pager with official Jetpack Compose Pager
     implementation("androidx.compose.foundation:foundation")
