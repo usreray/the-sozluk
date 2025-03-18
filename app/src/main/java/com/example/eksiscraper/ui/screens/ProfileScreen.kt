@@ -37,10 +37,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.eksiscraper.R
 import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.ui.components.EntriesDisplay
 import com.example.eksiscraper.ui.components.EntriesSkeleton
@@ -197,7 +199,7 @@ private fun EmptySavedTopicsMessage(paddingValues: PaddingValues) {
             modifier = Modifier.padding(16.dp)
         ) {
             Icon(
-                imageVector = Icons.Outlined.FavoriteBorder,
+                painter = painterResource(id = R.drawable.bookmark_24px),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.height(48.dp)
@@ -291,19 +293,11 @@ private fun SavedTopicsList(
                             onClick = { viewModel.unsaveTopic(topic) }
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Favorite,
+                                painter = painterResource(id = R.drawable.bookmark_24px_filled),
                                 contentDescription = "Unsave topic",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                    }
-                    
-                    if (topic.commentCount > 0) {
-                        Text(
-                            text = "${topic.commentCount} entries",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }

@@ -41,6 +41,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.ui.text.TextLayoutResult
 import com.example.eksiscraper.network.EksiService
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.painterResource
+import com.example.eksiscraper.R
 
 @Composable
 fun EntryItem(
@@ -160,8 +162,8 @@ fun EntryItem(
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Favorite,
-                                contentDescription = "Unfavorite entry",
+                                painter = painterResource(id = R.drawable.thumb_up_24px_filled),
+                                contentDescription = "Unlike entry",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -193,8 +195,8 @@ fun EntryItem(
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.FavoriteBorder,
-                                contentDescription = "Favorite entry",
+                                painter = painterResource(id = R.drawable.thumb_up_24px),
+                                contentDescription = "Like entry",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }

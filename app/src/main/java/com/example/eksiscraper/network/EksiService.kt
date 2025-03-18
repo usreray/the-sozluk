@@ -220,7 +220,15 @@ object EksiService {
             val topics = mutableListOf<Topic>()
             
             for (topicElement in topicElements) {
-                val title = topicElement.text()
+                // Get the HTML content of the element instead of just text
+                val htmlContent = topicElement.html()
+                
+                // Remove <small> tags and their content
+                val titleWithoutSmall = htmlContent.replace(Regex("<small>.*?</small>"), "").trim()
+                
+                // Convert the cleaned HTML back to plain text
+                val title = Jsoup.parse(titleWithoutSmall).text()
+                
                 val href = topicElement.attr("href")
                 
                 if (title.isNotEmpty() && href.isNotEmpty()) {
@@ -327,7 +335,15 @@ object EksiService {
             val topics = mutableListOf<Topic>()
             
             for (topicElement in topicElements) {
-                val title = topicElement.text()
+                // Get the HTML content of the element instead of just text
+                val htmlContent = topicElement.html()
+                
+                // Remove <small> tags and their content
+                val titleWithoutSmall = htmlContent.replace(Regex("<small>.*?</small>"), "").trim()
+                
+                // Convert the cleaned HTML back to plain text
+                val title = Jsoup.parse(titleWithoutSmall).text()
+                
                 val href = topicElement.attr("href")
                 
                 if (title.isNotEmpty() && href.isNotEmpty()) {
@@ -480,9 +496,17 @@ object EksiService {
             // Extract entry list items directly instead of just content divs
             val entryListItems = document.select("li[data-id]")
             
-            // Use a simple approach: if we're on page X and got entries, there are at least X pages
+            // Extract the total number of pages from data-pagecount attribute
             var totalPages = page
-            if (entryListItems.isEmpty() && page > 1) {
+            val pagerElement = document.select("div.pager").firstOrNull()
+            
+            if (pagerElement != null) {
+                // Extract the data-pagecount attribute
+                val pageCountStr = pagerElement.attr("data-pagecount")
+                if (pageCountStr.isNotEmpty()) {
+                    totalPages = pageCountStr.toIntOrNull() ?: page
+                }
+            } else if (entryListItems.isEmpty() && page > 1) {
                 // If no entries found and we're beyond page 1, adjust totalPages
                 totalPages = page - 1
             }
@@ -679,17 +703,25 @@ object EksiService {
                 }
             }
             
-            // Try to determine the total number of pages
+            // Extract the total number of pages from data-pagecount attribute
             var totalPages = 1
-            val pagerElements = document.select("div.pager")
-            if (pagerElements.isNotEmpty()) {
-                val pageLinks = pagerElements.select("a")
-                for (link in pageLinks) {
-                    val pageText = link.text().trim()
-                    if (pageText.matches(Regex("\\d+"))) {
-                        val pageNum = pageText.toIntOrNull() ?: 1
-                        if (pageNum > totalPages) {
-                            totalPages = pageNum
+            val pagerElement = document.select("div.pager").firstOrNull()
+            
+            if (pagerElement != null) {
+                // Extract the data-pagecount attribute
+                val pageCountStr = pagerElement.attr("data-pagecount")
+                if (pageCountStr.isNotEmpty()) {
+                    totalPages = pageCountStr.toIntOrNull() ?: 1
+                } else {
+                    // Fallback: use the old method of counting links if data-pagecount is not available
+                    val pageLinks = pagerElement.select("a")
+                    for (link in pageLinks) {
+                        val pageText = link.text().trim()
+                        if (pageText.matches(Regex("\\d+"))) {
+                            val pageNum = pageText.toIntOrNull() ?: 1
+                            if (pageNum > totalPages) {
+                                totalPages = pageNum
+                            }
                         }
                     }
                 }

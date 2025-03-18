@@ -63,132 +63,17 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.ui.res.painterResource
+import com.example.eksiscraper.R
 
 
 /**
- * Helper function to clean topic titles by removing entry numbers at the end
+ * Clean the topic title by removing entry numbers at the end
  */
 private fun cleanTopicTitle(title: String): String {
     // Pattern to match a number at the end of the title, possibly with spaces before it
     val numberPattern = Regex("\\s+\\d+$")
     return title.replace(numberPattern, "")
-}
-
-/**
- * Shared page selection dialog used in both TopicDetailScreen and SearchScreen
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun PageSelectionDialog(
-    currentPage: Int,
-    maxPages: Int,
-    selectedPage: Int,
-    onPageSelected: (Int) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select Page") },
-        text = {
-            Column {
-                Text("Current page: $currentPage of $maxPages")
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Page input field
-                var pageInput by remember { mutableStateOf(selectedPage.toString()) }
-                
-                OutlinedTextField(
-                    value = pageInput,
-                    onValueChange = { 
-                        // Only allow numeric input
-                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                            pageInput = it
-                            // Update selected page if valid
-                            it.toIntOrNull()?.let { num ->
-                                if (num >= 1 && num <= maxPages) { // Limit to max pages
-                                    onPageSelected(num)
-                                }
-                            }
-                        }
-                    },
-                    label = { Text("Page number (1-$maxPages)") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                        unfocusedIndicatorColor = MaterialTheme.colorScheme.outline,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        cursorColor = MaterialTheme.colorScheme.primary
-                    )
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Quick navigation buttons - only Prev and Next
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Button(
-                        onClick = { 
-                            val prev = (selectedPage - 1).coerceAtLeast(1)
-                            onPageSelected(prev)
-                            pageInput = prev.toString()
-                        },
-                        enabled = selectedPage > 1,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text("Prev")
-                    }
-                    
-                    Button(
-                        onClick = { 
-                            val next = (selectedPage + 1).coerceAtMost(maxPages)
-                            onPageSelected(next)
-                            pageInput = next.toString()
-                        },
-                        enabled = selectedPage < maxPages,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Text("Next")
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                enabled = selectedPage >= 1 && selectedPage <= maxPages && selectedPage != currentPage,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Text("Go to Page")
-            }
-        },
-        dismissButton = {
-            Button(
-                onClick = onDismiss,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent
-                )
-            ) {
-                Text(
-                    "Cancel",
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    )
 }
 
 /**
@@ -204,8 +89,8 @@ fun TopicHeader(
     onShowPageDialog: () -> Unit,
     isPreviousEnabled: Boolean,
     isNextEnabled: Boolean,
-    isSaved: Boolean = false,
-    onSaveToggle: () -> Unit = {}
+    isSaved: Boolean,
+    onSaveToggle: () -> Unit
 ) {
     // Clean the title by removing entry numbers at the end
     val cleanTitle = cleanTopicTitle(title)
@@ -236,7 +121,10 @@ fun TopicHeader(
                 // Save/Unsave button
                 IconButton(onClick = onSaveToggle) {
                     Icon(
-                        imageVector = if (isSaved) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                        painter = painterResource(
+                            id = if (isSaved) R.drawable.bookmark_24px_filled 
+                                else R.drawable.bookmark_24px
+                        ),
                         contentDescription = if (isSaved) "Unsave Topic" else "Save Topic",
                         tint = MaterialTheme.colorScheme.primary
                     )

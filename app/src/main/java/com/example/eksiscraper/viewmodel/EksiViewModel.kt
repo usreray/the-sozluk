@@ -451,6 +451,13 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
         
+        // For a new search, reset the current page to 1
+        if (isNewSearch) {
+            _currentPage.value = 1
+        } else {
+            _currentPage.value = page
+        }
+        
         // If changing pages, update the redirectedUrl to match the correct page
         val updatedRedirectedUrl = if (searchResult.value?.redirectedUrl?.isNotEmpty() == true && !isNewSearch) {
             if (searchResult.value?.redirectedUrl?.contains("p=") == true) {
@@ -467,13 +474,11 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
         // Then call searchTopic with the updated redirectedUrl
         viewModelScope.launch {
             _isSearching.value = true
-            _currentPage.value = page
-            _selectedPage.value = page
             
             try {
                 val result = EksiService.searchTopic(
                     _searchQuery.value,
-                    page,
+                    if (isNewSearch) 1 else page,  // Use page 1 for new searches
                     updatedRedirectedUrl  // Use the updated redirectedUrl
                 )
                 

@@ -106,6 +106,9 @@ fun TopicDetailScreen(
     
     // Handle back press to return to home screen
     BackHandler {
+        // Set active screen to home first before clearing the selected topic
+        // This prevents the "Topic not found" error from flashing
+        viewModel.setActiveScreen("home")
         viewModel.clearSelectedTopic()
         navController.popBackStack()
     }
