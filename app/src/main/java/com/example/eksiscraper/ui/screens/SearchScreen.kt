@@ -29,6 +29,8 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -53,6 +55,10 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
     val isPageDialogVisible by viewModel.isPageDialogVisible
     val selectedPage by viewModel.selectedPage
     val context = LocalContext.current
+    
+    // Add state to track scroll position and navigation visibility
+    val isScrolledState = remember { mutableStateOf(false) }
+    val isScrolled = isScrolledState.value
     
     // Set the active screen
     LaunchedEffect(Unit) {
@@ -210,7 +216,8 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                                     viewModel.saveTopic(topic)
                                 }
                             }
-                        }
+                        },
+                        isScrolled = isScrolled
                     )
                     
                     // Entries
@@ -219,7 +226,8 @@ fun SearchScreen(viewModel: EksiViewModel = viewModel()) {
                             topic = result,
                             currentPage = currentPage,
                             viewModel = viewModel,
-                            scrollState = viewModel.searchScrollState
+                            scrollState = viewModel.searchScrollState,
+                            onScroll = { scrolled -> isScrolledState.value = scrolled }
                         )
                     }
                 }

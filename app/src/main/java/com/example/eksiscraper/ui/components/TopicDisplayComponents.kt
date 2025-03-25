@@ -65,6 +65,17 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.ui.res.painterResource
 import com.example.eksiscraper.R
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 
 
 /**
@@ -90,10 +101,21 @@ fun TopicHeader(
     isPreviousEnabled: Boolean,
     isNextEnabled: Boolean,
     isSaved: Boolean,
-    onSaveToggle: () -> Unit
+    onSaveToggle: () -> Unit,
+    isScrolled: Boolean = false
 ) {
     // Clean the title by removing entry numbers at the end
     val cleanTitle = cleanTopicTitle(title)
+    
+    // Animation for page navigation visibility - use a more stable animation configuration
+    val pageNavHeightPx by animateDpAsState(
+        targetValue = if (isScrolled) 0.dp else 60.dp,  // Height when visible
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,  // Low bouncy for quick response
+            stiffness = Spring.StiffnessHigh           // Faster response
+        ),
+        label = "pageNavHeight"
+    )
     
     Card(
         modifier = Modifier
@@ -104,6 +126,7 @@ fun TopicHeader(
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // Title and save button section
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -131,64 +154,88 @@ fun TopicHeader(
                 }
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Page selector - simplified display
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+            // Only show page navigation with animation when visible
+            AnimatedVisibility(
+                visible = !isScrolled,
+                enter = expandVertically(
+                    animationSpec = tween(
+                        durationMillis = 300,
+                        easing = FastOutSlowInEasing
+                    )
+                ) + fadeIn(
+                    animationSpec = tween(durationMillis = 200)
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(
+                        durationMillis = 250,
+                        easing = FastOutLinearInEasing
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(durationMillis = 150)
+                )
             ) {
-                // Previous page button - just icon
-                IconButton(
-                    onClick = onPreviousPage,
-                    enabled = isPreviousEnabled,
-                    modifier = Modifier.padding(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Previous Page",
-                        tint = if (isPreviousEnabled) 
-                               MaterialTheme.colorScheme.primary 
-                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                Column {
+                    // Add a divider to separate title from page navigation
+                    Spacer(modifier = Modifier.height(8.dp))
+                    androidx.compose.material3.Divider(
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.2f),
+                        thickness = 1.dp
                     )
-                }
-                
-                // Page info and change page button
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = if (maxPages > 0) "Page $currentPage of $maxPages" else "Page $currentPage",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                     
-                    // Page button that opens the dialog
-                    OutlinedButton(
-                        onClick = onShowPageDialog,
-                        modifier = Modifier.padding(horizontal = 8.dp)
+                    // Page navigation section
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Change Page")
+                        // Previous page button - just icon
+                        IconButton(
+                            onClick = onPreviousPage,
+                            enabled = isPreviousEnabled,
+                            modifier = Modifier.padding(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Previous Page",
+                                tint = if (isPreviousEnabled) 
+                                       MaterialTheme.colorScheme.primary 
+                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
+                        }
+                        
+                        // Page info and change page button
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            OutlinedButton(
+                                onClick = onShowPageDialog,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            ) {
+                                Text(
+                                    text = "$currentPage/$maxPages",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                        
+                        // Next page button - just icon
+                        IconButton(
+                            onClick = onNextPage,
+                            enabled = isNextEnabled,
+                            modifier = Modifier.padding(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowForward,
+                                contentDescription = "Next Page",
+                                tint = if (isNextEnabled) 
+                                       MaterialTheme.colorScheme.primary 
+                                       else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            )
+                        }
                     }
-                }
-                
-                // Next page button - just icon
-                IconButton(
-                    onClick = onNextPage,
-                    enabled = isNextEnabled,
-                    modifier = Modifier.padding(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowForward,
-                        contentDescription = "Next Page",
-                        tint = if (isNextEnabled) 
-                               MaterialTheme.colorScheme.primary 
-                               else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    )
                 }
             }
         }
@@ -227,8 +274,145 @@ fun EntriesDisplay(
     topic: Topic,
     currentPage: Int,
     viewModel: EksiViewModel,
-    scrollState: LazyListState
+    scrollState: LazyListState,
+    onScroll: (Boolean) -> Unit = {}
 ) {
+    // Track previous scroll position to determine scroll direction
+    val previousScrollOffset = remember { mutableStateOf(0) }
+    val previousFirstVisibleIndex = remember { mutableStateOf(0) }
+    val isScrollingUp = remember { mutableStateOf(false) }
+    
+    // Check if we're at the top
+    val isAtTop = scrollState.firstVisibleItemIndex == 0 && scrollState.firstVisibleItemScrollOffset == 0
+    
+    // Check if we're at the end of the list
+    val isAtEnd = remember { mutableStateOf(false) }
+    
+    // Track if we're scrolling too fast
+    val lastScrollUpdateTime = remember { mutableStateOf(System.currentTimeMillis()) }
+    val isScrollingFast = remember { mutableStateOf(false) }
+    
+    // Track if we should hide controls to prevent flickering
+    val shouldHideControls = remember { mutableStateOf(false) }
+
+    // Use derivedStateOf to efficiently calculate if we're near the end of the list
+    val reachedEnd = remember {
+        derivedStateOf {
+            if (topic.entries.isEmpty()) {
+                false
+            } else {
+                val lastVisibleItem = scrollState.layoutInfo.visibleItemsInfo.lastOrNull()
+                val totalItems = topic.entries.size
+                
+                // Check if the last item is visible and we're near the end
+                lastVisibleItem != null && lastVisibleItem.index >= totalItems - 1
+            }
+        }
+    }
+    
+    // Update isAtEnd based on reachedEnd derived state
+    LaunchedEffect(reachedEnd.value) {
+        isAtEnd.value = reachedEnd.value
+        
+        // If we reached the end while scrolling fast and not scrolling up,
+        // ensure we keep controls hidden to prevent flickering
+        if (reachedEnd.value && isScrollingFast.value && !isScrollingUp.value) {
+            shouldHideControls.value = true
+        }
+    }
+    
+    // Create a derived state for scrolling down (opposite of scrolling up)
+    // This helps us handle the fast scroll down case better
+    val isScrollingDown = remember { mutableStateOf(false) }
+    
+    // Determine if we should show navigation controls
+    // Show when at top or when scrolling up (but use our anti-flicker detection)
+    val shouldShowControls = isAtTop || (isScrollingUp.value && !shouldHideControls.value)
+    
+    // Additional effect to handle when scroll jumps past our detection
+    LaunchedEffect(scrollState.firstVisibleItemIndex) {
+        // When item index changes significantly, it's a fast scroll
+        val currentFirstVisibleIndex = scrollState.firstVisibleItemIndex
+        val previousIndex = previousFirstVisibleIndex.value
+        
+        // If we jump by more than 2 items at once, consider it a fast scroll
+        if (Math.abs(currentFirstVisibleIndex - previousIndex) > 2) {
+            isScrollingFast.value = true
+            
+            // If we're scrolling down fast, update controls immediately
+            if (currentFirstVisibleIndex > previousIndex) {
+                isScrollingDown.value = true
+                isScrollingUp.value = false
+                shouldHideControls.value = true  // Set our anti-flicker flag
+                onScroll(true) // Hide controls immediately on fast scroll down
+            }
+        } else {
+            // Not scrolling fast
+            isScrollingFast.value = false
+            
+            // If we're scrolling up, we can reset the anti-flicker flag
+            if (currentFirstVisibleIndex < previousIndex) {
+                shouldHideControls.value = false
+            }
+        }
+    }
+    
+    // Detect scroll change and direction
+    LaunchedEffect(scrollState.firstVisibleItemIndex, scrollState.firstVisibleItemScrollOffset) {
+        val currentTime = System.currentTimeMillis()
+        val deltaTime = currentTime - lastScrollUpdateTime.value
+        lastScrollUpdateTime.value = currentTime
+        
+        val currentOffset = scrollState.firstVisibleItemScrollOffset
+        val currentFirstVisibleIndex = scrollState.firstVisibleItemIndex
+        
+        // Determine scroll direction with more reliable logic
+        val movingUp = if (currentFirstVisibleIndex == previousFirstVisibleIndex.value) {
+            // If we're on the same item, compare offsets
+            currentOffset < previousScrollOffset.value
+        } else {
+            // If we've changed items, check if we're moving up in the list
+            currentFirstVisibleIndex < previousFirstVisibleIndex.value
+        }
+        
+        // Track both up and down directions explicitly
+        isScrollingUp.value = movingUp
+        isScrollingDown.value = !movingUp
+        
+        // Update our anti-flicker flag
+        if (movingUp) {
+            // If explicitly scrolling up, we can reset the anti-flicker flag
+            // But only after a small delay to prevent flickering during momentum scrolls
+            if (deltaTime > 100) {
+                shouldHideControls.value = false
+            }
+        } else if (deltaTime < 50 || isScrollingFast.value) {
+            // If scrolling down fast, set the anti-flicker flag
+            shouldHideControls.value = true
+        }
+        
+        // If scrolling down fast, make sure we hide controls
+        if (!movingUp && (deltaTime < 50 || isScrollingFast.value)) {
+            onScroll(true) // Hide controls on fast scroll down
+        } else {
+            // Normal scroll behavior
+            onScroll(!shouldShowControls)
+        }
+        
+        // Store current values for next comparison
+        previousScrollOffset.value = currentOffset
+        previousFirstVisibleIndex.value = currentFirstVisibleIndex
+    }
+    
+    // Reset shouldHideControls when at the top
+    LaunchedEffect(isAtTop) {
+        if (isAtTop) {
+            // If we're at the top, always reset the anti-flicker flag
+            shouldHideControls.value = false
+            onScroll(false) // Force show controls at top
+        }
+    }
+    
     LazyColumn(
         state = scrollState,
         modifier = Modifier

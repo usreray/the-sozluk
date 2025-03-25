@@ -69,6 +69,10 @@ fun TopicDetailScreen(
     val isLoadingTopic by viewModel.isLoadingTopic
     val activeScreen by viewModel.activeScreen
     
+    // Add state to track scroll position and hide/show navigation
+    val isScrolledState = remember { mutableStateOf(false) }
+    val isScrolled = isScrolledState.value
+    
     // Set the active screen
     LaunchedEffect(Unit) {
         println("TopicDetailScreen: Setting active screen to topic_detail")
@@ -84,10 +88,8 @@ fun TopicDetailScreen(
         }
     }
     
-    // Calculate max pages based on comment count (10 entries per page)
-    val maxPages = selectedTopic?.let { 
-        ceil(it.commentCount.toFloat() / 10).toInt().coerceAtLeast(1)
-    } ?: 1
+    // Use the totalPages property directly from the Topic model instead of calculating locally
+    val maxPages = selectedTopic?.totalPages ?: 1
     
     // Page selection dialog
     if (isPageDialogVisible) {
@@ -106,6 +108,9 @@ fun TopicDetailScreen(
     
     // Handle back press to return to home screen
     BackHandler {
+        // Clear expanded entries explicitly before navigation
+        viewModel.clearExpandedEntries()
+        
         // Set active screen to home first before clearing the selected topic
         // This prevents the "Topic not found" error from flashing
         viewModel.setActiveScreen("home")
@@ -149,7 +154,8 @@ fun TopicDetailScreen(
                             viewModel.saveTopic(topic)
                         }
                     }
-                }
+                },
+                isScrolled = isScrolled
             )
             
             // Entries
@@ -158,7 +164,8 @@ fun TopicDetailScreen(
                     topic = topic,
                     currentPage = currentPage,
                     viewModel = viewModel,
-                    scrollState = viewModel.topicDetailScrollState
+                    scrollState = viewModel.topicDetailScrollState,
+                    onScroll = { scrolled -> isScrolledState.value = scrolled }
                 )
             }
         } else {

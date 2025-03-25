@@ -67,6 +67,10 @@ fun ProfileScreen(
     val isPageDialogVisible by viewModel.isPageDialogVisible
     val selectedPage by viewModel.selectedPage
     
+    // Add state to track scroll position and navigation visibility
+    val isScrolledState = remember { mutableStateOf(false) }
+    val isScrolled = isScrolledState.value
+    
     // Set the active screen
     LaunchedEffect(Unit) {
         println("ProfileScreen: Setting active screen to profile")
@@ -137,7 +141,8 @@ fun ProfileScreen(
                                 // Return to the saved topics list if a topic is unsaved
                                 viewModel.stopViewingSavedTopic()
                             }
-                        }
+                        },
+                        isScrolled = isScrolled
                     )
                     
                     // Entries - directly match TopicDetailScreen structure
@@ -146,7 +151,8 @@ fun ProfileScreen(
                             topic = topic,
                             currentPage = savedTopicCurrentPage,
                             viewModel = viewModel,
-                            scrollState = viewModel.profileScrollState
+                            scrollState = viewModel.profileScrollState,
+                            onScroll = { scrolled -> isScrolledState.value = scrolled }
                         )
                     }
                 }
@@ -173,7 +179,8 @@ fun ProfileScreen(
                 SavedTopicsList(
                     savedTopics = savedTopics,
                     onTopicSelected = { topic ->
-                        viewModel.viewSavedTopic(topic)
+                        // Always view saved topics starting at page 1
+                        viewModel.viewSavedTopic(topic, 1)
                     },
                     viewModel = viewModel,
                     paddingValues = paddingValues,

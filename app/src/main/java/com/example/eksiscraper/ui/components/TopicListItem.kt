@@ -73,4 +73,4 @@ fun TopicListItem(topic: Topic, onClick: () -> Unit) {
             }
         }
     }
-} 
+}

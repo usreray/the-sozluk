@@ -9,8 +9,7 @@ data class SavedTopicEntity(
     @PrimaryKey val title: String,
     val url: String,
     val commentCount: Int,
-    val redirectedUrl: String,
-    val totalPages: Int
+    val redirectedUrl: String
 ) {
     companion object {
         fun fromTopic(topic: Topic): SavedTopicEntity {
@@ -18,8 +17,7 @@ data class SavedTopicEntity(
                 title = topic.title,
                 url = topic.url,
                 commentCount = topic.commentCount,
-                redirectedUrl = topic.redirectedUrl,
-                totalPages = topic.totalPages
+                redirectedUrl = topic.redirectedUrl
             )
         }
         
@@ -29,7 +27,6 @@ data class SavedTopicEntity(
                 url = entity.url,
                 commentCount = entity.commentCount,
                 redirectedUrl = entity.redirectedUrl,
-                totalPages = entity.totalPages,
                 isSaved = true
             )
         }

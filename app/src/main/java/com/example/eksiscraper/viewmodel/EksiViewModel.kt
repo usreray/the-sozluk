@@ -196,6 +196,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun fetchTopics(page: Int = 1) {
+        println("Home: fetchTopics called with page=$page, category=${_selectedHomeCategory.value}")
         if (page == 1) {
             _isLoading.value = true
             _error.value = null
@@ -219,13 +220,17 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 
+                println("Home: fetching topics for category=${_selectedHomeCategory.value}, page=$page")
                 // Pass the selected category to getPopularTopics
                 val result = EksiService.getPopularTopics(page, _selectedHomeCategory.value)
                 
                 // Cancel the timeout job since we got a response
                 timeoutJob.cancel()
                 
+                println("Home: received ${result.size} topics for page=$page")
+                
                 if (result.isEmpty()) {
+                    println("Home: no topics found for page=$page")
                     if (page == 1) {
                         _error.value = "No topics found. Please try again later."
                     } else {
@@ -233,6 +238,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                         _canLoadMoreTopics.value = false
                     }
                 } else if (result.size == 1 && result[0].title.startsWith("Error fetching data")) {
+                    println("Home: error fetching topics: ${result[0].title}")
                     if (page == 1) {
                         _error.value = result[0].title
                     } else {
@@ -248,13 +254,16 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                     if (page == 1) {
                         _topics.value = updatedResult
                         _homeCurrentPage.value = 1
+                        println("Home: updated topics for page 1, count=${updatedResult.size}")
                     } else {
                         _topics.value = _topics.value + updatedResult
                         _homeCurrentPage.value = page
+                        println("Home: appended ${updatedResult.size} topics for page=$page, total=${_topics.value.size}")
                     }
                     
                     // If we received fewer than 50 topics, we've reached the last page
                     _canLoadMoreTopics.value = result.size >= 50
+                    println("Home: canLoadMoreTopics=${_canLoadMoreTopics.value}")
                 }
                 
                 if (page == 1) {
@@ -263,6 +272,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                     _isLoadingMoreTopics.value = false
                 }
             } catch (e: Exception) {
+                println("Home: error loading topics: ${e.message}")
                 if (page == 1) {
                     _error.value = "Failed to load data: ${e.message ?: "Unknown error"}"
                     _isLoading.value = false
@@ -275,6 +285,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     fun loadMoreTopics() {
+        println("Home: loadMoreTopics called, current page=${_homeCurrentPage.value}, loading=${_isLoading.value}, loadingMore=${_isLoadingMoreTopics.value}, canLoadMore=${_canLoadMoreTopics.value}")
         if (!_isLoading.value && !_isLoadingMoreTopics.value && _canLoadMoreTopics.value) {
             fetchTopics(_homeCurrentPage.value + 1)
         }
@@ -373,7 +384,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                         entries = searchResult.entries, 
                         entriesLoaded = true,
                         loadedPages = topic.loadedPages + page,
-                        totalPages = 999,  // Set a high default value to allow many pages
+                        totalPages = searchResult.totalPages,  // Use the actual page count instead of a fixed value
                         redirectedUrl = searchResult.redirectedUrl.ifEmpty { originalPath }
                     )
                     
@@ -399,7 +410,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                         entries = searchResult.entries, 
                         entriesLoaded = true,
                         loadedPages = topic.loadedPages + page,
-                        totalPages = 999,  // Set a high default value to allow many pages
+                        totalPages = searchResult.totalPages,  // Use the actual page count instead of a fixed value
                         redirectedUrl = searchResult.redirectedUrl
                     )
                     
@@ -504,11 +515,16 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     
     // Add methods for page dialog
     fun showPageDialog() {
-        // For topic details, use topicCurrentPage
-        _selectedPage.value = if (_selectedTopic.value != null) {
-            _topicCurrentPage.value
-        } else {
-            _currentPage.value
+        // Set the initial selected page based on the current context
+        _selectedPage.value = when {
+            // For topic details in the home/search screen
+            _selectedTopic.value != null -> _topicCurrentPage.value
+            
+            // For viewing saved topics in the profile screen
+            _viewingSavedTopic.value != null -> _savedTopicCurrentPage.value
+            
+            // For search results
+            else -> _currentPage.value
         }
         _isPageDialogVisible.value = true
     }
@@ -524,13 +540,17 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
     fun applySelectedPage() {
         // For search results
         if (_searchResult.value != null) {
-            // If we're viewing a saved topic in the You tab
+            // If we're viewing a saved topic in the search tab
             if (_searchResult.value?.isSaved == true) {
                 viewSavedTopic(_searchResult.value!!, _selectedPage.value)
             } else {
                 search(_selectedPage.value)
             }
         } 
+        // For viewing saved topics in the profile screen
+        else if (_viewingSavedTopic.value != null) {
+            viewSavedTopic(_viewingSavedTopic.value!!, _selectedPage.value)
+        }
         // For topic details
         else if (_selectedTopic.value != null) {
             navigateTopicToPage(_selectedPage.value)
@@ -619,15 +639,20 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
 
     // Method to view a saved topic by using the same approach as search
     fun viewSavedTopic(topic: Topic, page: Int = 1) {
-        // Clear expanded entries when changing pages
-        if (_savedTopicCurrentPage.value != page || _viewingSavedTopic.value?.title != topic.title) {
+        // Clear expanded entries when changing pages or viewing a new topic
+        val isNewTopic = _viewingSavedTopic.value?.title != topic.title
+        
+        if (_savedTopicCurrentPage.value != page || isNewTopic) {
             clearExpandedEntries()
             
-            // Reset scroll position to top when changing pages
+            // Reset scroll position to top when changing pages or viewing a new topic
             viewModelScope.launch {
                 profileScrollState.scrollToItem(0)
             }
         }
+        
+        // Reset the selected page to match the current page for the page selection dialog
+        _selectedPage.value = page
         
         // Set the viewing saved topic state
         _viewingSavedTopic.value = topic
@@ -653,7 +678,8 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                     redirectedUrl  // Use the cleaned redirectedUrl
                 )
                 
-                // Update the viewingSavedTopic with the fetched entries
+                // Update the viewingSavedTopic with the fetched entries and ensure isSaved is true
+                // Get the actual totalPages from the search result
                 _viewingSavedTopic.value = result.copy(isSaved = true)
             } catch (e: Exception) {
                 // Handle error
@@ -776,6 +802,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
 
     // Method to change the selected home category
     fun changeHomeCategory(category: String) {
+        println("Home: changeHomeCategory called with category=$category, current=${_selectedHomeCategory.value}")
         if (_selectedHomeCategory.value != category) {
             _selectedHomeCategory.value = category
             
@@ -788,6 +815,7 @@ class EksiViewModel(application: Application) : AndroidViewModel(application) {
                 getCategoryScrollState(category).scrollToItem(0)
             }
             
+            println("Home: category changed to $category, fetching new topics")
             // Fetch topics for the selected category
             fetchTopics(1)
         }

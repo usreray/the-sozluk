@@ -11,7 +11,7 @@ import java.util.HashMap
 
 object EksiService {
     private const val BASE_URL = "https://eksisozluk.com"
-    private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
+    private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"
     
     // Add the cookie string
     private const val COOKIE_STRING = ""
@@ -26,11 +26,20 @@ object EksiService {
             .timeout(10000)
             .followRedirects(true)
             .header("Cookie", COOKIE_STRING)
-            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7")
-            .header("Accept-Language", "en-US,en;q=0.9,tr;q=0.8")
-            .header("Accept-Encoding", "gzip, deflate, br")
+            .header("Host", "eksisozluk.com")
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept-Language", "en-US,en;q=0.5")
+            .header("Accept-Encoding", "gzip, deflate, br, zstd")
+            .header("DNT", "1")
+            .header("Sec-GPC", "1")
             .header("Connection", "keep-alive")
             .header("Upgrade-Insecure-Requests", "1")
+            .header("Sec-Fetch-Dest", "document")
+            .header("Sec-Fetch-Mode", "navigate")
+            .header("Sec-Fetch-Site", "same-origin")
+            .header("Sec-Fetch-User", "?1")
+            .header("Priority", "u=0, i")
+            .header("TE", "trailers")
             .ignoreHttpErrors(true)
     }
     
@@ -109,6 +118,8 @@ object EksiService {
     
     suspend fun getPopularTopics(page: Int = 1, category: String = "popular"): List<Topic> = withContext(Dispatchers.IO) {
         try {
+            println("EksiService.getPopularTopics: page=$page, category=$category")
+            
             // Map category to the corresponding URL path
             val urlPath = when (category) {
                 "today" -> "basliklar/bugun"
@@ -116,8 +127,12 @@ object EksiService {
                 else -> "basliklar/gundem" // "popular" is the default
             }
             
+            println("EksiService.getPopularTopics: mapped category to urlPath=$urlPath")
+            
             // Try with the main URL first
             val result = tryFetchTopicsWithoutEntries(BASE_URL, page, urlPath)
+            
+            println("EksiService.getPopularTopics: fetched ${result.size} topics")
             
             if (page == 1) {
                 lastFetchedTopics = result
@@ -125,6 +140,7 @@ object EksiService {
             
             return@withContext result
         } catch (e: Exception) {
+            println("EksiService.getPopularTopics: error: ${e.message}")
             e.printStackTrace()
             // Return some fallback data in case of error
             val errorResult = listOf(
@@ -160,13 +176,18 @@ object EksiService {
                 "$baseUrl/$urlPath$pageParam"
             }
             
+            println("tryFetchTopicsWithoutEntries: fetching URL=$url")
+            
             // Connect to the URL with cookie
             val connection = applyCommonConnectionSettings(Jsoup.connect(url))
             
             // Execute the request
             val response = connection.execute()
             
+            println("tryFetchTopicsWithoutEntries: HTTP response status=${response.statusCode()}")
+            
             if (response.statusCode() != 200) {
+                println("tryFetchTopicsWithoutEntries: Status code ${response.statusCode()}, trying mobile version")
                 // Try a different approach - direct mobile URL
                 return@withContext tryMobileVersionWithoutEntries(baseUrl, page, urlPath)
             }
@@ -178,6 +199,7 @@ object EksiService {
             
             // If the first selector doesn't work, try alternatives
             if (topicElements.isEmpty()) {
+                println("tryFetchTopicsWithoutEntries: first selector failed, trying alternatives")
                 topicElements = document.select(".topic-list li a")
             }
             
@@ -190,6 +212,7 @@ object EksiService {
             }
             
             if (topicElements.isEmpty()) {
+                println("tryFetchTopicsWithoutEntries: all standard selectors failed, trying generic links")
                 // Use a different approach to get links that start with '/'
                 val allLinks = document.select("a[href^='/']")
                 // Create a new Elements collection for non-empty text links
@@ -204,6 +227,7 @@ object EksiService {
             
             // Check if we found any topics at all
             if (topicElements.isEmpty()) {
+                println("tryFetchTopicsWithoutEntries: No topics found in the page")
                 return@withContext listOf(
                     Topic(
                         title = "Error fetching data: No topics found",
@@ -214,6 +238,8 @@ object EksiService {
                     )
                 )
             }
+            
+            println("tryFetchTopicsWithoutEntries: Found ${topicElements.size} topic elements")
             
             // Process all topics on the page (up to 50)
             // No need to calculate startIndex and endIndex as we'll use all topics from the page
@@ -247,8 +273,10 @@ object EksiService {
             
             // If we found fewer than 50 topics, we've reached the last page
             val isLastPage = topics.size < 50
+            println("tryFetchTopicsWithoutEntries: Processed ${topics.size} topics, isLastPage=$isLastPage")
             
             if (topics.isEmpty()) {
+                println("tryFetchTopicsWithoutEntries: No valid topics found after processing")
                 return@withContext listOf(
                     Topic(
                         title = "Error fetching data: No topics found",
@@ -262,6 +290,7 @@ object EksiService {
             
             return@withContext topics
         } catch (e: Exception) {
+            println("tryFetchTopicsWithoutEntries: Error: ${e.message}")
             e.printStackTrace()
             return@withContext listOf(
                 Topic(
@@ -277,12 +306,15 @@ object EksiService {
     
     private suspend fun tryMobileVersionWithoutEntries(baseUrl: String, page: Int = 1, urlPath: String = "basliklar/gundem"): List<Topic> = withContext(Dispatchers.IO) {
         try {
+            println("tryMobileVersionWithoutEntries: Attempting mobile version fetch for page=$page, urlPath=$urlPath")
             // Try the mobile version
             val mobileUrl = if (page > 1) {
                 "$baseUrl/mobil/$urlPath?p=$page"
             } else {
                 "$baseUrl/mobil/$urlPath"
             }
+            
+            println("tryMobileVersionWithoutEntries: Using mobile URL=$mobileUrl")
             
             // Use the helper function to set up the connection with cookie
             val connection = applyCommonConnectionSettings(Jsoup.connect(mobileUrl))
@@ -292,7 +324,10 @@ object EksiService {
             
             val response = connection.execute()
             
+            println("tryMobileVersionWithoutEntries: HTTP response status=${response.statusCode()}")
+            
             if (response.statusCode() != 200) {
+                println("tryMobileVersionWithoutEntries: Failed with status code ${response.statusCode()}")
                 return@withContext listOf(
                     Topic(
                         title = "Error fetching data: HTTP error ${response.statusCode()}",
@@ -310,15 +345,18 @@ object EksiService {
             var topicElements = document.select(".topic-list li a")
             
             if (topicElements.isEmpty()) {
+                println("tryMobileVersionWithoutEntries: First selector failed, trying alternatives")
                 topicElements = document.select("ul.topic-list li a")
             }
             
             if (topicElements.isEmpty()) {
+                println("tryMobileVersionWithoutEntries: Standard selectors failed, trying generic links")
                 topicElements = document.select("a[href^='/']")
             }
             
             // Check if we found any topics at all
             if (topicElements.isEmpty()) {
+                println("tryMobileVersionWithoutEntries: No topics found in mobile version")
                 return@withContext listOf(
                     Topic(
                         title = "Error fetching data: No topics found",
@@ -329,6 +367,8 @@ object EksiService {
                     )
                 )
             }
+            
+            println("tryMobileVersionWithoutEntries: Found ${topicElements.size} topic elements")
             
             // Process all topics on the page (up to 50)
             // No need to calculate startIndex and endIndex as we'll use all topics from the page
@@ -362,8 +402,10 @@ object EksiService {
             
             // If we found fewer than 50 topics, we've reached the last page
             val isLastPage = topics.size < 50
+            println("tryMobileVersionWithoutEntries: Processed ${topics.size} topics, isLastPage=$isLastPage")
             
             if (topics.isEmpty()) {
+                println("tryMobileVersionWithoutEntries: No valid topics found after processing")
                 return@withContext listOf(
                     Topic(
                         title = "Error fetching data: No topics found",
@@ -377,6 +419,7 @@ object EksiService {
             
             return@withContext topics
         } catch (e: Exception) {
+            println("tryMobileVersionWithoutEntries: Error: ${e.message}")
             e.printStackTrace()
             return@withContext listOf(
                 Topic(
@@ -393,6 +436,8 @@ object EksiService {
     // Add a new method to search for a topic
     suspend fun searchTopic(query: String, page: Int = 1, redirectedUrl: String = ""): Topic = withContext(Dispatchers.IO) {
         try {
+            println("EksiService.searchTopic: query='$query', page=$page, redirectedUrl='$redirectedUrl'")
+            
             // Determine the URL to use
             val searchUrl = if (redirectedUrl.isNotEmpty()) {
                 // If we have a redirected URL, use it with the page parameter if needed
@@ -420,6 +465,8 @@ object EksiService {
                 "/?q=${query.trim().replace(" ", "+")}"
             }
             
+            println("EksiService.searchTopic: searchUrl='$searchUrl'")
+            
             // Store the corrected URL for logging
             val correctedRedirectedUrl = searchUrl
             
@@ -427,6 +474,8 @@ object EksiService {
             val connection = applyCommonConnectionSettings(Jsoup.connect("$BASE_URL$searchUrl"))
             
             val response = connection.execute()
+            
+            println("EksiService.searchTopic: HTTP response status: ${response.statusCode()}")
             
             // Check for HTTP errors
             if (response.statusCode() != 200) {
@@ -449,6 +498,7 @@ object EksiService {
             
         } catch (e: Exception) {
             e.printStackTrace()
+            println("EksiService.searchTopic: Error: ${e.message}")
             
             // Return an error topic
             return@withContext Topic(
@@ -472,6 +522,7 @@ object EksiService {
         try {
             // Get the final URL after redirection
             val finalUrl = response.url().toString()
+            println("processTopicResponse: finalUrl='$finalUrl'")
             
             // Extract the redirected path from the final URL (including query parameters)
             val redirectedPath = if (finalUrl.startsWith(BASE_URL)) {
@@ -481,6 +532,8 @@ object EksiService {
             } else {
                 searchUrl // Fallback to the original search URL
             }
+            
+            println("processTopicResponse: redirectedPath='$redirectedPath'")
             
             // Parse the document to get entries
             val document = response.parse()
@@ -493,6 +546,8 @@ object EksiService {
                 .replace(Regex(" - sayfa \\d+"), "")  // Remove "- sayfa X" pattern
                 .trim()
             
+            println("processTopicResponse: pageTitle='$pageTitle', cleanTitle='$cleanTitle'")
+            
             // Extract entry list items directly instead of just content divs
             val entryListItems = document.select("li[data-id]")
             
@@ -503,13 +558,29 @@ object EksiService {
             if (pagerElement != null) {
                 // Extract the data-pagecount attribute
                 val pageCountStr = pagerElement.attr("data-pagecount")
+                println("processTopicResponse: pageCountStr='$pageCountStr'")
+                
                 if (pageCountStr.isNotEmpty()) {
-                    totalPages = pageCountStr.toIntOrNull() ?: page
+                    val parsedPageCount = pageCountStr.toIntOrNull() ?: page
+                    
+                    // Verify the page count with additional checks if possible
+                    val lastPageLink = pagerElement.select("a").lastOrNull { 
+                        it.text().matches(Regex("\\d+")) 
+                    }?.text()?.toIntOrNull()
+                    
+                    if (lastPageLink != null && lastPageLink != parsedPageCount) {
+                        println("processTopicResponse: WARNING - pagecount mismatch: attr=$parsedPageCount, lastLink=$lastPageLink")
+                        // Use the last page link as a fallback
+                        totalPages = lastPageLink
+                    } else {
+                        totalPages = parsedPageCount
+                    }
+                    
+                    println("processTopicResponse: totalPages set from verification: $totalPages")
                 }
-            } else if (entryListItems.isEmpty() && page > 1) {
-                // If no entries found and we're beyond page 1, adjust totalPages
-                totalPages = page - 1
             }
+            
+            println("processTopicResponse: finalTotalPages=$totalPages, entryItemsCount=${entryListItems.size}")
             
             // Process entries
             val entries = mutableListOf<Entry>()
@@ -590,6 +661,8 @@ object EksiService {
                 redirectedUrl = redirectedPath,
                 totalPages = totalPages
             )
+            
+            println("processTopicResponse: returning topic with title='${topic.title}', totalPages=${topic.totalPages}, redirectedUrl='${topic.redirectedUrl}'")
             
             return@withContext topic
         } catch (e: Exception) {
@@ -710,22 +783,29 @@ object EksiService {
             if (pagerElement != null) {
                 // Extract the data-pagecount attribute
                 val pageCountStr = pagerElement.attr("data-pagecount")
+                println("fetchEntriesForTopic: pageCountStr='$pageCountStr'")
+                
                 if (pageCountStr.isNotEmpty()) {
-                    totalPages = pageCountStr.toIntOrNull() ?: 1
-                } else {
-                    // Fallback: use the old method of counting links if data-pagecount is not available
-                    val pageLinks = pagerElement.select("a")
-                    for (link in pageLinks) {
-                        val pageText = link.text().trim()
-                        if (pageText.matches(Regex("\\d+"))) {
-                            val pageNum = pageText.toIntOrNull() ?: 1
-                            if (pageNum > totalPages) {
-                                totalPages = pageNum
-                            }
-                        }
+                    val parsedPageCount = pageCountStr.toIntOrNull() ?: 1
+                    
+                    // Verify the page count with additional checks if possible
+                    val lastPageLink = pagerElement.select("a").lastOrNull { 
+                        it.text().matches(Regex("\\d+")) 
+                    }?.text()?.toIntOrNull()
+                    
+                    if (lastPageLink != null && lastPageLink != parsedPageCount) {
+                        println("fetchEntriesForTopic: WARNING - pagecount mismatch: attr=$parsedPageCount, lastLink=$lastPageLink")
+                        // Use the last page link as a fallback
+                        totalPages = lastPageLink
+                    } else {
+                        totalPages = parsedPageCount
                     }
+                    
+                    println("fetchEntriesForTopic: totalPages set from verification: $totalPages")
                 }
             }
+            
+            println("fetchEntriesForTopic: finalTotalPages=$totalPages, topic=${topic.title}, entriesCount=${entries.size}")
             
             // Create a new Topic with the entries
             return@withContext topic.copy(
