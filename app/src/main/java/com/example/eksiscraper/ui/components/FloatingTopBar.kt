@@ -64,6 +64,8 @@ fun FloatingTopBar(
     visible: Boolean = true,
     isLoading: Boolean = false,
     leading: (@Composable () -> Unit)? = null,
+    /** Makes the title card tappable, e.g. to open the profile of a conversation */
+    onTitleClick: (() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null
 ) {
     val showTitle = title != null || subtitle != null || leading != null
@@ -91,7 +93,11 @@ fun FloatingTopBar(
                     enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
                     exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start)
                 ) {
-                    FloatingSurface(shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth()) {
+                    FloatingSurface(
+                        shape = RoundedCornerShape(26.dp),
+                        onClick = onTitleClick,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Column {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -140,15 +146,15 @@ fun FloatingTopBar(
 private fun FloatingSurface(
     shape: androidx.compose.ui.graphics.Shape,
     modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    Surface(
-        shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 6.dp,
-        modifier = modifier,
-        content = content
-    )
+    val color = MaterialTheme.colorScheme.surfaceContainerHigh
+    if (onClick != null) {
+        Surface(onClick = onClick, shape = shape, color = color, shadowElevation = 6.dp, modifier = modifier, content = content)
+    } else {
+        Surface(shape = shape, color = color, shadowElevation = 6.dp, modifier = modifier, content = content)
+    }
 }
 
 /**

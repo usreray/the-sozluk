@@ -12,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -162,15 +163,18 @@ fun EntryCard(
                     )
                 }
             }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = if (isExpanded) Int.MAX_VALUE else COLLAPSED_LINES,
-                overflow = TextOverflow.Ellipsis,
-                onTextLayout = { if (!isExpanded) overflows = it.hasVisualOverflow },
-                modifier = Modifier.padding(end = 12.dp).animateContentSize()
-            )
+            // Long-press selects text to copy part of an entry; links stay tappable
+            SelectionContainer {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else COLLAPSED_LINES,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { if (!isExpanded) overflows = it.hasVisualOverflow },
+                    modifier = Modifier.padding(end = 12.dp).animateContentSize()
+                )
+            }
             if (overflows || isExpanded) {
                 TextButton(onClick = onToggleExpand) {
                     Text(if (isExpanded) "daha az göster" else "devamını oku")
@@ -298,11 +302,13 @@ private fun CommentsSection(
                             modifier = Modifier.padding(end = 10.dp)
                         )
                     }
-                    Text(
-                        rememberEntryText(comment.contentHtml, comment.content, onLink),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(top = 6.dp, end = 10.dp)
-                    )
+                    SelectionContainer {
+                        Text(
+                            rememberEntryText(comment.contentHtml, comment.content, onLink),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 6.dp, end = 10.dp)
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconToggleButton(
                             checked = comment.isLiked,

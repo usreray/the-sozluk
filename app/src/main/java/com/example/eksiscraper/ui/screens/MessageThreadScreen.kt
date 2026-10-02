@@ -2,6 +2,7 @@ package com.example.eksiscraper.ui.screens
 
 import android.app.Application
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -125,6 +126,7 @@ fun MessageThreadScreen(
                 title = otherNick,
                 subtitle = "profili aç",
                 onBack = { navController.popBackStack() },
+                onTitleClick = { navController.navigate(Screen.Author.createRoute(otherNick)) },
                 leading = {
                     AuthorAvatar(
                         otherNick,
@@ -218,7 +220,10 @@ private fun Bubble(message: Message, onLink: (com.example.eksiscraper.ui.compone
             modifier = Modifier.widthIn(max = 320.dp).alpha(if (message.isPending) 0.6f else 1f)
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                Text(rememberEntryText(message.html, message.text, onLink), style = MaterialTheme.typography.bodyLarge)
+                // Long-press to select and copy, as in any messaging app
+                SelectionContainer {
+                    Text(rememberEntryText(message.html, message.text, onLink), style = MaterialTheme.typography.bodyLarge)
+                }
                 Text(
                     if (message.isFailed) "gönderilemedi" else message.time,
                     style = MaterialTheme.typography.labelSmall,
