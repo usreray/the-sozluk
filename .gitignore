@@ -17,3 +17,8 @@ local.properties
 # Local build logs
 build_*.log
 build_*.txt
+
+# Signing keys and release outputs
+*.jks
+*.keystore
+/app/release
