@@ -10,7 +10,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,13 +38,25 @@ import kotlinx.coroutines.launch
  * Shows eksisozluk.com's own login page. The password never passes through the app:
  * once the login is confirmed we copy the WebView's cookies and go back to the app.
  */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun LoginScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
 
-    Scaffold { paddingValues ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Giriş yap") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Kapat")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -82,7 +102,7 @@ fun LoginScreen(navController: NavController) {
             )
 
             if (isLoading) {
-                LinearProgressIndicator(
+                LinearWavyProgressIndicator(
                     modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter)
                 )
             }

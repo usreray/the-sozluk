@@ -1,64 +1,58 @@
-
 package com.example.eksiscraper.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import android.app.Application
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
-import com.example.eksiscraper.ui.components.CategoryTabBar
-import com.example.eksiscraper.ui.components.TopicListItem
-import com.example.eksiscraper.ui.components.TopicListSkeleton
+import com.example.eksiscraper.ui.components.ErrorState
+import com.example.eksiscraper.ui.components.LoadingState
+import com.example.eksiscraper.ui.components.TopicRow
+import com.example.eksiscraper.ui.components.segmentedShape
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.viewmodel.EksiViewModelFactory
+import com.example.eksiscraper.viewmodel.HomeCategory
 import com.example.eksiscraper.viewmodel.HomeViewModel
-import com.google.accompanist.swiperefresh.SwipeRefresh
-import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.pager.PagerDefaults
-import androidx.compose.foundation.pager.PagerSnapDistance
-import android.app.Application
-import androidx.compose.ui.platform.LocalContext
 
-@OptIn(ExperimentalMaterial3Api::class)
+private val loadingMessages = listOf("başlıklar toplanıyor", "gündem taranıyor", "entry'ler sayılıyor")
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HomeScreen(
     navController: NavHostController,
@@ -66,303 +60,158 @@ fun HomeScreen(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
 ) {
-    val topics by viewModel.topics
-    val isLoading by viewModel.isLoading
-    val error by viewModel.error
-    val isLoadingMoreTopics by viewModel.isLoadingMoreTopics
-    val canLoadMoreTopics by viewModel.canLoadMoreTopics
-    val scrollToTop by viewModel.scrollToTop
-    val selectedCategory by viewModel.selectedCategory
-    
-    val swipeRefreshState = rememberSwipeRefreshState(isLoading)
-    val snackbarHostState = remember { SnackbarHostState() }
+    val categories = HomeCategory.entries
+    val pagerState = rememberPagerState(pageCount = { categories.size })
     val scope = rememberCoroutineScope()
-    
-    // Define categories
-    val categories = listOf(
-        "popular" to "Popular",
-        "today" to "Today",
-        "stream" to "Stream"
-    )
-    
-    // Find the initial page based on the selected category
-    val initialPage = categories.indexOfFirst { it.first == selectedCategory }.coerceAtLeast(0)
-    
-    // Create pager state for horizontal swipes with custom fling behavior
-    val pagerState = rememberPagerState(
-        initialPage = initialPage,
-        pageCount = { categories.size }
-    )
-    
-    // Custom fling behavior to ensure we only change pages when swipe is completed
-    val flingBehavior = PagerDefaults.flingBehavior(
-        state = pagerState,
-        pagerSnapDistance = PagerSnapDistance.atMost(1)
-    )
-    
-    // Sync pager state with selected category when the selected category changes externally
-    LaunchedEffect(selectedCategory) {
-        val index = categories.indexOfFirst { it.first == selectedCategory }
-        if (index >= 0 && index != pagerState.currentPage) {
-            pagerState.animateScrollToPage(index)
-        }
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
+    // Load a tab the first time it is shown
+    LaunchedEffect(pagerState.currentPage) {
+        viewModel.ensureLoaded(categories[pagerState.currentPage])
     }
 
-    // Only update the selected category when page change has settled
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage to pagerState.currentPageOffsetFraction }
-            .collect { (page, offset) ->
-                // Only update when the swipe has settled (offset is 0)
-                if (offset == 0f) {
-                    val category = categories.getOrNull(page)?.first ?: return@collect
-                    if (category != selectedCategory) {
-                        viewModel.updateCategory(category)
-                    }
-                }
-            }
-    }
-    
-    // Initialize the first page of content when the screen becomes visible
-    LaunchedEffect(Unit) {
-        if (topics.isEmpty() && !isLoading) {
-            viewModel.fetchTopics()
-        }
-    }
-    
-    // Observe the scrollToTop state and scroll to top when it changes to true
-    LaunchedEffect(scrollToTop) {
-        if (scrollToTop) {
-            // Get the correct scroll state for the current page
-            val currentCategory = categories[pagerState.currentPage].first
-            val scrollState = viewModel.getCategoryScrollState(currentCategory)
-            
-            // Scroll to the top of the list
-            scrollState.animateScrollToItem(0)
-            
-            // Reset the flag
-            viewModel.resetScrollToTop()
-        }
-    }
-    
-    // Show FAB only when scrolled down
-    val showFab by remember {
-        derivedStateOf {
-            // Get the correct scroll state for the current page
-            val currentCategory = categories[pagerState.currentPage].first
-            val scrollState = viewModel.getCategoryScrollState(currentCategory)
-            
-            scrollState.firstVisibleItemIndex > 0 || scrollState.firstVisibleItemScrollOffset > 0
-        }
-    }
-    
-    // Detect when we've scrolled to the bottom of the list
-    val isAtBottom by remember {
-        derivedStateOf {
-            // Get the correct scroll state for the current page
-            val currentCategory = categories[pagerState.currentPage].first
-            val scrollState = viewModel.getCategoryScrollState(currentCategory)
-            
-            if (topics.isEmpty()) {
-                false
-            } else {
-                val layoutInfo = scrollState.layoutInfo
-                val visibleItemsInfo = layoutInfo.visibleItemsInfo
-                
-                if (visibleItemsInfo.isEmpty()) {
-                    false
-                } else {
-                    val lastVisibleItem = visibleItemsInfo.last()
-                    val lastVisibleItemIndex = lastVisibleItem.index
-                    val totalItemsCount = topics.size
-                    
-                    // Consider we're at the bottom if we can see the last item
-                    // or we're within 3 items of the end
-                    lastVisibleItemIndex >= totalItemsCount - 3
-                }
-            }
-        }
-    }
-    
-    // Load more topics when we reach the bottom
-    LaunchedEffect(isAtBottom, isLoading, isLoadingMoreTopics, canLoadMoreTopics) {
-        if (isAtBottom && !isLoading && !isLoadingMoreTopics && canLoadMoreTopics) {
-            viewModel.loadMoreTopics()
-        }
-    }
-    
-    // Method to scroll to the top of the home screen without reloading data
-    fun scrollHomeToTop() {
-        // Get the correct scroll state for the current category
-        val currentCategory = categories[pagerState.currentPage].first
-        val scrollState = viewModel.getCategoryScrollState(currentCategory)
-        
-        // Scroll to the top of the list
-        scope.launch {
-            scrollState.animateScrollToItem(0)
-        }
-    }
-    
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            AnimatedVisibility(
-                visible = showFab,
-                enter = fadeIn() + slideInVertically { it },
-                exit = fadeOut() + slideOutVertically { it }
-            ) {
-                FloatingActionButton(
-                    onClick = { 
-                        scrollHomeToTop()
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
+                            "ekşi",
+                            style = MaterialTheme.typography.headlineMediumEmphasized,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     },
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    elevation = FloatingActionButtonDefaults.elevation(
-                        defaultElevation = 6.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowUp,
-                        contentDescription = "Scroll to top"
-                    )
-                }
-            }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Add the CategoryTabBar at the top
-            CategoryTabBar(
-                selectedCategory = selectedCategory,
-                onCategorySelected = { category -> viewModel.updateCategory(category) },
-                pagerState = pagerState
-            )
-            
-            // Use HorizontalPager for the main content
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f),
-                flingBehavior = flingBehavior
-            ) { page ->
-                // Get the category for this page
-                val pageCategory = categories[page].first
-                
-                // Get the scroll state directly from the ViewModel
-                val pageScrollState = viewModel.getCategoryScrollState(pageCategory)
-                
-                // The content inside each page is the same, it's just filtered by the selected category
-                SwipeRefresh(
-                    state = swipeRefreshState,
-                    onRefresh = { viewModel.refreshTopics() },
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        Column(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            // Show loading indicator at the top while loading
-                            AnimatedVisibility(
-                                visible = isLoading && topics.isNotEmpty(),
-                                enter = fadeIn(),
-                                exit = fadeOut()
-                            ) {
-                                LinearProgressIndicator(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 8.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            }
-                            
-                            // Topic list
-                            if (topics.isEmpty() && !isLoading) {
-                                // Empty state
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "No topics available.\nPull down to refresh.",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
+                    scrollBehavior = scrollBehavior
+                )
+                CategoryButtons(
+                    selected = pagerState.currentPage,
+                    onSelect = { index ->
+                        scope.launch {
+                            if (index == pagerState.currentPage) {
+                                // Tapping the open tab again jumps back to the top
+                                viewModel.listStates.getValue(categories[index]).animateScrollToItem(0)
                             } else {
-                                LazyColumn(
-                                    state = pageScrollState,  // Use the ViewModel's scroll state
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding = PaddingValues(
-                                        start = 16.dp,
-                                        end = 16.dp,
-                                        top = 8.dp,
-                                        bottom = 88.dp // Extra padding for bottom nav
-                                    )
-                                ) {
-                                    itemsIndexed(topics) { index, topic ->
-                                        TopicListItem(
-                                            topic = topic,
-                                            onClick = { 
-                                                navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url))
-                                            }
-                                        )
-                                    }
-                                    
-                                    // Show loading indicator at the bottom when loading more topics
-                                    if (isLoadingMoreTopics) {
-                                        item {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(16.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                CircularProgressIndicator(
-                                                    modifier = Modifier.size(32.dp),
-                                                    color = MaterialTheme.colorScheme.primary,
-                                                    strokeWidth = 2.dp
-                                                )
-                                            }
-                                        }
-                                    }
-                                    
-                                    // Show end of list message when no more topics can be loaded
-                                    if (!canLoadMoreTopics && topics.isNotEmpty() && !isLoadingMoreTopics) {
-                                        item {
-                                            Text(
-                                                text = "End of topics reached",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                textAlign = TextAlign.Center,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
+                                pagerState.animateScrollToPage(index)
                             }
                         }
-                        
-                        // Center loading indicator when initially loading
-                        if (isLoading && topics.isEmpty()) {
-                            Surface(
-                                modifier = Modifier.fillMaxSize(),
-                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-                            ) {
+                    }
+                )
+            }
+        }
+    ) { padding ->
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize().padding(padding),
+            beyondViewportPageCount = 1
+        ) { page ->
+            CategoryPage(
+                category = categories[page],
+                viewModel = viewModel,
+                onTopicClick = { title, url ->
+                    navController.navigate(Screen.TopicDetail.createRoute(title, url))
+                }
+            )
+        }
+    }
+}
+
+/** Connected toggle buttons: the M3 Expressive take on a segmented control. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CategoryButtons(selected: Int, onSelect: (Int) -> Unit) {
+    val categories = HomeCategory.entries
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
+    ) {
+        categories.forEachIndexed { index, category ->
+            ToggleButton(
+                checked = index == selected,
+                onCheckedChange = { onSelect(index) },
+                modifier = Modifier.weight(1f),
+                shapes = when (index) {
+                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    categories.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                }
+            ) {
+                Text(category.label)
+            }
+        }
+    }
+}
+
+private enum class HomePhase { Loading, Error, Content }
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CategoryPage(
+    category: HomeCategory,
+    viewModel: HomeViewModel,
+    onTopicClick: (title: String, url: String) -> Unit
+) {
+    val state = viewModel.state(category)
+    val listState = viewModel.listStates.getValue(category)
+    val phase = when {
+        state.error != null -> HomePhase.Error
+        state.topics.isEmpty() -> HomePhase.Loading
+        else -> HomePhase.Content
+    }
+
+    // Infinite scroll: fetch the next page a few rows before the end
+    val nearEnd by remember(listState) {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = listState.layoutInfo.totalItemsCount
+            total > 0 && last >= total - 6
+        }
+    }
+    LaunchedEffect(nearEnd, state.topics.size) {
+        if (nearEnd) viewModel.loadMore(category)
+    }
+
+    Crossfade(targetState = phase, label = "homePhase") { current ->
+        when (current) {
+            HomePhase.Loading -> LoadingState(messages = loadingMessages)
+            HomePhase.Error -> ErrorState(
+                message = state.error.orEmpty(),
+                onRetry = { viewModel.retry(category) }
+            )
+            HomePhase.Content -> {
+                val refreshState = rememberPullToRefreshState()
+                PullToRefreshBox(
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = { viewModel.refresh(category) },
+                    state = refreshState,
+                    indicator = {
+                        PullToRefreshDefaults.LoadingIndicator(
+                            state = refreshState,
+                            isRefreshing = state.isRefreshing,
+                            modifier = Modifier.align(Alignment.TopCenter)
+                        )
+                    }
+                ) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        itemsIndexed(state.topics, key = { _, topic -> topic.url }) { index, topic ->
+                            TopicRow(
+                                topic = topic,
+                                shape = segmentedShape(index, state.topics.size),
+                                onClick = { onTopicClick(topic.title, topic.url) },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                        if (state.isLoadingMore) {
+                            item(key = "loadingMore") {
                                 Box(
-                                    modifier = Modifier.fillMaxSize(),
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
                                     contentAlignment = Alignment.Center
-                                ) {
-                                    TopicListSkeleton(itemCount = 10)
-                                }
+                                ) { LoadingIndicator() }
                             }
                         }
                     }

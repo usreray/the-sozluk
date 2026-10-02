@@ -1,153 +1,101 @@
 package com.example.eksiscraper.viewmodel
 
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.repository.EksiRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class HomeViewModel(
-    private val repository: EksiRepository
-) : ViewModel() {
+enum class HomeCategory(val key: String, val label: String) {
+    Gundem("popular", "gündem"),
+    Bugun("today", "bugün"),
+    Debe("debe", "debe")
+}
 
-    private val _topics = mutableStateOf<List<Topic>>(emptyList())
-    val topics: State<List<Topic>> = _topics
+data class CategoryState(
+    val topics: List<Topic> = emptyList(),
+    /** First load with nothing on screen yet */
+    val isLoading: Boolean = false,
+    /** Pull-to-refresh over an existing list */
+    val isRefreshing: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val error: String? = null,
+    val page: Int = 0,
+    val canLoadMore: Boolean = true
+)
 
-    private val _isLoading = mutableStateOf(false)
-    val isLoading: State<Boolean> = _isLoading
+/** Each tab keeps its own list, so swiping between tabs never shows another tab's topics. */
+class HomeViewModel(private val repository: EksiRepository) : ViewModel() {
 
-    private val _error = mutableStateOf<String?>(null)
-    val error: State<String?> = _error
+    private val states = mutableStateMapOf<HomeCategory, CategoryState>()
+    private val jobs = mutableMapOf<HomeCategory, Job>()
 
-    private val _currentPage = mutableStateOf(1)
-    val currentPage: State<Int> = _currentPage
+    val listStates: Map<HomeCategory, LazyListState> =
+        HomeCategory.entries.associateWith { LazyListState() }
 
-    private val _selectedCategory = mutableStateOf("popular")
-    val selectedCategory: State<String> = _selectedCategory
+    fun state(category: HomeCategory): CategoryState = states[category] ?: CategoryState()
 
-    private val _canLoadMoreTopics = mutableStateOf(true)
-    val canLoadMoreTopics: State<Boolean> = _canLoadMoreTopics
+    fun ensureLoaded(category: HomeCategory) {
+        val s = state(category)
+        if (s.page == 0 && !s.isLoading && s.error == null) load(category, page = 1)
+    }
 
-    private val _isLoadingMoreTopics = mutableStateOf(false)
-    val isLoadingMoreTopics: State<Boolean> = _isLoadingMoreTopics
-    
-    private val _scrollToTop = mutableStateOf(false)
-    val scrollToTop: State<Boolean> = _scrollToTop
+    fun refresh(category: HomeCategory) = load(category, page = 1, refreshing = true)
 
-    // Scroll states
-    val popularScrollState = LazyListState()
-    val todayScrollState = LazyListState()
-    val streamScrollState = LazyListState()
+    fun retry(category: HomeCategory) = load(category, page = 1)
 
-    fun getCategoryScrollState(category: String): LazyListState {
-        return when (category) {
-            "popular" -> popularScrollState
-            "today" -> todayScrollState
-            "stream" -> streamScrollState
-            else -> popularScrollState
+    fun loadMore(category: HomeCategory) {
+        val s = state(category)
+        if (s.page > 0 && s.canLoadMore && !s.isLoading && !s.isRefreshing && !s.isLoadingMore) {
+            load(category, s.page + 1)
         }
     }
 
-    // Switching tabs starts a new load; the old one must not overwrite the new tab's list
-    private var fetchJob: Job? = null
-
-    fun fetchTopics(page: Int = 1) {
-        val category = _selectedCategory.value
-        fetchJob?.cancel()
-        if (page == 1) {
-            _isLoading.value = true
-            _error.value = null
-            _currentPage.value = 1
-            _topics.value = emptyList()
-        } else {
-            _isLoadingMoreTopics.value = true
+    private fun load(category: HomeCategory, page: Int, refreshing: Boolean = false) {
+        jobs[category]?.cancel()
+        update(category) {
+            if (page == 1) it.copy(
+                isLoading = !refreshing || it.topics.isEmpty(),
+                isRefreshing = refreshing && it.topics.isNotEmpty(),
+                isLoadingMore = false,
+                error = null
+            ) else it.copy(isLoadingMore = true)
         }
-
-        fetchJob = viewModelScope.launch {
+        jobs[category] = viewModelScope.launch {
             try {
-                // Timeout handling
-                val timeoutJob = launch {
-                    delay(30000)
-                    if (page == 1 && _isLoading.value) {
-                        _isLoading.value = false
-                        _error.value = "Request timed out."
-                    } else if (page > 1 && _isLoadingMoreTopics.value) {
-                        _isLoadingMoreTopics.value = false
-                        _canLoadMoreTopics.value = false
-                    }
-                }
-
-                val result = repository.getPopularTopics(page, category)
-                timeoutJob.cancel()
-                if (category != _selectedCategory.value) return@launch
-
-                if (result.isEmpty()) {
-                    if (page == 1) {
-                        _error.value = "No topics found."
-                    } else {
-                        _canLoadMoreTopics.value = false
-                    }
-                } else if (result.size == 1 && result[0].title.startsWith("Error fetching data")) {
-                    if (page == 1) {
-                        _error.value = result[0].title
-                    } else {
-                        _canLoadMoreTopics.value = false
-                    }
-                } else {
-                    if (page == 1) {
-                        _topics.value = result
-                    } else {
-                        _topics.value = _topics.value + result
-                    }
-                    _currentPage.value = page
-                    _canLoadMoreTopics.value = result.size >= 50
+                val result = repository.getPopularTopics(page, category.key)
+                update(category) {
+                    it.copy(
+                        // Lazy list keys are topic URLs, so never keep the same topic twice
+                        topics = (if (page == 1) result else it.topics + result).distinctBy { t -> t.url },
+                        page = page,
+                        // debe is a single list; the others have ~50 topics per page
+                        canLoadMore = category != HomeCategory.Debe && result.size >= 40,
+                        isLoading = false,
+                        isRefreshing = false,
+                        isLoadingMore = false
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (page == 1) {
-                    _error.value = e.message
-                } else {
-                    _canLoadMoreTopics.value = false
-                }
-            } finally {
-                // A cancelled load leaves the flags to the load that replaced it
-                if (fetchJob == coroutineContext[Job]) {
-                    _isLoading.value = false
-                    _isLoadingMoreTopics.value = false
+                update(category) {
+                    if (page == 1) it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        // Keep a list that is already on screen; only show the error if empty
+                        error = if (it.topics.isEmpty()) e.message ?: "Bir şeyler ters gitti" else null
+                    ) else it.copy(isLoadingMore = false, canLoadMore = false)
                 }
             }
         }
     }
 
-    fun loadMoreTopics() {
-        if (!_isLoading.value && !_isLoadingMoreTopics.value && _canLoadMoreTopics.value) {
-            fetchTopics(_currentPage.value + 1)
-        }
-    }
-
-    fun updateCategory(category: String) {
-        if (_selectedCategory.value != category) {
-            _selectedCategory.value = category
-            fetchTopics(1)
-        }
-    }
-    
-    fun scrollToTop() {
-        _scrollToTop.value = true
-    }
-    
-    fun resetScrollToTop() {
-        _scrollToTop.value = false
-    }
-    
-    fun refreshTopics() {
-        fetchTopics(1)
+    private inline fun update(category: HomeCategory, block: (CategoryState) -> CategoryState) {
+        states[category] = block(state(category))
     }
 }

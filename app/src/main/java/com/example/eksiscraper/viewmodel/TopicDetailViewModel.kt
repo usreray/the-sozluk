@@ -10,6 +10,7 @@ import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.model.withFavorite
 import com.example.eksiscraper.repository.EksiRepository
 import java.net.URI
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel() {
@@ -74,27 +75,14 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         fetchEntries(topic, page)
     }
 
-    /** Leaves today's entries for the full topic, at the page holding today's first entry. */
+    /** Leaves today's entries for the full topic, starting from its first entry. */
     fun showOlderEntries() {
         val topic = _selectedTopic.value ?: return
-        if (topic.olderEntriesUrl.isEmpty()) return
         showAllEntries = true
         clearExpandedEntries()
-        _isLoading.value = true
-        _error.value = null
-        viewModelScope.launch {
-            try {
-                val result = repository.searchTopic(topic.title, 1, topic.olderEntriesUrl)
-                _selectedTopic.value = result.copy(url = topic.url, isSaved = topic.isSaved)
-                _totalPages.value = result.totalPages
-                _currentPage.value = result.currentPage
-                scrollState.scrollToItem(0)
-            } catch (e: Exception) {
-                _error.value = e.message ?: "Could not load the topic"
-            } finally {
-                _isLoading.value = false
-            }
-        }
+        _currentPage.value = 1
+        viewModelScope.launch { scrollState.scrollToItem(0) }
+        fetchEntries(topic, 1)
     }
 
     private fun fetchEntries(topic: Topic, page: Int) {
@@ -127,12 +115,18 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 _selectedTopic.value = if (topic.url.isNotEmpty()) result.copy(url = topic.url) else result
                 _totalPages.value = result.totalPages
                 _currentPage.value = page
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _error.value = e.message ?: "Could not load the topic"
+                _error.value = e.message ?: "Başlık yüklenemedi"
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    fun retry() {
+        _selectedTopic.value?.let { fetchEntries(it, _currentPage.value) }
     }
 
     fun navigateToPage(page: Int) {

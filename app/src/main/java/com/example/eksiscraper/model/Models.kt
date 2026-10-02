@@ -17,8 +17,7 @@ data class Topic(
     // Page the site actually returned (differs from the requested one for ?focusto= links)
     val currentPage: Int = 1,
     // "N entry daha" on gündem (?a=popular) pages: entries written before today
-    val olderEntriesCount: Int = 0,
-    val olderEntriesUrl: String = ""
+    val olderEntriesCount: Int = 0
 )
 
 data class Entry(

@@ -1,12 +1,12 @@
 package com.example.eksiscraper.network
 
-import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.Topic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.jsoup.Jsoup
+import java.io.IOException
 import java.net.URLEncoder
 
 object EksiNetworkDataSource {
@@ -46,7 +46,7 @@ object EksiNetworkDataSource {
     suspend fun fetchTopics(page: Int, category: String): List<Topic> = withContext(Dispatchers.IO) {
         val urlPath = when (category) {
             "today" -> "basliklar/bugun"
-            "stream" -> "basliklar/sorunsal"
+            "debe" -> "debe"
             else -> "basliklar/gundem"
         }
 
@@ -70,35 +70,12 @@ object EksiNetworkDataSource {
         val response = connection.execute()
 
         if (response.statusCode() != 200) {
-            // Fallback to mobile or handle error
-            // For now, returning empty list or throwing exception could be options
-            // But keeping it simple as per original logic, maybe return error topic
-             return@withContext listOf(
-                Topic(
-                    title = "Error fetching data: HTTP ${response.statusCode()}",
-                    url = "",
-                    commentCount = 0,
-                    entries = listOf(Entry("Please try again later.")),
-                    entriesLoaded = true
-                )
-            )
+            throw IOException("ekşi sözlük şu an yanıt vermiyor (HTTP ${response.statusCode()})")
         }
 
-        val document = response.parse()
-        val topics = HtmlParser.parseTopics(document)
-        
-        if (topics.isEmpty()) {
-             return@withContext listOf(
-                Topic(
-                    title = "Error fetching data: No topics found",
-                    url = "",
-                    commentCount = 0,
-                    entries = listOf(Entry("Please try again later.")),
-                    entriesLoaded = true
-                )
-            )
-        }
-        
+        val topics = HtmlParser.parseTopics(response.parse())
+        if (topics.isEmpty()) throw IOException("Başlık listesi okunamadı")
+
         return@withContext topics
     }
 
@@ -125,14 +102,7 @@ object EksiNetworkDataSource {
         val response = connection.execute()
 
         if (response.statusCode() != 200) {
-             return@withContext Topic(
-                title = query,
-                url = "$BASE_URL$searchUrl",
-                commentCount = 0,
-                entries = listOf(Entry("HTTP error: ${response.statusCode()}")),
-                entriesLoaded = true,
-                totalPages = 1
-            )
+            throw IOException("Başlık yüklenemedi (HTTP ${response.statusCode()})")
         }
 
         val document = response.parse()

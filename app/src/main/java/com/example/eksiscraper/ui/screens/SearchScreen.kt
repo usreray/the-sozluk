@@ -1,335 +1,136 @@
 package com.example.eksiscraper.ui.screens
 
 import android.app.Application
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SearchBar
+import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.example.eksiscraper.ui.components.EntriesDisplay
-import com.example.eksiscraper.ui.components.EntriesSkeleton
-import com.example.eksiscraper.ui.components.PageSelectionDialog
-import com.example.eksiscraper.ui.components.TopicHeader
-import com.example.eksiscraper.ui.components.TopicListSkeleton
+import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.ui.components.MessageState
+import com.example.eksiscraper.ui.components.TopicRow
+import com.example.eksiscraper.ui.components.segmentedShape
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.viewmodel.EksiViewModelFactory
 import com.example.eksiscraper.viewmodel.SearchViewModel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SearchScreen(
-        navController: NavController? = null, // Optional for now if not used for navigation yet
-        viewModel: SearchViewModel =
-                viewModel(
-                        factory =
-                                EksiViewModelFactory(
-                                        LocalContext.current.applicationContext as Application
-                                )
-                )
+    navController: NavController,
+    viewModel: SearchViewModel = viewModel(
+        factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
 ) {
-        val searchQuery by viewModel.searchQuery
-        val searchResult by viewModel.searchResult
-        val isSearching by viewModel.isSearching
-        val currentPage by viewModel.currentPage
-        val suggestions by viewModel.suggestions
+    val query by viewModel.query
+    val suggestions by viewModel.suggestions
+    val isLoading by viewModel.isLoadingSuggestions
+    val focusManager = LocalFocusManager.current
 
-        // Local state for page dialog since it's UI specific
-        val isPageDialogVisible = remember { mutableStateOf(false) }
-        val selectedPage = remember { mutableStateOf(1) }
+    // ekşi redirects a query to its topic (or entry for "#123"), so a search opens the topic screen
+    fun open(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        focusManager.clearFocus()
+        navController.navigate(Screen.TopicDetail.createRoute(trimmed, ""))
+    }
 
-        // Add state to track scroll position
-        val isScrolledState = remember { mutableStateOf(false) }
-        val isScrolled = isScrolledState.value
-
-        // Handle back gesture when search results are displayed
-        BackHandler(enabled = searchResult != null) { viewModel.clearSearch() }
-
-        // Get total pages from the search result, with a minimum of the current page
-        val totalPages = (searchResult?.totalPages ?: 1).coerceAtLeast(currentPage)
-
-        // Page selection dialog
-        if (isPageDialogVisible.value) {
-                PageSelectionDialog(
-                        currentPage = currentPage,
-                        maxPages = totalPages,
-                        selectedPage = selectedPage.value,
-                        onPageSelected = { selectedPage.value = it },
-                        onConfirm = {
-                                viewModel.search(selectedPage.value)
-                                isPageDialogVisible.value = false
-                        },
-                        onDismiss = { isPageDialogVisible.value = false }
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
+        SearchBar(
+            inputField = {
+                SearchBarDefaults.InputField(
+                    query = query,
+                    onQueryChange = viewModel::updateQuery,
+                    onSearch = ::open,
+                    expanded = false,
+                    onExpandedChange = {},
+                    placeholder = { Text("başlık, #entry ya da @yazar") },
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = viewModel::clear) {
+                                Icon(Icons.Rounded.Close, contentDescription = "Temizle")
+                            }
+                        }
+                    }
                 )
+            },
+            expanded = false,
+            onExpandedChange = {},
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        ) {}
+
+        AnimatedVisibility(visible = isLoading) {
+            LinearWavyProgressIndicator(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp)
+            )
         }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-                // Only show search container if no results are displayed
-                // Don't show it when changing pages of an existing search result
-                if (searchResult == null) {
-                        Card(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                colors =
-                                        CardDefaults.cardColors(
-                                                containerColor =
-                                                        MaterialTheme.colorScheme.surfaceVariant
-                                        )
-                        ) {
-                                Column(modifier = Modifier.padding(16.dp)) {
-                                        Text(
-                                                text = "Search",
-                                                style = MaterialTheme.typography.titleMedium,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+        Crossfade(targetState = query.isBlank(), label = "searchBody") { blank ->
+            if (blank) {
+                MessageState(
+                    icon = Icons.Rounded.TravelExplore,
+                    title = "Ne arıyorsun?",
+                    message = "Bir başlık yaz, #numara ile bir entry'ye git ya da @ ile bir yazar ara."
+                )
+            } else {
+                SuggestionList(query = query, suggestions = suggestions, onSelect = ::open)
+            }
+        }
+    }
+}
 
-                                        Spacer(modifier = Modifier.height(8.dp))
-
-                                        Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                                OutlinedTextField(
-                                                        value = searchQuery,
-                                                        onValueChange = {
-                                                                viewModel.updateSearchQuery(it)
-                                                        },
-                                                        label = { Text("Enter search term") },
-                                                        modifier =
-                                                                Modifier.weight(1f)
-                                                                        .padding(end = 8.dp),
-                                                        singleLine = true,
-                                                        keyboardOptions =
-                                                                KeyboardOptions(
-                                                                        imeAction = ImeAction.Search
-                                                                ),
-                                                        keyboardActions =
-                                                                KeyboardActions(
-                                                                        onSearch = {
-                                                                                viewModel.search()
-                                                                        }
-                                                                ),
-                                                        colors =
-                                                                TextFieldDefaults.colors(
-                                                                        focusedIndicatorColor =
-                                                                                MaterialTheme
-                                                                                        .colorScheme
-                                                                                        .primary,
-                                                                        unfocusedIndicatorColor =
-                                                                                MaterialTheme
-                                                                                        .colorScheme
-                                                                                        .outline,
-                                                                        focusedLabelColor =
-                                                                                MaterialTheme
-                                                                                        .colorScheme
-                                                                                        .primary,
-                                                                        cursorColor =
-                                                                                MaterialTheme
-                                                                                        .colorScheme
-                                                                                        .primary
-                                                                ),
-                                                        leadingIcon = {
-                                                                Icon(
-                                                                        imageVector =
-                                                                                Icons.Default
-                                                                                        .Search,
-                                                                        contentDescription =
-                                                                                "Search",
-                                                                        tint =
-                                                                                MaterialTheme
-                                                                                        .colorScheme
-                                                                                        .onSurfaceVariant
-                                                                                        .copy(
-                                                                                                alpha =
-                                                                                                        0.7f
-                                                                                        )
-                                                                )
-                                                        }
-                                                )
-
-                                                OutlinedButton(
-                                                        onClick = { viewModel.search() },
-                                                        enabled =
-                                                                searchQuery.isNotEmpty() &&
-                                                                        !isSearching,
-                                                        border =
-                                                                ButtonDefaults.outlinedButtonBorder
-                                                                        .copy(
-                                                                                brush =
-                                                                                        androidx.compose
-                                                                                                .ui
-                                                                                                .graphics
-                                                                                                .SolidColor(
-                                                                                                        if (searchQuery
-                                                                                                                        .isNotEmpty() &&
-                                                                                                                        !isSearching
-                                                                                                        )
-                                                                                                                MaterialTheme
-                                                                                                                        .colorScheme
-                                                                                                                        .primary
-                                                                                                        else
-                                                                                                                MaterialTheme
-                                                                                                                        .colorScheme
-                                                                                                                        .outline
-                                                                                                )
-                                                                        ),
-                                                        colors =
-                                                                ButtonDefaults.outlinedButtonColors(
-                                                                        contentColor =
-                                                                                if (searchQuery
-                                                                                                .isNotEmpty() &&
-                                                                                                !isSearching
-                                                                                )
-                                                                                        MaterialTheme
-                                                                                                .colorScheme
-                                                                                                .primary
-                                                                                else
-                                                                                        MaterialTheme
-                                                                                                .colorScheme
-                                                                                                .onSurfaceVariant
-                                                                                                .copy(
-                                                                                                        alpha =
-                                                                                                                0.38f
-                                                                                                )
-                                                                )
-                                                ) { Text("Search") }
-                                        }
-
-                                        if (suggestions.isNotEmpty() && !isSearching) {
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
-                                                        items(suggestions) { suggestion ->
-                                                                Text(
-                                                                        text = suggestion,
-                                                                        style =
-                                                                                MaterialTheme.typography
-                                                                                        .bodyLarge,
-                                                                        color =
-                                                                                MaterialTheme.colorScheme
-                                                                                        .onSurfaceVariant,
-                                                                        modifier =
-                                                                                Modifier.fillMaxWidth()
-                                                                                        .clickable {
-                                                                                                viewModel
-                                                                                                        .selectSuggestion(
-                                                                                                                suggestion
-                                                                                                        )
-                                                                                        }
-                                                                                        .padding(
-                                                                                                vertical =
-                                                                                                        12.dp,
-                                                                                                horizontal =
-                                                                                                        4.dp
-                                                                                        )
-                                                                )
-                                                                HorizontalDivider()
-                                                        }
-                                                }
-                                        }
-                                }
-                        }
-
-                        // Show loading indicator for initial search
-                        if (isSearching) {
-                                TopicListSkeleton(itemCount = 5)
-                        }
-                } else {
-                        // Display search results
-                        Column(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                                if (isSearching) {
-                                        EntriesSkeleton(itemCount = 5)
-                                } else {
-                                        // Topic title with page selector
-                                        TopicHeader(
-                                                title = searchResult?.title ?: "",
-                                                currentPage = currentPage,
-                                                maxPages = totalPages,
-                                                onPreviousPage = {
-                                                        if (currentPage > 1) {
-                                                                viewModel.search(currentPage - 1)
-                                                        }
-                                                },
-                                                onNextPage = { viewModel.search(currentPage + 1) },
-                                                onShowPageDialog = {
-                                                        selectedPage.value = currentPage
-                                                        isPageDialogVisible.value = true
-                                                },
-                                                isPreviousEnabled = currentPage > 1,
-                                                isNextEnabled =
-                                                        true, // Always enable next page for search
-                                                // results
-                                                isSaved = searchResult?.isSaved ?: false,
-                                                onSaveToggle = {
-                                                        searchResult?.let { topic ->
-                                                                if (topic.isSaved) {
-                                                                        viewModel.unsaveTopic(topic)
-                                                                } else {
-                                                                        viewModel.saveTopic(topic)
-                                                                }
-                                                        }
-                                                },
-                                                isScrolled = isScrolled
-                                        )
-
-                                        // Entries
-                                        searchResult?.let { result ->
-                                                EntriesDisplay(
-                                                        topic = result,
-                                                        currentPage = currentPage,
-                                                        scrollState = viewModel.scrollState,
-                                                        onScroll = { scrolled ->
-                                                                isScrolledState.value = scrolled
-                                                        },
-                                                        isEntryExpanded = { entryId ->
-                                                                viewModel.isEntryExpanded(entryId)
-                                                        },
-                                                        onToggleEntryExpansion = { entryId ->
-                                                                viewModel.toggleEntryExpansion(
-                                                                        entryId
-                                                                )
-                                                        },
-                                                        onToggleEntryFavorite = { entryId ->
-                                                                viewModel.toggleEntryFavorite(entryId)
-                                                        },
-                                                        onLoginRequest = {
-                                                                navController?.navigate(Screen.Login.route)
-                                                        }
-                                                )
-                                        }
-                                }
-                        }
+@Composable
+private fun SuggestionList(query: String, suggestions: List<String>, onSelect: (String) -> Unit) {
+    // The typed text itself always comes first, so a search is one tap away
+    val rows = listOf(query.trim()) + suggestions.filterNot { it.equals(query.trim(), ignoreCase = true) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        itemsIndexed(rows, key = { index, text -> "$index:$text" }) { index, text ->
+            TopicRow(
+                topic = Topic(title = text),
+                shape = segmentedShape(index, rows.size),
+                onClick = { onSelect(text) },
+                modifier = Modifier.animateItem(),
+                trailing = {
+                    Icon(
+                        Icons.AutoMirrored.Rounded.ArrowForward,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
+            )
         }
+    }
 }

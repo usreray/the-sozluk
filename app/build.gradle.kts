@@ -48,12 +48,13 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
+    // 1.4.0 keeps the M3 Expressive APIs internal; 1.5.0-alpha14 is the newest alpha that still
+    // works with Compose 1.10 (later alphas need Compose 1.11+, i.e. AGP 9)
+    implementation("androidx.compose.material3:material3:1.5.0-alpha14")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.jsoup)
-    implementation(libs.accompanist.swiperefresh)
-    implementation ("androidx.compose.runtime:runtime-saveable:1.7.8")
     
     // Replace Accompanist Pager with official Jetpack Compose Pager
     implementation("androidx.compose.foundation:foundation")

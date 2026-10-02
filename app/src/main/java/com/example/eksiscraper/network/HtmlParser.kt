@@ -119,8 +119,8 @@ object HtmlParser {
                                 ?.toIntOrNull()
                                 ?: page
 
-                // On ?a=popular pages a "N entry daha" link above the list leads to the
-                // full topic at today's first entry (/slug--id?focusto=<entry id>)
+                // On ?a=popular / ?day= pages a "N entry daha" link above the list counts the
+                // entries before today's first one (its href is /slug--id?focusto=<entry id>)
                 val firstEntry = entryListItems.firstOrNull()
                 val olderLink =
                         document.select("a.showall").firstOrNull { link ->
@@ -222,15 +222,6 @@ object HtmlParser {
                         }
                 }
 
-                if (entries.isEmpty()) {
-                        entries.add(
-                                Entry(
-                                        content = "No entries found for this topic on page $page",
-                                        entryId = "error_no_entries_${System.currentTimeMillis()}"
-                                )
-                        )
-                }
-
                 // Determine redirected URL
                 val finalUrl = document.location()
                 val redirectedPath =
@@ -250,8 +241,7 @@ object HtmlParser {
                         redirectedUrl = redirectedPath,
                         totalPages = maxOf(totalPages, returnedPage),
                         currentPage = returnedPage,
-                        olderEntriesCount = olderCount,
-                        olderEntriesUrl = if (olderCount > 0) olderLink?.attr("href").orEmpty() else ""
+                        olderEntriesCount = olderCount
                 )
         }
 }
