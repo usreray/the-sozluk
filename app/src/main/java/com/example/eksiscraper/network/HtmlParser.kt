@@ -353,7 +353,10 @@ object HtmlParser {
         fun parseProfile(document: Document, nick: String): AuthorProfile {
                 fun count(id: String) =
                         document.selectFirst("#$id")?.text()?.filter(Char::isDigit)?.toIntOrNull() ?: 0
-                val avatar = document.selectFirst("img.avatar")?.attr("src").orEmpty()
+                // The profile's own picture box; a bare img.avatar can be the logged-in user's
+                // own picture in the site header
+                val avatar = (document.selectFirst("#profile-logo img") ?: document.selectFirst("#user-profile-title img.avatar, img.logo.avatar"))
+                        ?.attr("src").orEmpty()
                 return AuthorProfile(
                         nick = document.selectFirst("#user-profile-title")?.attr("data-nick")
                                 ?.ifBlank { null } ?: nick,
