@@ -55,6 +55,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.network.EksiSession
 import com.example.eksiscraper.ui.components.FloatingTopBar
+import com.example.eksiscraper.ui.components.LargeTitle
+import androidx.compose.runtime.derivedStateOf
 import com.example.eksiscraper.ui.components.LocalBottomBarInset
 import com.example.eksiscraper.ui.components.MessageState
 import com.example.eksiscraper.ui.components.TopicRow
@@ -80,9 +82,11 @@ fun ProfileScreen(
         if (isLoggedIn && nick == null) viewModel.refreshNick()
     }
 
+    val scrolled by remember { derivedStateOf { viewModel.scrollState.firstVisibleItemIndex > 0 } }
     Scaffold(
         topBar = {
-            FloatingTopBar(title = "profil") {
+            // The page shows a big "profil"; the bar takes the title only once it scrolled away
+            FloatingTopBar(title = if (scrolled) "profil" else null) {
                     if (isLoggedIn) {
                         IconButton(onClick = { navController.navigate(Screen.Messages.createRoute()) }) {
                             Icon(Icons.Rounded.Mail, contentDescription = "Mesajlar")
@@ -100,6 +104,7 @@ fun ProfileScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp + LocalBottomBarInset.current),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            item(key = "title") { LargeTitle("profil") }
             item(key = "account") {
                 AccountCard(
                     isLoggedIn = isLoggedIn,

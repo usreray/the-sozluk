@@ -1,6 +1,9 @@
 package com.example.eksiscraper.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,23 +77,19 @@ fun FavoritersSheet(
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)
                 ) {
-                    itemsIndexed(list, key = { _, nick -> nick }) { index, nick ->
-                        Surface(
-                            onClick = {
-                                onDismiss()
-                                onAuthor(nick)
-                            },
-                            shape = segmentedShape(index, list.size),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
-                            ) {
-                                AuthorAvatar(nick, size = 32)
-                                Text(nick, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 14.dp))
-                            }
-                        }
+                    itemsIndexed(list, key = { _, nick -> nick }) { _, nick ->
+                        Text(
+                            nick,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    onDismiss()
+                                    onAuthor(nick)
+                                }
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        )
                     }
                 }
             }

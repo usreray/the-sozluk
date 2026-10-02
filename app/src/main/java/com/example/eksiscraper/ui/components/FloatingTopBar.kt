@@ -1,6 +1,9 @@
 package com.example.eksiscraper.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Box
@@ -87,12 +90,13 @@ fun FloatingTopBar(
                     }
                 }
             }
-            // As wide as the title needs; the spacer after it keeps the actions at the end
-            Box(modifier = Modifier.weight(1f, fill = false)) {
+            // The title card sits centered in the space between back and actions, as wide as
+            // its text: short titles stay balanced instead of hugging the back button
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showTitle,
-                    enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
-                    exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start)
+                    enter = fadeIn() + scaleIn(initialScale = 0.9f),
+                    exit = fadeOut() + scaleOut(targetScale = 0.9f)
                 ) {
                     FloatingSurface(
                         shape = RoundedCornerShape(26.dp),
@@ -107,11 +111,15 @@ fun FloatingTopBar(
                                     it()
                                     Spacer(Modifier.width(12.dp))
                                 }
-                                Column(modifier = Modifier.weight(1f, fill = false)) {
+                                Column(
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
                                     if (title != null) {
                                         Text(
                                             title,
                                             style = MaterialTheme.typography.titleMediumEmphasized,
+                                            textAlign = TextAlign.Center,
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -132,11 +140,13 @@ fun FloatingTopBar(
                     }
                 }
             }
-            Spacer(Modifier.weight(0.001f))
             if (actions != null) {
                 FloatingSurface(shape = CircleShape) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 2.dp)) { actions() }
                 }
+            } else if (onBack != null) {
+                // Mirror the back button so the title is centered on the screen
+                Spacer(Modifier.width(52.dp))
             }
         }
     }
@@ -183,4 +193,19 @@ fun LazyListState.isScrollingUp(): Boolean {
             up || !canScrollForward
         }
     }.value
+}
+
+/**
+ * The big page heading for screens whose bar starts as bare round buttons (settings, profile,
+ * messages); the bar shows the title only after this has scrolled away.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun LargeTitle(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text,
+        style = MaterialTheme.typography.displaySmallEmphasized,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = modifier.padding(start = 8.dp, top = 8.dp, bottom = 12.dp)
+    )
 }

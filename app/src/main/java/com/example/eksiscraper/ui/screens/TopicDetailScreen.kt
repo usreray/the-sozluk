@@ -261,6 +261,8 @@ fun TopicDetailScreen(
     // Room under the floating header so the first row starts below it
     val topInset = floatingTopBarInset()
 
+    // A surface at the root sets the background and the default text color (no Scaffold here)
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
     Box(modifier = Modifier.fillMaxSize()) {
         Crossfade(targetState = phase, label = "topicPhase") { current ->
             when (current) {
@@ -311,12 +313,6 @@ fun TopicDetailScreen(
         FloatingTopBar(
             title = displayTitle,
             // Pages are in the bottom toolbar; only say when this is a single entry
-            subtitle = when {
-                !loaded -> null
-                topic?.url?.contains("/entry/") == true -> "tek entry · tamamı için dokun"
-                viewModel.isTodayOnly -> "bugünün entry'leri · tamamı için dokun"
-                else -> null
-            },
             // The title opens the whole topic from its first page
             onTitleClick = if (loaded) viewModel::showOlderEntries else null,
             onBack = { navController.popBackStack() },
@@ -353,6 +349,7 @@ fun TopicDetailScreen(
         )
 
         SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 88.dp))
+    }
     }
 }
 

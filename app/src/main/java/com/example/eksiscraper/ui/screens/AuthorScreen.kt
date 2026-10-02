@@ -164,6 +164,8 @@ fun AuthorScreen(
 
     // The nick moves into the floating bar once the big header has scrolled away
     val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    // A surface at the root sets the background and the default text color (no Scaffold here)
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
     Box(modifier = Modifier.fillMaxSize()) {
         Crossfade(
             targetState = when {
@@ -240,6 +242,7 @@ fun AuthorScreen(
             }
         }
         SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+    }
     }
 }
 

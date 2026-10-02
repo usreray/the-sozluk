@@ -58,6 +58,10 @@ import androidx.navigation.NavController
 import com.example.eksiscraper.settings.AppSettings
 import com.example.eksiscraper.settings.ThemeMode
 import com.example.eksiscraper.ui.components.FloatingTopBar
+import com.example.eksiscraper.ui.components.LargeTitle
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
 import com.example.eksiscraper.ui.components.segmentedShape
 import com.example.eksiscraper.ui.theme.isAppInDarkTheme
 import kotlin.math.roundToInt
@@ -70,14 +74,19 @@ fun SettingsScreen(navController: NavController) {
     val pureBlack by AppSettings.pureBlack
     val textScale by AppSettings.textScale
 
+    val listState = rememberLazyListState()
+    val scrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     Scaffold(
-        topBar = { FloatingTopBar(title = "ayarlar", onBack = { navController.popBackStack() }) }
+        // A bare back button over a big "ayarlar"; the small title appears after scrolling
+        topBar = { FloatingTopBar(title = if (scrolled) "ayarlar" else null, onBack = { navController.popBackStack() }) }
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            item { LargeTitle("ayarlar") }
             item { SectionTitle("görünüm") }
             item {
                 Surface(shape = segmentedShape(0, 3), color = MaterialTheme.colorScheme.surfaceContainerLow) {
