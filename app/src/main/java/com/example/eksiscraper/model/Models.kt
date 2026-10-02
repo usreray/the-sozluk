@@ -24,3 +24,13 @@ data class Entry(
     val entryId: String = "",
     val isFavorited: Boolean = false
 ) 
+/** Returns a copy of the topic with one entry's favorite state (and count) changed. */
+fun Topic.withFavorite(entryId: String, favorited: Boolean): Topic = copy(
+    entries = entries.map { entry ->
+        if (entry.entryId != entryId || entry.isFavorited == favorited) entry
+        else entry.copy(
+            isFavorited = favorited,
+            favoriteCount = (entry.favoriteCount + if (favorited) 1 else -1).coerceAtLeast(0)
+        )
+    }
+)

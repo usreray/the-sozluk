@@ -39,8 +39,7 @@ fun EntryItem(
         index: Int,
         isExpanded: Boolean,
         onExpandToggle: () -> Unit,
-        isFavorite: Boolean = false, // This parameter will be ignored now
-        onFavoriteToggle: (String) -> Unit = {}
+        onFavoriteToggle: () -> Unit = {}
 ) {
     // Track whether text is actually visually truncated
     var isTextTruncated by remember { mutableStateOf(false) }
@@ -51,15 +50,6 @@ fun EntryItem(
 
     // Create a coroutine scope for making network requests
     val coroutineScope = rememberCoroutineScope()
-
-    // Use rememberSaveable with a key based on entryId to persist state across scrolling
-    // Local UI state for favorite status - initialize with server state
-    var isLocallyFavorited by
-            rememberSaveable(key = "fav_${entry.entryId}") { mutableStateOf(entry.isFavorited) }
-
-    // Local UI state for favorite count - initialize with server count
-    var localFavoriteCount by
-            rememberSaveable(key = "count_${entry.entryId}") { mutableStateOf(entry.favoriteCount) }
 
     ElevatedCard(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 12.dp),
@@ -114,61 +104,28 @@ fun EntryItem(
                     horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Start
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Use different icon and color based on favorite state
-                    if (isLocallyFavorited) {
-                        IconButton(
-                                onClick = {
-                                    // Store current state before toggling
-                                    val currentlyFavorited = isLocallyFavorited
-
-                                    // Toggle local UI state for immediate feedback
-                                    isLocallyFavorited = !isLocallyFavorited
-
-                                    // Decrease favorite count by 1 when unfavoriting
-                                    localFavoriteCount = (localFavoriteCount - 1).coerceAtLeast(0)
-
-                                    // Call the toggle function with the current favorite state
-                                    // before toggling
-                                    onFavoriteToggle(entry.entryId)
-                                },
-                                modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                    painter = painterResource(id = R.drawable.thumb_up_24px_filled),
-                                    contentDescription = "Unlike entry",
-                                    tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        IconButton(
-                                onClick = {
-                                    // Store current state before toggling
-                                    val currentlyFavorited = isLocallyFavorited
-
-                                    // Toggle local UI state for immediate feedback
-                                    isLocallyFavorited = !isLocallyFavorited
-
-                                    // Increase favorite count by 1 when favoriting
-                                    localFavoriteCount += 1
-
-                                    // Call the toggle function with the current favorite state
-                                    // before toggling
-                                    onFavoriteToggle(entry.entryId)
-                                },
-                                modifier = Modifier.size(40.dp)
-                        ) {
-                            Icon(
-                                    painter = painterResource(id = R.drawable.thumb_up_24px),
-                                    contentDescription = "Like entry",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    // State comes from the ViewModel, which only changes it for logged-in users
+                    IconButton(onClick = onFavoriteToggle, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                                painter =
+                                        painterResource(
+                                                id =
+                                                        if (entry.isFavorited)
+                                                                R.drawable.thumb_up_24px_filled
+                                                        else R.drawable.thumb_up_24px
+                                        ),
+                                contentDescription =
+                                        if (entry.isFavorited) "Unlike entry" else "Like entry",
+                                tint =
+                                        if (entry.isFavorited) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
                     // Only show the number if it's greater than 0
-                    if (localFavoriteCount > 0) {
+                    if (entry.favoriteCount > 0) {
                         Text(
-                                text = localFavoriteCount.toString(),
+                                text = entry.favoriteCount.toString(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.model.withFavorite
 import com.example.eksiscraper.repository.EksiRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -107,7 +108,6 @@ class SearchViewModel(private val repository: EksiRepository) : ViewModel() {
 
     // Entry states
     private val _expandedEntryIds = mutableStateMapOf<String, Boolean>()
-    private val _favoritedEntryIds = mutableStateMapOf<String, Boolean>()
 
     fun isEntryExpanded(entryId: String): Boolean {
         return _expandedEntryIds[entryId] ?: false
@@ -118,13 +118,14 @@ class SearchViewModel(private val repository: EksiRepository) : ViewModel() {
         _expandedEntryIds[entryId] = !current
     }
 
-    fun toggleEntryFavorite(entryId: String, isFavorited: Boolean) {
-        _favoritedEntryIds[entryId] = isFavorited
+    /** Optimistically flips the favorite; reverts if eksisozluk.com rejects it. */
+    fun toggleEntryFavorite(entryId: String) {
+        val entry = _searchResult.value?.entries?.firstOrNull { it.entryId == entryId } ?: return
+        val target = !entry.isFavorited
+        _searchResult.value = _searchResult.value?.withFavorite(entryId, target)
         viewModelScope.launch {
-            if (isFavorited) {
-                repository.favoriteEntry(entryId)
-            } else {
-                repository.unfavoriteEntry(entryId)
+            if (!repository.setFavorite(entryId, target)) {
+                _searchResult.value = _searchResult.value?.withFavorite(entryId, !target)
             }
         }
     }

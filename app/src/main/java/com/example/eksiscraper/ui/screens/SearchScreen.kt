@@ -45,6 +45,7 @@ import com.example.eksiscraper.ui.components.EntriesSkeleton
 import com.example.eksiscraper.ui.components.PageSelectionDialog
 import com.example.eksiscraper.ui.components.TopicHeader
 import com.example.eksiscraper.ui.components.TopicListSkeleton
+import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.viewmodel.EksiViewModelFactory
 import com.example.eksiscraper.viewmodel.SearchViewModel
 
@@ -319,13 +320,11 @@ fun SearchScreen(
                                                                         entryId
                                                                 )
                                                         },
-                                                        onToggleEntryFavorite = {
-                                                                entryId,
-                                                                isFavorited ->
-                                                                viewModel.toggleEntryFavorite(
-                                                                        entryId,
-                                                                        isFavorited
-                                                                )
+                                                        onToggleEntryFavorite = { entryId ->
+                                                                viewModel.toggleEntryFavorite(entryId)
+                                                        },
+                                                        onLoginRequest = {
+                                                                navController?.navigate(Screen.Login.route)
                                                         }
                                                 )
                                         }

@@ -41,8 +41,6 @@ import com.example.eksiscraper.viewmodel.EksiViewModelFactory
 import com.example.eksiscraper.viewmodel.ProfileViewModel
 import android.app.Application
 import androidx.compose.ui.platform.LocalContext
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,9 +71,7 @@ fun ProfileScreen(
                     SavedTopicsList(
                         savedTopics = savedTopics,
                         onTopicSelected = { topic ->
-                            val encodedTitle = URLEncoder.encode(topic.title, StandardCharsets.UTF_8.toString())
-                            val encodedUrl = URLEncoder.encode(topic.url, StandardCharsets.UTF_8.toString())
-                            navController.navigate("${Screen.TopicDetail.route}/$encodedTitle/$encodedUrl")
+                            navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url))
                         },
                         viewModel = viewModel,
                         paddingValues = PaddingValues(0.dp)

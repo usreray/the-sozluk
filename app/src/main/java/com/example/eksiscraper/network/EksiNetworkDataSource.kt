@@ -152,6 +152,21 @@ object EksiNetworkDataSource {
         List(titles.length()) { titles.getString(it) }
     }
 
+    /** True if these cookies belong to a logged-in user (the login-only page doesn't redirect). */
+    suspend fun isLoggedIn(cookies: String, userAgent: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val connection = Jsoup.connect("$BASE_URL${EksiSession.LOGGED_IN_PATH}")
+                .userAgent(userAgent)
+                .timeout(10000)
+                .followRedirects(false)
+                .ignoreHttpErrors(true)
+                .header("Cookie", cookies)
+            connection.execute().statusCode() == 200
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     suspend fun favoriteEntry(entryId: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val favlaUrl = "$BASE_URL/entry/favla"

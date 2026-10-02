@@ -24,12 +24,9 @@ class EksiRepository(
         return EksiNetworkDataSource.fetchSuggestions(query)
     }
 
-    suspend fun favoriteEntry(entryId: String): Boolean {
-        return EksiNetworkDataSource.favoriteEntry(entryId)
-    }
-
-    suspend fun unfavoriteEntry(entryId: String): Boolean {
-        return EksiNetworkDataSource.unfavoriteEntry(entryId)
+    suspend fun setFavorite(entryId: String, favorited: Boolean): Boolean {
+        return if (favorited) EksiNetworkDataSource.favoriteEntry(entryId)
+        else EksiNetworkDataSource.unfavoriteEntry(entryId)
     }
 
     // Local operations (delegated to SavedTopicRepository)

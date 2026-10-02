@@ -85,18 +85,18 @@ object HtmlParser {
                 searchUrl: String,
                 baseUrl: String
         ): Topic {
-                // Try to get the actual topic title from the page
-                val pageTitle =
-                        document.select("h1.topic-title, h1.başlık, h1, title")
-                                .firstOrNull()
-                                ?.text()
-                                ?: query
-                // Remove both "- ekşi sözlük" and page information like "- sayfa 5"
+                // The topic heading; <title> ("x - gündem - sayfa 2 - ekşi sözlük") is a fallback.
+                // A plain union selector would return <title> first, as it comes first in the page.
+                val heading = document.selectFirst("h1#title, h1[data-title]")
                 val cleanTitle =
-                        pageTitle
-                                .replace(" - ekşi sözlük", "")
-                                .replace(Regex(" - sayfa \\d+"), "") // Remove "- sayfa X" pattern
-                                .trim()
+                        heading?.attr("data-title")?.takeIf { it.isNotBlank() }
+                                ?: heading?.text()?.takeIf { it.isNotBlank() }
+                                ?: document.title()
+                                        .replace(Regex(" - sayfa \\d+"), "")
+                                        .replace(" - gündem", "")
+                                        .replace(" - ekşi sözlük", "")
+                                        .trim()
+                                        .ifBlank { query }
 
                 // Extract entry list items directly instead of just content divs
                 val entryListItems = document.select("li[data-id]")
@@ -235,7 +235,8 @@ object HtmlParser {
 
                 return Topic(
                         title = cleanTitle,
-                        url = "$baseUrl$searchUrl",
+                        // The topic's own address (after any search redirect), without the page
+                        url = baseUrl + redirectedPath.substringBefore("?"),
                         commentCount = entries.size,
                         entries = entries,
                         entriesLoaded = true,

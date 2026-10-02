@@ -37,10 +37,10 @@ fun Navigation(
         }
         
         composable(
-            route = "${Screen.TopicDetail.route}/{title}/{url}",
+            route = Screen.TopicDetail.pattern,
             arguments = listOf(
-                navArgument("title") { type = NavType.StringType },
-                navArgument("url") { type = NavType.StringType }
+                navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                navArgument("url") { type = NavType.StringType; defaultValue = "" }
             )
         ) { backStackEntry ->
             val title = backStackEntry.arguments?.getString("title") ?: ""

@@ -57,8 +57,6 @@ import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerSnapDistance
 import android.app.Application
 import androidx.compose.ui.platform.LocalContext
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -312,9 +310,7 @@ fun HomeScreen(
                                         TopicListItem(
                                             topic = topic,
                                             onClick = { 
-                                                val encodedTitle = URLEncoder.encode(topic.title, StandardCharsets.UTF_8.toString())
-                                                val encodedUrl = URLEncoder.encode(topic.url, StandardCharsets.UTF_8.toString())
-                                                navController.navigate("${Screen.TopicDetail.route}/$encodedTitle/$encodedUrl")
+                                                navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url))
                                             }
                                         )
                                     }

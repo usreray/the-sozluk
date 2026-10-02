@@ -14,10 +14,9 @@ import androidx.compose.runtime.mutableStateOf
  */
 object EksiSession {
     const val BASE_URL = "https://eksisozluk.com"
-    const val LOGIN_URL = "$BASE_URL/giris"
-
-    // Auth cookie set by eksisozluk.com after a successful login
-    private const val AUTH_COOKIE = "a"
+    // /mesaj is only reachable when logged in, so landing there proves the login worked
+    const val LOGGED_IN_PATH = "/mesaj"
+    const val LOGIN_URL = "$BASE_URL/giris?returnUrl=%2Fmesaj"
     private const val PREFS = "eksi_session"
     private const val KEY_COOKIES = "cookies"
     private const val KEY_USER_AGENT = "user_agent"
@@ -29,7 +28,7 @@ object EksiSession {
 
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        _isLoggedIn.value = hasAuthCookie(cookies)
+        _isLoggedIn.value = cookies.isNotEmpty()
     }
 
     val cookies: String
@@ -39,16 +38,16 @@ object EksiSession {
     val userAgent: String?
         get() = if (::prefs.isInitialized) prefs.getString(KEY_USER_AGENT, null) else null
 
-    /** Reads the WebView's cookies; returns true if they contain a login. */
-    fun captureFromWebView(webViewUserAgent: String): Boolean {
-        val webCookies = CookieManager.getInstance().getCookie(BASE_URL).orEmpty()
-        if (!hasAuthCookie(webCookies)) return false
+    /** The WebView's current cookies for eksisozluk.com. */
+    fun webViewCookies(): String = CookieManager.getInstance().getCookie(BASE_URL).orEmpty()
+
+    /** Stores cookies of a login that has been confirmed. */
+    fun saveLogin(webCookies: String, webViewUserAgent: String) {
         prefs.edit()
             .putString(KEY_COOKIES, webCookies)
             .putString(KEY_USER_AGENT, webViewUserAgent)
             .apply()
         _isLoggedIn.value = true
-        return true
     }
 
     fun logout() {
@@ -56,7 +55,4 @@ object EksiSession {
         CookieManager.getInstance().removeAllCookies(null)
         _isLoggedIn.value = false
     }
-
-    private fun hasAuthCookie(cookies: String): Boolean =
-        cookies.split(";").any { it.trim().startsWith("$AUTH_COOKIE=") }
 }

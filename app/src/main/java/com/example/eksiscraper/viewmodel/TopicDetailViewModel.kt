@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.model.withFavorite
 import com.example.eksiscraper.repository.EksiRepository
 import java.net.URI
 import kotlinx.coroutines.launch
@@ -27,6 +28,9 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     private val _expandedEntries = mutableStateMapOf<String, Boolean>()
     val expandedEntries: Map<String, Boolean> = _expandedEntries
+
+    private val _error = mutableStateOf<String?>(null)
+    val error: State<String?> = _error
 
     val scrollState = LazyListState()
 
@@ -69,48 +73,30 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     private fun fetchEntries(topic: Topic, page: Int) {
         _isLoading.value = true
+        _error.value = null
         viewModelScope.launch {
             try {
+                // Open the topic itself from its first entry: drop query parameters such as
+                // ?a=popular (today's entries only) or an old ?p=; the data source adds the page
+                val path = try {
+                    if (topic.url.isEmpty()) null
+                    else URI(if (topic.url.startsWith("http")) topic.url else "https://eksisozluk.com" + (if (topic.url.startsWith("/")) "" else "/") + topic.url).path
+                } catch (e: Exception) {
+                    null
+                }
                 val result =
-                        if (topic.url.isNotEmpty()) {
-                            // Extract path and query
-                            val uri =
-                                    try {
-                                        if (topic.url.startsWith("http")) URI(topic.url)
-                                        else
-                                                URI(
-                                                        "https://eksisozluk.com" +
-                                                                if (topic.url.startsWith("/")) ""
-                                                                else "/" + topic.url
-                                                )
-                                    } catch (e: Exception) {
-                                        null
-                                    }
-
-                            val path = uri?.path ?: topic.url
-                            val query = uri?.query
-
-                            val originalPath = if (query != null) "$path?$query" else path
-
-                            // Modify path for page
-                            val pathWithPage =
-                                    if (originalPath.contains("p=")) {
-                                        originalPath.replaceFirst(Regex("p=\\d+"), "p=$page")
-                                    } else {
-                                        if (originalPath.contains("?")) "$originalPath&p=$page"
-                                        else "$originalPath?p=$page"
-                                    }
-
-                            repository.searchTopic(topic.title, page, pathWithPage)
-                        } else {
+                        if (path.isNullOrBlank() || path == "/") {
+                            // No topic path (e.g. an old saved search URL): search by title
                             repository.searchTopic(topic.title, page)
+                        } else {
+                            repository.searchTopic(topic.title, page, path)
                         }
 
                 _selectedTopic.value = result
                 _totalPages.value = result.totalPages
                 _currentPage.value = page
             } catch (e: Exception) {
-                // Handle error
+                _error.value = e.message ?: "Could not load the topic"
             } finally {
                 _isLoading.value = false
             }
@@ -129,32 +115,20 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         _expandedEntries[entryId] = !(_expandedEntries[entryId] ?: false)
     }
 
-    fun toggleEntryFavorite(entryId: String, isFavorited: Boolean) {
+    /** Optimistically flips the favorite; reverts if eksisozluk.com rejects it. */
+    fun toggleEntryFavorite(entryId: String) {
+        val entry = _selectedTopic.value?.entries?.firstOrNull { it.entryId == entryId } ?: return
+        val target = !entry.isFavorited
+        _selectedTopic.value = _selectedTopic.value?.withFavorite(entryId, target)
         viewModelScope.launch {
-            if (isFavorited) {
-                repository.favoriteEntry(entryId)
-            } else {
-                repository.unfavoriteEntry(entryId)
+            if (!repository.setFavorite(entryId, target)) {
+                _selectedTopic.value = _selectedTopic.value?.withFavorite(entryId, !target)
             }
         }
     }
 
     private fun clearExpandedEntries() {
         _expandedEntries.clear()
-    }
-
-    fun favoriteEntry(entryId: String) {
-        viewModelScope.launch {
-            repository.favoriteEntry(entryId)
-            // Ideally update the UI to reflect the change locally
-        }
-    }
-
-    fun unfavoriteEntry(entryId: String) {
-        viewModelScope.launch {
-            repository.unfavoriteEntry(entryId)
-            // Ideally update the UI to reflect the change locally
-        }
     }
 
     fun saveTopic() {
