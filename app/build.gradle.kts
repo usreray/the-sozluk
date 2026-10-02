@@ -1,13 +1,13 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // AGP 9 compiles Kotlin itself; no org.jetbrains.kotlin.android plugin
     alias(libs.plugins.kotlin.compose)
-    id("com.google.devtools.ksp") version "2.1.10-1.0.29"
+    alias(libs.plugins.ksp)
 }
 
 android {
     namespace = "com.example.eksiscraper"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.eksiscraper"
@@ -32,9 +32,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
     buildFeatures {
         compose = true
     }
@@ -48,9 +45,9 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    // 1.4.0 keeps the M3 Expressive APIs internal; 1.5.0-alpha14 is the newest alpha that still
-    // works with Compose 1.10 (later alphas need Compose 1.11+, i.e. AGP 9)
-    implementation("androidx.compose.material3:material3:1.5.0-alpha14")
+    // 1.4.0 (the BOM's version) keeps the M3 Expressive APIs internal; 1.5.0-alpha27 is the
+    // newest alpha built against Compose 1.12 (alpha28+ needs 1.13)
+    implementation(libs.material3.expressive)
     implementation("androidx.compose.material:material-icons-extended")
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -64,8 +61,6 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     
-    implementation(libs.generativeai)
-    implementation("com.google.code.gson:gson:2.10.1")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
