@@ -84,9 +84,17 @@ object EksiNetworkDataSource {
 
         // Ask for the topic index the way the site's own script does: logged-in pages leave the
         // list out of the HTML and load it with this XHR, which also works when logged out
-        val connection = applyCommonConnectionSettings(session.newRequest(url))
+        // Some lists (bugün when logged in) can take the site a while on the first request of a
+        // session and are quick right after; allow more time and retry a timeout once
+        fun request() = applyCommonConnectionSettings(session.newRequest(url))
             .header("X-Requested-With", "XMLHttpRequest")
-        val response = connection.execute()
+            .timeout(20000)
+            .execute()
+        val response = try {
+            request()
+        } catch (e: java.net.SocketTimeoutException) {
+            request()
+        }
 
         // Follow lists (olay, takip, son, kenar, çaylaklar) are for logged-in users only
         if (response.statusCode() == 403 || response.statusCode() == 401) {
