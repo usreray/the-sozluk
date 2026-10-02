@@ -40,8 +40,8 @@ class EksiRepository(
         EksiNetworkDataSource.vote(entryId, authorId, rate, previous)
 
     /** Returns an error message, or null on success. */
-    suspend fun submitForm(form: FormSpec, values: Map<String, String>): String? =
-        EksiNetworkDataSource.submitForm(form, values)
+    suspend fun submitForm(form: FormSpec, values: Map<String, String>, ajax: Boolean = false): String? =
+        EksiNetworkDataSource.submitForm(form, values, ajax)
 
     suspend fun getProfile(nick: String): AuthorProfile = EksiNetworkDataSource.fetchProfile(nick)
 

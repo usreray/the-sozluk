@@ -24,7 +24,7 @@ sealed class Screen(val route: String) {
     }
     object Author : Screen("author") {
         const val pattern = "author?nick={nick}"
-        fun createRoute(nick: String): String = "author?nick=${Uri.encode(nick)}"
+        fun createRoute(nick: String): String = "author?nick=${Uri.encode(nick.trim().removePrefix("@"))}"
     }
     object TopicDetail : Screen("topic_detail") {
         const val pattern = "topic_detail?title={title}&url={url}"

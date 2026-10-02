@@ -281,24 +281,41 @@ object EksiNetworkDataSource {
      * Posts a form read from a page (entry form, delete form) with its hidden fields, including
      * the CSRF token, plus [values]. Returns an error message, or null on success.
      */
-    suspend fun submitForm(form: FormSpec, values: Map<String, String>): String? = withContext(Dispatchers.IO) {
-        try {
-            val action = if (form.action.startsWith("http")) form.action else BASE_URL + form.action
-            val response = applyCommonConnectionSettings(session.newRequest(action))
-                .method(org.jsoup.Connection.Method.POST)
-                .referrer("$BASE_URL/")
-                .data(form.fields + values)
-                .execute()
-            if (response.statusCode() !in 200..399) return@withContext "İşlem başarısız (HTTP ${response.statusCode()})"
-            // A rejected form comes back with the site's validation message
-            val error = runCatching { response.parse() }.getOrNull()
-                ?.select(".field-validation-error, .validation-summary-errors")
-                ?.text()?.trim()
-            error?.takeIf { it.isNotEmpty() }
-        } catch (e: Exception) {
-            e.message ?: "İşlem başarısız"
+    suspend fun submitForm(form: FormSpec, values: Map<String, String>, ajax: Boolean = false): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val action = if (form.action.startsWith("http")) form.action else BASE_URL + form.action
+                val request = applyCommonConnectionSettings(session.newRequest(action))
+                    .method(org.jsoup.Connection.Method.POST)
+                    .referrer("$BASE_URL/")
+                    .header("Origin", BASE_URL)
+                    .data(form.fields + values)
+                // The site's own script posts some forms as XHR; then the status code is the verdict
+                if (ajax) request.header("X-Requested-With", "XMLHttpRequest").header("Accept", "*/*")
+                val response = request.execute()
+                val body = response.body()
+                val document = runCatching { Jsoup.parse(body) }.getOrNull()
+                val error = document?.select(
+                    ".field-validation-error, .validation-summary-errors, #message-validation-result, .error-message"
+                )?.text()?.trim()?.ifEmpty { null }
+                // Diagnostics without content: status, where the post landed, and any error text
+                android.util.Log.d(
+                    "EksiForm",
+                    "POST ${form.action} -> ${response.statusCode()} ${response.url().path} " +
+                        "type=${response.contentType()} len=${body.length} error=${error ?: "-"}"
+                )
+                when {
+                    response.statusCode() !in 200..399 -> "İşlem başarısız (HTTP ${response.statusCode()})"
+                    error != null -> error
+                    // XHR endpoints may answer {"Success":false,"Message":"..."}
+                    body.trimStart().startsWith("{") && body.contains("\"Success\":false") ->
+                        runCatching { JSONObject(body).optString("Message") }.getOrNull()?.ifEmpty { null } ?: "İşlem başarısız"
+                    else -> null
+                }
+            } catch (e: Exception) {
+                e.message ?: "İşlem başarısız"
+            }
         }
-    }
 
     suspend fun fetchProfile(nick: String): AuthorProfile = withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/biri/${encodePath(nick)}"))

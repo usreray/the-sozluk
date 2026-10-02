@@ -105,7 +105,15 @@ data class MessageThread(
     val time: String
 )
 
-data class Message(val text: String, val html: String, val time: String, val isOutgoing: Boolean)
+data class Message(
+    val text: String,
+    val html: String,
+    val time: String,
+    val isOutgoing: Boolean,
+    /** Shown at once while sending; replaced by the server's copy */
+    val isPending: Boolean = false,
+    val isFailed: Boolean = false
+)
 
 data class MessageBox(
     val threads: List<MessageThread>,

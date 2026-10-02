@@ -234,7 +234,8 @@ object HtmlParser {
         )
 
         fun parseThread(document: Document): ThreadDetail = ThreadDetail(
-                nick = document.selectFirst("#message-thread-title a[href^=/biri/]")?.text().orEmpty(),
+                // The title shows "@nick"; the form and profile URLs want the bare nick
+                nick = document.selectFirst("#message-thread-title a[href^=/biri/]")?.text().orEmpty().trim().removePrefix("@"),
                 messages = document.select("#message-thread > article").map { article ->
                         val paragraph = article.selectFirst("p")
                         Message(

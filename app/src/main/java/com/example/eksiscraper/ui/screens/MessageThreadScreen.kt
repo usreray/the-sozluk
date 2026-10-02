@@ -51,6 +51,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
@@ -171,14 +172,13 @@ fun MessageThreadScreen(
                         value = reply,
                         onValueChange = { reply = it },
                         placeholder = { Text("yanıt yaz") },
-                        enabled = !isSending,
                         shape = RoundedCornerShape(28.dp),
                         maxLines = 5,
                         modifier = Modifier.weight(1f)
                     )
                     FilledIconButton(
                         onClick = { viewModel.send(otherNick, reply.trim()) { reply = "" } },
-                        enabled = reply.isNotBlank() && !isSending,
+                        enabled = reply.isNotBlank(),
                         modifier = Modifier.padding(start = 8.dp).size(52.dp)
                     ) {
                         if (isSending) LoadingIndicator(modifier = Modifier.size(24.dp))
@@ -219,14 +219,14 @@ private fun Bubble(message: Message, onLink: (com.example.eksiscraper.ui.compone
                 bottomEnd = if (outgoing) 6.dp else 24.dp
             ),
             color = if (outgoing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.widthIn(max = 320.dp)
+            modifier = Modifier.widthIn(max = 320.dp).alpha(if (message.isPending) 0.6f else 1f)
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                 Text(rememberEntryText(message.html, message.text, onLink), style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    message.time,
+                    if (message.isFailed) "gönderilemedi" else message.time,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (message.isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.End).padding(top = 4.dp)
                 )
             }

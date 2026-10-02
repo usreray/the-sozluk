@@ -1,19 +1,23 @@
 package com.example.eksiscraper.viewmodel
 
+import android.app.Application
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.eksiscraper.model.FormSpec
-import com.example.eksiscraper.model.Message
 import com.example.eksiscraper.model.MessageBox
+import com.example.eksiscraper.model.Message
 import com.example.eksiscraper.model.ThreadDetail
+import com.example.eksiscraper.network.SiteFormSender
 import com.example.eksiscraper.repository.EksiRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Message box, one open conversation, and sending through the site's own forms. */
-class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
+class MessagesViewModel(
+    private val repository: EksiRepository,
+    private val application: Application
+) : ViewModel() {
 
     private val _archive = mutableStateOf(false)
     val archive: State<Boolean> = _archive
@@ -39,8 +43,6 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
     private val _message = mutableStateOf<String?>(null)
     val message: State<String?> = _message
 
-    // The send form (with its CSRF token) from the last page that had one
-    private var sendForm: FormSpec? = null
     private var threadId: String? = null
 
     fun loadBox(archive: Boolean = _archive.value) {
@@ -51,7 +53,6 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
             try {
                 val box = repository.getMessageBox(archive, 1)
                 _box.value = box
-                box.sendForm?.let { sendForm = it }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -76,7 +77,6 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
             try {
                 val detail = repository.getThread(id)
                 _thread.value = detail
-                detail.sendForm?.let { sendForm = it }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -85,28 +85,57 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
-    /** Sends to [to]; replies use the same "yeni mesaj" form with the other person's nick. */
+    /**
+     * Sends to [to] through the site's own "yeni mesaj" form in an invisible WebView: a plain
+     * HTTP post of the same form is accepted but silently dropped by ekşi. In a conversation the
+     * reload then checks the message really arrived before showing it as sent.
+     */
     fun send(to: String, text: String, onSent: () -> Unit) {
         _isSending.value = true
         viewModelScope.launch {
-            try {
-                // Some conversation pages carry no form; the message box always does
-                val form = sendForm ?: runCatching { repository.getMessageBox(false, 1).sendForm }.getOrNull()
-                if (form == null) {
-                    _message.value = "Mesaj formu bulunamadı"
-                    return@launch
+            val sentBefore = _thread.value?.messages?.count { it.isOutgoing && !it.isPending && !it.isFailed }
+            // In a conversation the message appears at once as "sending"; the input clears now
+            val pending = Message(text, "", "gönderiliyor…", isOutgoing = true, isPending = true)
+            if (threadId != null) {
+                _thread.value = _thread.value?.let { it.copy(messages = it.messages + pending) }
+                onSent()
+            }
+            fun markFailed() {
+                _thread.value = _thread.value?.let { t ->
+                    t.copy(messages = t.messages.map { if (it === pending) it.copy(isPending = false, isFailed = true) else it })
                 }
-                sendForm = form
-                val error = repository.submitForm(form, mapOf("To" to to, (form.textFieldName ?: "Message") to text))
+            }
+            try {
+                val error = SiteFormSender.submit(
+                    context = application,
+                    pagePath = "/mesaj",
+                    formSelector = "#message-send-form",
+                    values = mapOf("To" to to, "Message" to text)
+                )
                 if (error != null) {
+                    markFailed()
                     _message.value = error
                     return@launch
                 }
-                onSent()
-                // Show the message at once; the reload brings the server's copy
-                _thread.value = _thread.value?.let { it.copy(messages = it.messages + Message(text, "", "şimdi", true)) }
-                if (threadId != null) refreshThread() else _message.value = "mesaj gönderildi"
+                val id = threadId
+                if (id != null && sentBefore != null) {
+                    val detail = repository.getThread(id)
+                    if (detail.messages.count { it.isOutgoing } <= sentBefore) {
+                        markFailed()
+                        _message.value = "Mesaj ekşi'de görünmüyor; gönderilememiş olabilir"
+                        return@launch
+                    }
+                    _thread.value = detail
+                } else {
+                    _message.value = "mesaj gönderildi"
+                    onSent()
+                }
                 loadBox()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                markFailed()
+                _message.value = e.message ?: "Mesaj gönderilemedi"
             } finally {
                 _isSending.value = false
             }
