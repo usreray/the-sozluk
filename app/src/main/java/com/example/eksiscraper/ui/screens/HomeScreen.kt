@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.shape.CircleShape
 import com.example.eksiscraper.ui.components.FloatingSurface
 import com.example.eksiscraper.viewmodel.HomeTabRequest
@@ -127,6 +128,11 @@ fun HomeScreen(
         }
     }
     val headerPadding = with(density) { headerHeight.toDp() }
+    // Another tab's list starts at its own position, so bring the header back with it;
+    // otherwise its space stays empty above that list
+    LaunchedEffect(pagerState.currentPage) {
+        animate(headerOffset, 0f) { value, _ -> headerOffset = value }
+    }
 
     // Load a tab the first time it is shown
     LaunchedEffect(pagerState.currentPage, categories) {

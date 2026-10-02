@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
@@ -134,6 +135,10 @@ fun MessagesScreen(
                 return Offset.Zero
             }
         }
+    }
+    // Switching between inbox and arşiv shows a list from its top: bring the header back too
+    LaunchedEffect(archive) {
+        animate(headerOffset, 0f) { value, _ -> headerOffset = value }
     }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
