@@ -24,6 +24,13 @@ import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.Button
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -191,24 +198,46 @@ private fun AccountCard(
                     }
                 }
                 if (loggedIn) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    var confirmLogout by remember { mutableStateOf(false) }
+                    if (confirmLogout) {
+                        AlertDialog(
+                            onDismissRequest = { confirmLogout = false },
+                            icon = { Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null) },
+                            title = { Text("çıkış yapılsın mı?") },
+                            text = { Text("Favorileme, oylama ve mesajlar için tekrar giriş yapman gerekecek.") },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    confirmLogout = false
+                                    onLogout()
+                                }) { Text("çıkış yap", color = MaterialTheme.colorScheme.error) }
+                            },
+                            dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("vazgeç") } }
+                        )
+                    }
+                    // Connected pair on the card: the profile is the main action, logout the quiet one
+                    Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
                         if (nick != null) {
                             Button(
                                 onClick = onOpenProfile,
                                 modifier = Modifier.weight(1f),
+                                shapes = ButtonDefaults.shapes(),
                                 contentPadding = ButtonDefaults.ButtonWithIconContentPadding
                             ) {
                                 Icon(Icons.Rounded.Person, contentDescription = null)
-                                Text("Profilim", modifier = Modifier.padding(start = 8.dp))
+                                Text("profilim", modifier = Modifier.padding(start = 8.dp))
                             }
                         }
-                        OutlinedButton(
-                            onClick = onLogout,
+                        FilledTonalButton(
+                            onClick = { confirmLogout = true },
                             modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.6f),
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
                             contentPadding = ButtonDefaults.ButtonWithIconContentPadding
                         ) {
                             Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null)
-                            Text("Çıkış yap", modifier = Modifier.padding(start = 8.dp))
+                            Text("çıkış yap", modifier = Modifier.padding(start = 8.dp))
                         }
                     }
                 } else {

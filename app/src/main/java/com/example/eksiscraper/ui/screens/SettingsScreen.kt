@@ -1,6 +1,23 @@
 package com.example.eksiscraper.ui.screens
 
 import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import com.example.eksiscraper.settings.ContrastChoice
+import com.example.eksiscraper.settings.PaletteChoice
+import com.example.eksiscraper.settings.SeedColor
+import com.example.eksiscraper.ui.theme.rememberSeedScheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -116,6 +133,63 @@ fun SettingsScreen(navController: NavController) {
                 )
             }
 
+            item { SectionTitle("renkler") }
+            item {
+                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Text(
+                            if (dynamicColor) "bir renk seçince duvar kâğıdı renkleri kapanır" else "palet",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            SeedColor.entries.forEach { seed ->
+                                SeedSwatch(
+                                    seed = seed,
+                                    selected = !dynamicColor && seed == AppSettings.seed.value,
+                                    onClick = {
+                                        AppSettings.setSeed(seed)
+                                        AppSettings.setDynamicColor(false)
+                                    }
+                                )
+                            }
+                        }
+                        Text("stil", style = MaterialTheme.typography.titleMedium)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            PaletteChoice.entries.forEach { choice ->
+                                FilterChip(
+                                    selected = choice == AppSettings.palette.value,
+                                    onClick = {
+                                        AppSettings.setPalette(choice)
+                                        AppSettings.setDynamicColor(false)
+                                    },
+                                    label = { Text(choice.label) }
+                                )
+                            }
+                        }
+                        Text("kontrast", style = MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+                            ContrastChoice.entries.forEachIndexed { index, choice ->
+                                ToggleButton(
+                                    checked = choice == AppSettings.contrast.value,
+                                    onCheckedChange = { AppSettings.setContrast(choice) },
+                                    modifier = Modifier.weight(1f),
+                                    enabled = !dynamicColor,
+                                    shapes = when (index) {
+                                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                        ContrastChoice.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                                    }
+                                ) { Text(choice.label) }
+                            }
+                        }
+                    }
+                }
+            }
+
             item { SectionTitle("okuma") }
             item {
                 Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -167,6 +241,54 @@ private fun SwitchRow(
             supportingContent = { Text(subtitle) },
             trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled) },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+        )
+    }
+}
+
+/**
+ * A seed color shown as the palette it produces (primary on top, secondary and tertiary below),
+ * like the wallpaper color picker; the chosen one morphs into a cookie shape.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SeedSwatch(seed: SeedColor, selected: Boolean, onClick: () -> Unit) {
+    val scheme = rememberSeedScheme(
+        seed = seed,
+        palette = AppSettings.palette.value,
+        darkTheme = isAppInDarkTheme(),
+        pureBlack = false,
+        contrastLevel = 0.0
+    )
+    val shape = if (selected) MaterialShapes.Cookie9Sided.toShape() else CircleShape
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(60.dp)
+                .clip(shape)
+                .clickable(onClick = onClick)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxWidth().weight(1f).background(scheme.primary))
+                Row(Modifier.fillMaxWidth().weight(1f)) {
+                    Box(Modifier.fillMaxHeight().weight(1f).background(scheme.secondaryContainer))
+                    Box(Modifier.fillMaxHeight().weight(1f).background(scheme.tertiary))
+                }
+            }
+            if (selected) {
+                Icon(
+                    Icons.Rounded.Check,
+                    contentDescription = "seçili",
+                    tint = scheme.onPrimary,
+                    modifier = Modifier.background(scheme.primary, CircleShape).padding(4.dp).size(18.dp)
+                )
+            }
+        }
+        Text(
+            seed.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
         )
     }
 }

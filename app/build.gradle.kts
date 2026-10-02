@@ -64,6 +64,10 @@ dependencies {
     // Avatars and badge images
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+    // Material color algorithm: full M3 schemes (incl. Expressive) from a seed color
+    implementation(libs.material.kolor)
+    // Google's color algorithm (HCT, dynamic schemes) to build palettes from a seed color
+    implementation(libs.material.color.utilities)
     
     // Replace Accompanist Pager with official Jetpack Compose Pager
     implementation("androidx.compose.foundation:foundation")

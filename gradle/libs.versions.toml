@@ -1,11 +1,11 @@
 [versions]
 accompanistPager = "0.33.2-alpha"
 accompanistSwiperefresh = "0.27.0"
-agp = "9.3.3"
+agp = "9.4.1"
 datastorePreferences = "1.0.0"
 jsoup = "1.17.2"
 jsoupVersion = "1.17.2"
-kotlin = "2.3.21"
+kotlin = "2.4.10"
 coreKtx = "1.19.1"
 junit = "4.13.2"
 junitVersion = "1.2.1"
@@ -23,9 +23,13 @@ navigationComposeVersion = "2.8.9"
 roomVersion = "2.8.5"
 ksp = "2.3.12"
 coil = "3.6.3"
+materialKolor = "5.0.1"
+materialColorUtilities = "4.1.1"
 material3Expressive = "1.5.0-alpha27"
 
 [libraries]
+material-kolor = { module = "com.materialkolor:material-kolor", version.ref = "materialKolor" }
+material-color-utilities = { module = "com.materialkolor:material-color-utilities", version.ref = "materialColorUtilities" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 accompanist-pager = { module = "com.google.accompanist:accompanist-pager", version.ref = "accompanistPager" }
