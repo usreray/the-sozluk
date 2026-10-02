@@ -1,8 +1,6 @@
 package com.example.eksiscraper.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -12,43 +10,41 @@ import com.example.eksiscraper.ui.screens.HomeScreen
 import com.example.eksiscraper.ui.screens.ProfileScreen
 import com.example.eksiscraper.ui.screens.SearchScreen
 import com.example.eksiscraper.ui.screens.TopicDetailScreen
-import com.example.eksiscraper.viewmodel.EksiViewModel
 
 @Composable
 fun Navigation(
-    navController: NavHostController,
-    viewModel: EksiViewModel = viewModel()
+    navController: NavHostController
 ) {
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route
     ) {
         composable(Screen.Home.route) {
-            HomeScreen(navController, viewModel)
+            HomeScreen(navController)
         }
         
         composable(Screen.Search.route) {
-            SearchScreen(viewModel)
+            SearchScreen(navController)
         }
         
         composable(Screen.Profile.route) {
-            ProfileScreen(navController, viewModel)
+            ProfileScreen(navController)
         }
         
         composable(
-            route = Screen.TopicDetail.route,
+            route = "${Screen.TopicDetail.route}/{title}/{url}",
             arguments = listOf(
-                navArgument("topicIndex") {
-                    type = NavType.IntType
-                }
+                navArgument("title") { type = NavType.StringType },
+                navArgument("url") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val topicIndex = backStackEntry.arguments?.getInt("topicIndex") ?: 0
+            val title = backStackEntry.arguments?.getString("title") ?: ""
+            val url = backStackEntry.arguments?.getString("url") ?: ""
             TopicDetailScreen(
-                topicIndex = topicIndex,
-                navController = navController,
-                viewModel = viewModel
+                title = title,
+                url = url,
+                navController = navController
             )
         }
     }
-} 
+}

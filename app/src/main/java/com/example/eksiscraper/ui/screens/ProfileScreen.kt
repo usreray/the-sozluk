@@ -1,6 +1,5 @@
 package com.example.eksiscraper.ui.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,13 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,13 +21,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -44,151 +32,51 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.R
 import com.example.eksiscraper.model.Topic
-import com.example.eksiscraper.ui.components.EntriesDisplay
-import com.example.eksiscraper.ui.components.EntriesSkeleton
-import com.example.eksiscraper.ui.components.LoadingIndicator
-import com.example.eksiscraper.ui.components.PageSelectionDialog
 import com.example.eksiscraper.ui.components.SavedTopicsListSkeleton
-import com.example.eksiscraper.ui.components.TopicHeader
 import com.example.eksiscraper.ui.navigation.Screen
-import com.example.eksiscraper.viewmodel.EksiViewModel
+import com.example.eksiscraper.viewmodel.EksiViewModelFactory
+import com.example.eksiscraper.viewmodel.ProfileViewModel
+import android.app.Application
+import androidx.compose.ui.platform.LocalContext
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
     navController: NavController,
-    viewModel: EksiViewModel = viewModel()
+    viewModel: ProfileViewModel = viewModel(
+        factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
 ) {
     val savedTopics by viewModel.savedTopics
-    val isSearching by viewModel.isSearching
-    val viewingSavedTopic by viewModel.viewingSavedTopic
-    val isViewingSavedTopic by viewModel.isViewingSavedTopic
-    val savedTopicCurrentPage by viewModel.savedTopicCurrentPage
-    val isPageDialogVisible by viewModel.isPageDialogVisible
-    val selectedPage by viewModel.selectedPage
-    
-    // Add state to track scroll position and navigation visibility
-    val isScrolledState = remember { mutableStateOf(false) }
-    val isScrolled = isScrolledState.value
-    
-    // Set the active screen
-    LaunchedEffect(Unit) {
-        println("ProfileScreen: Setting active screen to profile")
-        viewModel.setActiveScreen("profile")
-        // No need to call clearSelectedTopic here as setActiveScreen already does it
-    }
-    
-    // Handle back press when viewing a saved topic
-    BackHandler(enabled = isViewingSavedTopic) {
-        viewModel.stopViewingSavedTopic()
-    }
-    
-    // Calculate total pages from the viewing topic
-    val totalPages = (viewingSavedTopic?.totalPages ?: 1).coerceAtLeast(savedTopicCurrentPage)
-    
-    // Page selection dialog
-    if (isPageDialogVisible) {
-        PageSelectionDialog(
-            currentPage = savedTopicCurrentPage,
-            maxPages = totalPages,
-            selectedPage = selectedPage,
-            onPageSelected = { viewModel.updateSelectedPage(it) },
-            onConfirm = { 
-                viewModel.applySelectedPage()
-                viewModel.hidePageDialog()
-            },
-            onDismiss = { viewModel.hidePageDialog() }
-        )
-    }
     
     Scaffold(
         // No top app bar to match Home and Search screens
     ) { paddingValues ->
-        if (isViewingSavedTopic) {
-            // Show topic content without applying paddingValues to match TopicDetailScreen
-            Column(
-                modifier = Modifier.fillMaxSize()
-                // Removed paddingValues to match TopicDetailScreen structure
-            ) {
-                if (isSearching) {
-                    // Use the same approach as TopicDetailScreen for skeleton loading
-                    EntriesSkeleton(itemCount = 5)
-                } else if (viewingSavedTopic != null) {
-                    // Topic title with page selector - no nested Column
-                    TopicHeader(
-                        title = viewingSavedTopic?.title ?: "",
-                        currentPage = savedTopicCurrentPage,
-                        maxPages = totalPages,
-                        onPreviousPage = { 
-                            if (savedTopicCurrentPage > 1) {
-                                viewingSavedTopic?.let { topic ->
-                                    viewModel.viewSavedTopic(topic, savedTopicCurrentPage - 1)
-                                }
-                            }
-                        },
-                        onNextPage = { 
-                            viewingSavedTopic?.let { topic ->
-                                viewModel.viewSavedTopic(topic, savedTopicCurrentPage + 1)
-                            }
-                        },
-                        onShowPageDialog = { viewModel.showPageDialog() },
-                        isPreviousEnabled = savedTopicCurrentPage > 1,
-                        isNextEnabled = true,  // Always enable next page
-                        isSaved = true,  // Always true since we're in the saved topics section
-                        onSaveToggle = {
-                            viewingSavedTopic?.let { topic ->
-                                viewModel.unsaveTopic(topic)
-                                // Return to the saved topics list if a topic is unsaved
-                                viewModel.stopViewingSavedTopic()
-                            }
-                        },
-                        isScrolled = isScrolled
-                    )
-                    
-                    // Entries - directly match TopicDetailScreen structure
-                    viewingSavedTopic?.let { topic ->
-                        EntriesDisplay(
-                            topic = topic,
-                            currentPage = savedTopicCurrentPage,
-                            viewModel = viewModel,
-                            scrollState = viewModel.profileScrollState,
-                            onScroll = { scrolled -> isScrolledState.value = scrolled }
-                        )
-                    }
-                }
-            }
+        // Show saved topics list or loading skeleton
+        // Since savedTopics is a State<List<Topic>>, we can check if it's empty.
+        // Note: We don't have an explicit isLoading state in ProfileViewModel yet, 
+        // but Room flow collection is usually fast. 
+        // If we wanted to show a skeleton initially, we could add an isLoading state to VM.
+        // For now, we'll assume if it's empty, it might be loading or just empty.
+        // But better to show empty message if truly empty.
+        
+        if (savedTopics.isEmpty()) {
+             // We can't easily distinguish between "loading" and "empty" without a state.
+             // But since it's local DB, it's fast. Let's assume empty means empty.
+             EmptySavedTopicsMessage(paddingValues)
         } else {
-            // Show saved topics list or loading skeleton
-            if (savedTopics.isEmpty()) {
-                // Check if we're loading or truly empty
-                val isLoading by viewModel.isLoading
-                if (isLoading) {
-                    // Show skeleton loading for saved topics
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                    ) {
-                        SavedTopicsListSkeleton(itemCount = 5)
-                    }
-                } else {
-                    // Show empty state message
-                    EmptySavedTopicsMessage(paddingValues)
-                }
-            } else {
-                SavedTopicsList(
-                    savedTopics = savedTopics,
-                    onTopicSelected = { topic ->
-                        // Always view saved topics starting at page 1
-                        viewModel.viewSavedTopic(topic, 1)
-                    },
-                    viewModel = viewModel,
-                    paddingValues = paddingValues,
-                    onBackToList = { 
-                        viewModel.stopViewingSavedTopic()
-                    }
-                )
-            }
+            SavedTopicsList(
+                savedTopics = savedTopics,
+                onTopicSelected = { topic ->
+                    val encodedTitle = URLEncoder.encode(topic.title, StandardCharsets.UTF_8.toString())
+                    val encodedUrl = URLEncoder.encode(topic.url, StandardCharsets.UTF_8.toString())
+                    navController.navigate("${Screen.TopicDetail.route}/$encodedTitle/$encodedUrl")
+                },
+                viewModel = viewModel,
+                paddingValues = paddingValues
+            )
         }
     }
 }
@@ -237,12 +125,11 @@ private fun EmptySavedTopicsMessage(paddingValues: PaddingValues) {
 private fun SavedTopicsList(
     savedTopics: List<Topic>,
     onTopicSelected: (Topic) -> Unit,
-    viewModel: EksiViewModel,
-    paddingValues: PaddingValues,
-    onBackToList: () -> Unit
+    viewModel: ProfileViewModel,
+    paddingValues: PaddingValues
 ) {
     LazyColumn(
-        state = viewModel.profileScrollState,
+        state = viewModel.scrollState,
         modifier = Modifier
             .fillMaxSize()
             .padding(paddingValues),
@@ -310,4 +197,4 @@ private fun SavedTopicsList(
             }
         }
     }
-} 
+}

@@ -1,3 +1,4 @@
+
 package com.example.eksiscraper.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
@@ -8,24 +9,15 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -37,16 +29,15 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -55,7 +46,8 @@ import com.example.eksiscraper.ui.components.CategoryTabBar
 import com.example.eksiscraper.ui.components.TopicListItem
 import com.example.eksiscraper.ui.components.TopicListSkeleton
 import com.example.eksiscraper.ui.navigation.Screen
-import com.example.eksiscraper.viewmodel.EksiViewModel
+import com.example.eksiscraper.viewmodel.EksiViewModelFactory
+import com.example.eksiscraper.viewmodel.HomeViewModel
 import com.google.accompanist.swiperefresh.SwipeRefresh
 import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import kotlinx.coroutines.launch
@@ -63,27 +55,27 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.PagerSnapDistance
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
+import android.app.Application
+import androidx.compose.ui.platform.LocalContext
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     navController: NavHostController,
-    viewModel: EksiViewModel = viewModel()
+    viewModel: HomeViewModel = viewModel(
+        factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
 ) {
     val topics by viewModel.topics
     val isLoading by viewModel.isLoading
     val error by viewModel.error
     val isLoadingMoreTopics by viewModel.isLoadingMoreTopics
     val canLoadMoreTopics by viewModel.canLoadMoreTopics
-    val scrollToTop by viewModel.homeScrollToTop
-    val selectedCategory by viewModel.selectedHomeCategory
+    val scrollToTop by viewModel.scrollToTop
+    val selectedCategory by viewModel.selectedCategory
     
-    // Use ViewModel's scroll state to maintain position across tab switches
-    val lazyListState = viewModel.homeScrollState
     val swipeRefreshState = rememberSwipeRefreshState(isLoading)
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -110,41 +102,6 @@ fun HomeScreen(
         pagerSnapDistance = PagerSnapDistance.atMost(1)
     )
     
-    // Track if a swipe is in progress
-    val isSwipeInProgress by remember {
-        derivedStateOf {
-            pagerState.currentPageOffsetFraction != 0f
-        }
-    }
-    
-    // Get the current scroll state based on the selected category
-    val currentScrollState = viewModel.getCategoryScrollState(selectedCategory)
-    
-    // Monitor swipe progress to detect direction and preload content
-    LaunchedEffect(isSwipeInProgress, pagerState.currentPageOffsetFraction) {
-        if (isSwipeInProgress) {
-            // Only preload when the user has swiped at least 50% of the way to the next page
-            // This prevents unnecessary API calls during small scrolls
-            val significantSwipe = Math.abs(pagerState.currentPageOffsetFraction) > 0.5
-            
-            if (significantSwipe) {
-                // If offset is positive, we're swiping from right to left (to see the next page)
-                // If offset is negative, we're swiping from left to right (to see the previous page)
-                val targetPage = if (pagerState.currentPageOffsetFraction > 0) {
-                    // Swiping to next page (right to left)
-                    (pagerState.currentPage + 1).coerceAtMost(categories.size - 1)
-                } else {
-                    // Swiping to previous page (left to right)
-                    (pagerState.currentPage - 1).coerceAtLeast(0)
-                }
-                
-                // Get the category for the target page and preload its content
-                val targetCategory = categories[targetPage].first
-                viewModel.preloadCategoryContent(targetCategory)
-            }
-        }
-    }
-    
     // Sync pager state with selected category when the selected category changes externally
     LaunchedEffect(selectedCategory) {
         val index = categories.indexOfFirst { it.first == selectedCategory }
@@ -161,7 +118,7 @@ fun HomeScreen(
                 if (offset == 0f) {
                     val category = categories.getOrNull(page)?.first ?: return@collect
                     if (category != selectedCategory) {
-                        viewModel.changeHomeCategory(category)
+                        viewModel.updateCategory(category)
                     }
                 }
             }
@@ -169,7 +126,9 @@ fun HomeScreen(
     
     // Initialize the first page of content when the screen becomes visible
     LaunchedEffect(Unit) {
-        viewModel.initializeHomePageIfNeeded()
+        if (topics.isEmpty() && !isLoading) {
+            viewModel.fetchTopics()
+        }
     }
     
     // Observe the scrollToTop state and scroll to top when it changes to true
@@ -183,7 +142,7 @@ fun HomeScreen(
             scrollState.animateScrollToItem(0)
             
             // Reset the flag
-            viewModel.resetHomeScrollToTop()
+            viewModel.resetScrollToTop()
         }
     }
     
@@ -215,7 +174,6 @@ fun HomeScreen(
                     false
                 } else {
                     val lastVisibleItem = visibleItemsInfo.last()
-                    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
                     val lastVisibleItemIndex = lastVisibleItem.index
                     val totalItemsCount = topics.size
                     
@@ -230,7 +188,6 @@ fun HomeScreen(
     // Load more topics when we reach the bottom
     LaunchedEffect(isAtBottom, isLoading, isLoadingMoreTopics, canLoadMoreTopics) {
         if (isAtBottom && !isLoading && !isLoadingMoreTopics && canLoadMoreTopics) {
-            println("HomeScreen: At bottom, loading more topics")
             viewModel.loadMoreTopics()
         }
     }
@@ -282,7 +239,7 @@ fun HomeScreen(
             // Add the CategoryTabBar at the top
             CategoryTabBar(
                 selectedCategory = selectedCategory,
-                onCategorySelected = { category -> viewModel.changeHomeCategory(category) },
+                onCategorySelected = { category -> viewModel.updateCategory(category) },
                 pagerState = pagerState
             )
             
@@ -301,7 +258,7 @@ fun HomeScreen(
                 // The content inside each page is the same, it's just filtered by the selected category
                 SwipeRefresh(
                     state = swipeRefreshState,
-                    onRefresh = { viewModel.fetchTopics() },
+                    onRefresh = { viewModel.refreshTopics() },
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize()
@@ -355,9 +312,9 @@ fun HomeScreen(
                                         TopicListItem(
                                             topic = topic,
                                             onClick = { 
-                                                // Reset scroll position before navigating
-                                                viewModel.selectTopic(index, 1)
-                                                navController.navigate(Screen.TopicDetail.createRoute(index)) 
+                                                val encodedTitle = URLEncoder.encode(topic.title, StandardCharsets.UTF_8.toString())
+                                                val encodedUrl = URLEncoder.encode(topic.url, StandardCharsets.UTF_8.toString())
+                                                navController.navigate("${Screen.TopicDetail.route}/$encodedTitle/$encodedUrl")
                                             }
                                         )
                                     }
@@ -417,4 +374,4 @@ fun HomeScreen(
             }
         }
     }
-} 
+}
