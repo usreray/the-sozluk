@@ -62,6 +62,10 @@ class EksiRepository(
 
     suspend fun getThread(id: String): ThreadDetail = EksiNetworkDataSource.fetchThread(id)
 
+    /** Returns the site's reason when it rejects the message, or null once it is sent. */
+    suspend fun sendMessage(form: FormSpec, to: String, text: String): String? =
+        EksiNetworkDataSource.sendMessage(form, to, text)
+
     suspend fun setFollowing(url: String): Boolean = EksiNetworkDataSource.postRelation(url)
 
     // Local operations (delegated to SavedTopicRepository)

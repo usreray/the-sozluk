@@ -246,6 +246,33 @@ object EksiNetworkDataSource {
         HtmlParser.parseMessageBox(response.parse())
     }
 
+    /**
+     * Posts the "yeni mesaj" form. Where ekşi redirects afterwards varies (the conversation or
+     * /mesaj), so only a notice on the landing page means a rejection; callers confirm delivery
+     * by reloading.
+     */
+    suspend fun sendMessage(form: FormSpec, to: String, text: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val action = if (form.action.startsWith("http")) form.action else BASE_URL + form.action
+            val response = applyCommonConnectionSettings(session.newRequest(action))
+                .method(org.jsoup.Connection.Method.POST)
+                .referrer("$BASE_URL/mesaj")
+                .header("Origin", BASE_URL)
+                .data(form.fields + mapOf("To" to to, (form.textFieldName ?: "Message") to text))
+                .execute()
+            val landed = response.url().path
+            val notice = Jsoup.parse(response.body())
+                .select(".field-validation-error, .validation-summary-errors, #message-validation-result, #notice, .notice, .toast, .alert, .error")
+                .filterNot { it.attr("style").replace(" ", "").contains("display:none") }
+                .map { it.ownText().ifBlank { it.text() }.trim().trimEnd('×').trim() }
+                .firstOrNull { it.isNotEmpty() && it.length < 300 }
+            android.util.Log.d("EksiForm", "POST ${form.action} -> ${response.statusCode()} $landed notice=${notice ?: "-"}")
+            if (response.statusCode() !in 200..399) "Mesaj gönderilemedi (HTTP ${response.statusCode()})" else notice
+        } catch (e: Exception) {
+            e.message ?: "Mesaj gönderilemedi"
+        }
+    }
+
     suspend fun fetchThread(id: String): ThreadDetail = withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/mesaj/$id")).execute()
         if (response.statusCode() != 200) throw IOException("Konuşma yüklenemedi (HTTP ${response.statusCode()})")

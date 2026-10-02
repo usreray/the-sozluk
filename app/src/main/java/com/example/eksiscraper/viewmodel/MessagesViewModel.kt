@@ -1,23 +1,19 @@
 package com.example.eksiscraper.viewmodel
 
-import android.app.Application
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.eksiscraper.model.FormSpec
 import com.example.eksiscraper.model.MessageBox
 import com.example.eksiscraper.model.Message
 import com.example.eksiscraper.model.ThreadDetail
-import com.example.eksiscraper.network.SiteFormSender
 import com.example.eksiscraper.repository.EksiRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 /** Message box, one open conversation, and sending through the site's own forms. */
-class MessagesViewModel(
-    private val repository: EksiRepository,
-    private val application: Application
-) : ViewModel() {
+class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
 
     private val _archive = mutableStateOf(false)
     val archive: State<Boolean> = _archive
@@ -45,6 +41,9 @@ class MessagesViewModel(
 
     private var threadId: String? = null
 
+    // The "yeni mesaj" form (with its CSRF token) from the last page that had one
+    private var sendForm: FormSpec? = null
+
     fun loadBox(archive: Boolean = _archive.value) {
         _archive.value = archive
         _isLoading.value = true
@@ -53,6 +52,7 @@ class MessagesViewModel(
             try {
                 val box = repository.getMessageBox(archive, 1)
                 _box.value = box
+                box.sendForm?.let { sendForm = it }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -86,9 +86,8 @@ class MessagesViewModel(
     }
 
     /**
-     * Sends to [to] through the site's own "yeni mesaj" form in an invisible WebView: a plain
-     * HTTP post of the same form is accepted but silently dropped by ekşi. In a conversation the
-     * reload then checks the message really arrived before showing it as sent.
+     * Sends to [to] with the site's "yeni mesaj" form; replies use it too, with the other
+     * person's nick. In a conversation the reload then checks the message really arrived.
      */
     fun send(to: String, text: String, onSent: () -> Unit) {
         _isSending.value = true
@@ -106,12 +105,11 @@ class MessagesViewModel(
                 }
             }
             try {
-                val error = SiteFormSender.submit(
-                    context = application,
-                    pagePath = "/mesaj",
-                    formSelector = "#message-send-form",
-                    values = mapOf("To" to to, "Message" to text)
-                )
+                // Some conversation pages carry no form; the message box always does
+                val form = sendForm ?: repository.getMessageBox(false, 1).sendForm
+                    ?: throw IllegalStateException("Mesaj formu bulunamadı")
+                sendForm = form
+                val error = repository.sendMessage(form, to, text)
                 if (error != null) {
                     markFailed()
                     _message.value = error
@@ -127,6 +125,12 @@ class MessagesViewModel(
                     }
                     _thread.value = detail
                 } else {
+                    // A new message: its conversation should now be on top of the box
+                    val top = repository.getMessageBox(false, 1).threads.firstOrNull()
+                    if (top == null || !top.nick.equals(to, ignoreCase = true)) {
+                        _message.value = "Mesaj ekşi'de görünmüyor; gönderilememiş olabilir"
+                        return@launch
+                    }
                     _message.value = "mesaj gönderildi"
                     onSent()
                 }
