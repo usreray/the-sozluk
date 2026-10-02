@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.repository.EksiRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -52,7 +54,12 @@ class HomeViewModel(
         }
     }
 
+    // Switching tabs starts a new load; the old one must not overwrite the new tab's list
+    private var fetchJob: Job? = null
+
     fun fetchTopics(page: Int = 1) {
+        val category = _selectedCategory.value
+        fetchJob?.cancel()
         if (page == 1) {
             _isLoading.value = true
             _error.value = null
@@ -62,7 +69,7 @@ class HomeViewModel(
             _isLoadingMoreTopics.value = true
         }
 
-        viewModelScope.launch {
+        fetchJob = viewModelScope.launch {
             try {
                 // Timeout handling
                 val timeoutJob = launch {
@@ -76,8 +83,9 @@ class HomeViewModel(
                     }
                 }
 
-                val result = repository.getPopularTopics(page, _selectedCategory.value)
+                val result = repository.getPopularTopics(page, category)
                 timeoutJob.cancel()
+                if (category != _selectedCategory.value) return@launch
 
                 if (result.isEmpty()) {
                     if (page == 1) {
@@ -100,6 +108,8 @@ class HomeViewModel(
                     _currentPage.value = page
                     _canLoadMoreTopics.value = result.size >= 50
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 if (page == 1) {
                     _error.value = e.message
@@ -107,8 +117,11 @@ class HomeViewModel(
                     _canLoadMoreTopics.value = false
                 }
             } finally {
-                _isLoading.value = false
-                _isLoadingMoreTopics.value = false
+                // A cancelled load leaves the flags to the load that replaced it
+                if (fetchJob == coroutineContext[Job]) {
+                    _isLoading.value = false
+                    _isLoadingMoreTopics.value = false
+                }
             }
         }
     }

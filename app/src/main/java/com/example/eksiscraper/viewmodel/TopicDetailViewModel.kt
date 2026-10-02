@@ -34,7 +34,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     val scrollState = LazyListState()
 
-    // False: today's entries of a gündem topic (?a=popular); true: the whole topic
+    // False: only today's entries (?a=popular / ?day=); true: the whole topic
     private var showAllEntries = false
 
     fun loadTopic(title: String, url: String, page: Int = 1) {
@@ -109,16 +109,18 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                     null
                 }
                 val path = uri?.path
-                // Gündem links (?a=popular) show today's entries, like the site and other
-                // clients; "N entry daha" switches to the full topic. Other params (an old
-                // ?p=, ?focusto=) are dropped: the data source adds the page itself.
-                val popular = !showAllEntries && uri?.query?.split("&")?.contains("a=popular") == true
+                // Gündem (?a=popular) and bugün (?day=YYYY-MM-DD) links show only today's
+                // entries, like the site and other clients; "N entry daha" switches to the full
+                // topic. Other params (an old ?p=, ?focusto=) are dropped: the data source adds
+                // the page itself.
+                val filter = if (showAllEntries) null
+                        else uri?.query?.split("&")?.firstOrNull { it == "a=popular" || it.startsWith("day=") }
                 val result =
                         if (path.isNullOrBlank() || path == "/") {
                             // No topic path (e.g. an old saved search URL): search by title
                             repository.searchTopic(topic.title, page)
                         } else {
-                            repository.searchTopic(topic.title, page, if (popular) "$path?a=popular" else path)
+                            repository.searchTopic(topic.title, page, if (filter != null) "$path?$filter" else path)
                         }
 
                 // Keep the link we were opened with so paging stays in the same (popular/full) mode
