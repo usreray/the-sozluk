@@ -56,6 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.model.MessageThread
 import com.example.eksiscraper.network.EksiSession
+import com.example.eksiscraper.ui.components.FloatingTopBar
 import com.example.eksiscraper.ui.components.AuthorAvatar
 import com.example.eksiscraper.ui.components.ErrorState
 import com.example.eksiscraper.ui.components.LoadingState
@@ -106,14 +107,7 @@ fun MessagesScreen(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             Column {
-                TopAppBar(
-                    title = { Text("mesajlar", style = MaterialTheme.typography.headlineMediumEmphasized) },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
-                        }
-                    }
-                )
+                FloatingTopBar(title = "mesajlar", onBack = { navController.popBackStack() })
                 if (isLoggedIn) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -158,7 +152,7 @@ fun MessagesScreen(
                 box == null -> LoadingState(messages = listOf("mesajlar getiriliyor"))
                 else -> PullToRefreshBox(isRefreshing = isLoading, onRefresh = { viewModel.loadBox() }) {
                     val threads = box!!.threads
-                    if (threads.isEmpty()) {
+                    if (threads.isEmpty() && !isLoading) {
                         MessageState(icon = Icons.Rounded.Inbox, title = if (archive) "Arşiv boş" else "Mesaj yok")
                     }
                     LazyColumn(

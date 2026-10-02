@@ -71,8 +71,8 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     val scrollState = LazyListState()
 
-    // False: only today's entries (?a=popular / ?day=); true: the whole topic
-    private var showAllEntries = false
+    // Topics always open from their first page; gündem / bugün filters are dropped
+    private var showAllEntries = true
     private var pageJob: Job? = null
 
     fun loadTopic(title: String, url: String) {
@@ -168,8 +168,10 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
-    /** Leaves today's entries for the full topic, starting from its first entry. */
+    /** On a single entry (/entry/<id>): open its whole topic from the first page. */
     fun showOlderEntries() {
+        val topic = _selectedTopic.value ?: return
+        if (topic.topicPath.isNotBlank()) _selectedTopic.value = topic.copy(url = topic.topicPath)
         showAllEntries = true
         jumpTo(1)
     }
@@ -202,8 +204,8 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
     private fun merge(current: Topic, result: Topic): Topic = result.copy(
         url = current.url.ifEmpty { result.url },
         isSaved = current.isSaved,
-        // The "N entry daha" count only belongs to the first page of today's entries
-        olderEntriesCount = if (showAllEntries) 0 else maxOf(current.olderEntriesCount, result.olderEntriesCount)
+        // "N entry daha" only matters on a single-entry page, where it leads to the whole topic
+        olderEntriesCount = if (current.url.contains("/entry/")) result.olderEntriesCount else 0
     )
 
     private fun List<Entry>.withPage(page: Int) = map { it.copy(page = page) }

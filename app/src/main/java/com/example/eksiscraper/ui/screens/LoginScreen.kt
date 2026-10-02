@@ -32,6 +32,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import com.example.eksiscraper.network.EksiNetworkDataSource
 import com.example.eksiscraper.network.EksiSession
+import com.example.eksiscraper.ui.components.FloatingTopBar
 import kotlinx.coroutines.launch
 
 /**
@@ -47,13 +48,10 @@ fun LoginScreen(navController: NavController) {
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Giriş yap") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Kapat")
-                    }
-                }
+            FloatingTopBar(
+                title = "Giriş yap",
+                subtitle = "ekşi sözlük hesabınla",
+                onBack = { navController.popBackStack() }
             )
         }
     ) { paddingValues ->

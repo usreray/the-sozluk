@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.example.eksiscraper.ui.components.FloatingTopBar
 import com.example.eksiscraper.ui.components.ErrorState
 import com.example.eksiscraper.ui.components.LoadingState
 import com.example.eksiscraper.ui.components.TopicRow
@@ -74,16 +75,13 @@ fun ChannelsScreen(
     Scaffold(
         topBar = {
             Column {
-                TopAppBar(
-                    title = { Text("#${selected?.name ?: name}", style = MaterialTheme.typography.headlineMediumEmphasized) },
-                    navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
-                        }
-                    }
+                FloatingTopBar(
+                    title = "#${selected?.name ?: name}",
+                    subtitle = "kanal",
+                    onBack = { navController.popBackStack() }
                 )
                 LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(channels, key = { it.path }) { channel ->

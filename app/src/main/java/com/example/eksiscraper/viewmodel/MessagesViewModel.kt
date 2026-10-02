@@ -45,6 +45,8 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
     private var sendForm: FormSpec? = null
 
     fun loadBox(archive: Boolean = _archive.value) {
+        // Another tab: drop the old list so its emptiness isn't shown while loading
+        if (archive != _archive.value) _box.value = null
         _archive.value = archive
         _isLoading.value = true
         _error.value = null

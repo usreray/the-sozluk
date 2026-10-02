@@ -29,6 +29,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.PersonAdd
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.AlertDialog
@@ -77,6 +78,10 @@ import com.example.eksiscraper.network.EksiSession
 import com.example.eksiscraper.ui.components.AuthorAvatar
 import com.example.eksiscraper.ui.components.EntryActions
 import com.example.eksiscraper.ui.components.EntryCard
+import com.example.eksiscraper.ui.components.FloatingTopBar
+import com.example.eksiscraper.ui.components.floatingTopBarInset
+import com.example.eksiscraper.ui.components.isScrollingUp
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.example.eksiscraper.ui.components.ErrorState
 import com.example.eksiscraper.ui.components.LoadingState
 import com.example.eksiscraper.ui.components.LoginRequiredDialog
@@ -142,35 +147,20 @@ fun AuthorScreen(
         onVote = { entry, rate -> requireLogin { viewModel.vote(entry, rate) } },
         onAuthor = { other -> if (other != nick) navController.navigate(Screen.Author.createRoute(other)) },
         onLink = { link -> navController.openEksiLink(link, uriHandler) },
-        onOpenTopic = { entry -> navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle, "/entry/${entry.entryId}")) }
+        onOpenTopic = { entry ->
+            navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle, entry.topicUrl.ifBlank { "/entry/${entry.entryId}" }))
+        }
     )
 
+    // The nick moves into the floating bar once the big header has scrolled away
     val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = {
-                    AnimatedVisibility(visible = headerGone, enter = fadeIn(), exit = fadeOut()) { Text(nick) }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
-    ) { padding ->
+    Box(modifier = Modifier.fillMaxSize()) {
         Crossfade(
             targetState = when {
                 profileError != null -> 2
                 profile == null -> 0
                 else -> 1
             },
-            modifier = Modifier.padding(padding),
             label = "authorPhase"
         ) { phase ->
             when (phase) {
@@ -179,7 +169,7 @@ fun AuthorScreen(
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = floatingTopBarInset(compact = true), bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item(key = "header") {
@@ -221,6 +211,25 @@ fun AuthorScreen(
                 }
             }
         }
+
+        val context = LocalContext.current
+        FloatingTopBar(
+            title = if (headerGone) nick else null,
+            onBack = { navController.popBackStack() },
+            visible = listState.isScrollingUp(),
+            modifier = Modifier.align(Alignment.TopCenter)
+        ) {
+            IconButton(onClick = {
+                val link = "${EksiSession.BASE_URL}/biri/${nick.trim().replace(' ', '-')}"
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(android.content.Intent.EXTRA_TEXT, link)
+                context.startActivity(android.content.Intent.createChooser(send, null))
+            }) {
+                Icon(Icons.Rounded.Share, contentDescription = "Profili paylaş")
+            }
+        }
+        SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
 }
 

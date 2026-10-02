@@ -80,6 +80,9 @@ import com.example.eksiscraper.ui.components.EntryActions
 import com.example.eksiscraper.ui.components.EntryCard
 import com.example.eksiscraper.ui.components.EntryComposerSheet
 import com.example.eksiscraper.ui.components.ErrorState
+import com.example.eksiscraper.ui.components.FloatingTopBar
+import com.example.eksiscraper.ui.components.floatingTopBarInset
+import com.example.eksiscraper.ui.components.isScrollingUp
 import com.example.eksiscraper.ui.components.LoadingState
 import com.example.eksiscraper.ui.components.LoginRequiredDialog
 import com.example.eksiscraper.ui.components.MessageState
@@ -246,7 +249,7 @@ fun TopicDetailScreen(
 
     val barsVisible = listState.isScrollingUp()
     // Room under the floating header so the first row starts below it
-    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 96.dp
+    val topInset = floatingTopBarInset()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Crossfade(targetState = phase, label = "topicPhase") { current ->
@@ -295,22 +298,35 @@ fun TopicDetailScreen(
             }
         }
 
-        FloatingHeader(
-            visible = barsVisible || phase != TopicPhase.Content,
+        FloatingTopBar(
             title = displayTitle,
             subtitle = when {
                 !loaded -> null
-                (topic?.olderEntriesCount ?: 0) > 0 -> "bugünün entry'leri"
+                topic?.url?.contains("/entry/") == true -> "tek entry"
                 totalPages > 1 -> "$totalPages sayfa"
                 else -> null
             },
-            topic = topic,
-            showActions = phase == TopicPhase.Content,
             onBack = { navController.popBackStack() },
-            onSaveToggle = { saved -> if (saved) viewModel.saveTopic() else viewModel.unsaveTopic() },
+            visible = barsVisible || phase != TopicPhase.Content,
             isLoading = isLoading && loaded,
             modifier = Modifier.align(Alignment.TopCenter)
-        )
+        ) {
+            // Nothing to save or share for a topic that doesn't exist
+            if (phase == TopicPhase.Content) {
+                TopicShareButton(topic)
+                IconToggleButton(
+                    checked = topic?.isSaved == true,
+                    onCheckedChange = { saved -> if (saved) viewModel.saveTopic() else viewModel.unsaveTopic() }
+                ) {
+                    Icon(
+                        imageVector = if (topic?.isSaved == true) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                        contentDescription = if (topic?.isSaved == true) "Kaydedildi" else "Kaydet",
+                        tint = if (topic?.isSaved == true) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
 
         BottomToolbar(
             visible = phase == TopicPhase.Content && (totalPages > 1 || canWrite) && barsVisible,
@@ -328,70 +344,6 @@ fun TopicDetailScreen(
     }
 }
 
-/** The topic's title as a floating card instead of an app bar; slides away while reading. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun FloatingHeader(
-    visible: Boolean,
-    title: String,
-    subtitle: String?,
-    topic: Topic?,
-    showActions: Boolean,
-    onBack: () -> Unit,
-    onSaveToggle: (Boolean) -> Unit,
-    isLoading: Boolean,
-    modifier: Modifier = Modifier
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically { -it } + fadeIn(),
-        exit = slideOutVertically { -it } + fadeOut(),
-        modifier = modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shadowElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(6.dp)) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
-                    }
-                    Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
-                        Text(
-                            title,
-                            style = MaterialTheme.typography.titleMediumEmphasized,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (subtitle != null) {
-                            Text(
-                                subtitle,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    if (showActions) {
-                        TopicShareButton(topic)
-                        IconToggleButton(checked = topic?.isSaved == true, onCheckedChange = onSaveToggle) {
-                            Icon(
-                                imageVector = if (topic?.isSaved == true) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                                contentDescription = if (topic?.isSaved == true) "Kaydedildi" else "Kaydet",
-                                tint = if (topic?.isSaved == true) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-                if (isLoading) LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
-            }
-        }
-    }
-}
-
 @Composable
 private fun OlderEntriesCard(count: Int, onShow: () -> Unit) {
     FilledTonalButton(
@@ -400,7 +352,7 @@ private fun OlderEntriesCard(count: Int, onShow: () -> Unit) {
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding
     ) {
         Icon(Icons.Rounded.History, contentDescription = null)
-        Text("$count entry daha · baştan oku", modifier = Modifier.padding(start = 8.dp))
+        Text("başlığın tamamını oku · $count entry daha", modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -486,23 +438,4 @@ private fun TopicShareButton(topic: Topic?) {
     }) {
         Icon(Icons.Rounded.Share, contentDescription = "Başlığı paylaş", tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-}
-
-/** True while the user scrolls toward the top (or sits at the top): show the bars then. */
-@Composable
-fun LazyListState.isScrollingUp(): Boolean {
-    var previousIndex by remember(this) { mutableIntStateOf(firstVisibleItemIndex) }
-    var previousOffset by remember(this) { mutableIntStateOf(firstVisibleItemScrollOffset) }
-    return remember(this) {
-        derivedStateOf {
-            val up = if (previousIndex != firstVisibleItemIndex) {
-                previousIndex > firstVisibleItemIndex
-            } else {
-                previousOffset >= firstVisibleItemScrollOffset
-            }
-            previousIndex = firstVisibleItemIndex
-            previousOffset = firstVisibleItemScrollOffset
-            up || !canScrollForward
-        }
-    }.value
 }

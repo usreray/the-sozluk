@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.eksiscraper.settings.AppSettings
 import com.example.eksiscraper.settings.ThemeMode
+import com.example.eksiscraper.ui.components.FloatingTopBar
 import com.example.eksiscraper.ui.components.segmentedShape
 import com.example.eksiscraper.ui.theme.isAppInDarkTheme
 import kotlin.math.roundToInt
@@ -51,21 +52,9 @@ fun SettingsScreen(navController: NavController) {
     val dynamicColor by AppSettings.dynamicColor
     val pureBlack by AppSettings.pureBlack
     val textScale by AppSettings.textScale
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            LargeFlexibleTopAppBar(
-                title = { Text("ayarlar") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
-        }
+        topBar = { FloatingTopBar(title = "ayarlar", onBack = { navController.popBackStack() }) }
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),

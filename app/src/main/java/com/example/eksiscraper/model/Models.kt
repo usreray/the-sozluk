@@ -16,7 +16,9 @@ data class Topic(
     // Forms the site renders for logged-in users; null when logged out or not allowed
     val entryForm: FormSpec? = null,
     val deleteForm: FormSpec? = null,
-    val commentForm: FormSpec? = null
+    val commentForm: FormSpec? = null,
+    /** The topic's own path (/slug--id) as linked from its heading; differs on /entry/<id> pages */
+    val topicPath: String = ""
 )
 
 data class Entry(

@@ -165,7 +165,8 @@ object HtmlParser {
                         olderEntriesCount = olderCount,
                         entryForm = findEntryForm(document),
                         deleteForm = findDeleteForm(document),
-                        commentForm = document.selectFirst("form#comment-entry-form")?.let(::formSpec)
+                        commentForm = document.selectFirst("form#comment-entry-form")?.let(::formSpec),
+                        topicPath = heading?.selectFirst("a[href]")?.attr("href")?.substringBefore("?").orEmpty()
                 )
         }
 

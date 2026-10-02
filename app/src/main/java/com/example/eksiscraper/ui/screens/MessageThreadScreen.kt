@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.model.Message
+import com.example.eksiscraper.ui.components.FloatingTopBar
 import com.example.eksiscraper.ui.components.AuthorAvatar
 import com.example.eksiscraper.ui.components.ErrorState
 import com.example.eksiscraper.ui.components.LoadingState
@@ -120,22 +121,18 @@ fun MessageThreadScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+            FloatingTopBar(
+                title = otherNick,
+                subtitle = "profili aç",
+                onBack = { navController.popBackStack() },
+                leading = {
+                    AuthorAvatar(
+                        otherNick,
+                        size = 36,
                         modifier = Modifier.clickable { navController.navigate(Screen.Author.createRoute(otherNick)) }
-                    ) {
-                        AuthorAvatar(otherNick, size = 36)
-                        Text(otherNick, modifier = Modifier.padding(start = 12.dp))
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
-                    }
-                },
-                actions = {
+                    )
+                }
+            ) {
                     if (thread?.threadForm != null) {
                         Box {
                             IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "Diğer") }
@@ -159,8 +156,7 @@ fun MessageThreadScreen(
                             }
                         }
                     }
-                }
-            )
+            }
         },
         bottomBar = {
             // Reply box: replies go through the "yeni mesaj" form to the same nick

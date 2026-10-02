@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.network.EksiSession
+import com.example.eksiscraper.ui.components.FloatingTopBar
 import com.example.eksiscraper.ui.components.LocalBottomBarInset
 import com.example.eksiscraper.ui.components.MessageState
 import com.example.eksiscraper.ui.components.TopicRow
@@ -74,9 +75,7 @@ fun ProfileScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("profil", style = MaterialTheme.typography.headlineMediumEmphasized) },
-                actions = {
+            FloatingTopBar(title = "profil") {
                     if (isLoggedIn) {
                         IconButton(onClick = { navController.navigate(Screen.Messages.createRoute()) }) {
                             Icon(Icons.Rounded.Mail, contentDescription = "Mesajlar")
@@ -85,8 +84,7 @@ fun ProfileScreen(
                     IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
                         Icon(Icons.Rounded.Settings, contentDescription = "Ayarlar")
                     }
-                }
-            )
+            }
         }
     ) { padding ->
         LazyColumn(
