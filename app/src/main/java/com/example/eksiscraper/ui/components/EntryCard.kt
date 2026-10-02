@@ -95,7 +95,9 @@ data class EntryActions(
     val comments: ((Entry) -> CommentsUi)? = null,
     val onToggleComments: (Entry) -> Unit = {},
     val onVoteComment: (Entry, Comment, Int) -> Unit = { _, _, _ -> },
-    val onWriteComment: ((Entry) -> Unit)? = null
+    val onWriteComment: ((Entry) -> Unit)? = null,
+    /** Tapping the favorite count shows who favorited */
+    val onShowFavoriters: ((Entry) -> Unit)? = null
 )
 
 /** What the card needs to show an entry's comments. */
@@ -184,7 +186,12 @@ fun EntryCard(
             Spacer(Modifier.size(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (entry.canVote) VoteButtons(entry, actions.onVote)
-                FavoriteButton(entry.isFavorited, entry.favoriteCount) { actions.onToggleFavorite(entry) }
+                FavoriteButton(
+                    isFavorited = entry.isFavorited,
+                    count = entry.favoriteCount,
+                    onToggle = { actions.onToggleFavorite(entry) },
+                    onCountClick = actions.onShowFavoriters?.let { show -> { show(entry) } }
+                )
                 val comments = actions.comments?.invoke(entry)
                 if (comments != null && (entry.commentCount > 0 || actions.onWriteComment != null)) {
                     IconToggleButton(checked = comments.isOpen, onCheckedChange = { actions.onToggleComments(entry) }) {
@@ -362,7 +369,7 @@ private fun VoteButtons(entry: Entry, onVote: (Entry, Int) -> Unit) {
 
 /** ekşi's favorite is a drop; it pops with a bouncy spring and the count rolls. */
 @Composable
-private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Unit) {
+private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Unit, onCountClick: (() -> Unit)?) {
     val scale by animateFloatAsState(
         targetValue = if (isFavorited) 1.15f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMedium),
@@ -390,7 +397,10 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
             Text(
                 text = if (value > 0) value.toString() else "",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = if (value > 0 && onCountClick != null) {
+                    Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onCountClick).padding(horizontal = 6.dp, vertical = 4.dp)
+                } else Modifier
             )
         }
     }

@@ -87,7 +87,8 @@ fun FloatingTopBar(
                     }
                 }
             }
-            Box(modifier = Modifier.weight(1f)) {
+            // As wide as the title needs; the spacer after it keeps the actions at the end
+            Box(modifier = Modifier.weight(1f, fill = false)) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showTitle,
                     enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
@@ -95,8 +96,7 @@ fun FloatingTopBar(
                 ) {
                     FloatingSurface(
                         shape = RoundedCornerShape(26.dp),
-                        onClick = onTitleClick,
-                        modifier = Modifier.fillMaxWidth()
+                        onClick = onTitleClick
                     ) {
                         Column {
                             Row(
@@ -107,7 +107,7 @@ fun FloatingTopBar(
                                     it()
                                     Spacer(Modifier.width(12.dp))
                                 }
-                                Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f, fill = false)) {
                                     if (title != null) {
                                         Text(
                                             title,
@@ -132,6 +132,7 @@ fun FloatingTopBar(
                     }
                 }
             }
+            Spacer(Modifier.weight(0.001f))
             if (actions != null) {
                 FloatingSurface(shape = CircleShape) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 2.dp)) { actions() }

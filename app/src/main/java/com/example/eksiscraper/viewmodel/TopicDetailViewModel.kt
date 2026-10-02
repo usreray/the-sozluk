@@ -71,12 +71,17 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     val scrollState = LazyListState()
 
-    // Topics always open from their first page; gündem / bugün filters are dropped
+    // False: only today's entries (?day= links from "bugün"); true: the whole topic
     private var showAllEntries = true
+
+    /** Showing just today's entries; the title then offers the whole topic */
+    val isTodayOnly: Boolean get() = !showAllEntries
     private var pageJob: Job? = null
 
     fun loadTopic(title: String, url: String) {
         if (_selectedTopic.value != null) return
+        // "bugün" links (?day=) open on today's entries like the site; everything else at page 1
+        showAllEntries = !url.contains("day=")
         _selectedTopic.value = Topic(title = title, url = url)
         viewModelScope.launch {
             val isSaved = repository.isTopicSaved(title)
@@ -168,10 +173,10 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
-    /** On a single entry (/entry/<id>): open its whole topic from the first page. */
+    /** Opens the whole topic from its first page (from a single entry, today's entries, or the title). */
     fun showOlderEntries() {
         val topic = _selectedTopic.value ?: return
-        if (topic.topicPath.isNotBlank()) _selectedTopic.value = topic.copy(url = topic.topicPath)
+        if (topic.topicPath.isNotBlank()) _selectedTopic.value = topic.copy(url = topic.topicPath, olderEntriesCount = 0)
         showAllEntries = true
         jumpTo(1)
     }
@@ -191,7 +196,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         // topic. Other params (an old ?p=, ?focusto=) are dropped: the data source adds
         // the page itself.
         val filter = if (showAllEntries) null
-        else uri?.query?.split("&")?.firstOrNull { it == "a=popular" || it.startsWith("day=") }
+        else uri?.query?.split("&")?.firstOrNull { it.startsWith("day=") }
         return if (path.isNullOrBlank() || path == "/") {
             // No topic path (e.g. a search or an old saved search URL): search by title
             repository.searchTopic(topic.title, page)
@@ -204,8 +209,8 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
     private fun merge(current: Topic, result: Topic): Topic = result.copy(
         url = current.url.ifEmpty { result.url },
         isSaved = current.isSaved,
-        // "N entry daha" only matters on a single-entry page, where it leads to the whole topic
-        olderEntriesCount = if (current.url.contains("/entry/")) result.olderEntriesCount else 0
+        // "N entry daha" leads from a single entry or today's entries to the whole topic
+        olderEntriesCount = if (current.url.contains("/entry/") || !showAllEntries) result.olderEntriesCount else 0
     )
 
     private fun List<Entry>.withPage(page: Int) = map { it.copy(page = page) }
@@ -345,6 +350,8 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             }
         }
     }
+
+    suspend fun favoriters(entryId: String): List<String> = repository.getFavoriters(entryId)
 
     fun consumeMessage() {
         _message.value = null

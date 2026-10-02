@@ -107,6 +107,7 @@ fun AuthorScreen(
     val isLoggedIn by EksiSession.isLoggedIn
     var selectedTab by rememberSaveable { mutableStateOf(AuthorTab.Latest) }
     var showLoginDialog by rememberSaveable { mutableStateOf(false) }
+    var favoritersOf by remember { mutableStateOf<com.example.eksiscraper.model.Entry?>(null) }
     val tabState = viewModel.tab(selectedTab)
     val listState = rememberLazyListState()
     val uriHandler = LocalUriHandler.current
@@ -142,7 +143,16 @@ fun AuthorScreen(
     }
 
     val requireLogin: (() -> Unit) -> Unit = { action -> if (isLoggedIn) action() else showLoginDialog = true }
+    favoritersOf?.let { entry ->
+        com.example.eksiscraper.ui.components.FavoritersSheet(
+            entry = entry,
+            load = viewModel::favoriters,
+            onAuthor = { nick -> navController.navigate(Screen.Author.createRoute(nick)) },
+            onDismiss = { favoritersOf = null }
+        )
+    }
     val actions = EntryActions(
+        onShowFavoriters = { entry -> requireLogin { favoritersOf = entry } },
         onToggleFavorite = { entry -> requireLogin { viewModel.toggleFavorite(entry) } },
         onVote = { entry, rate -> requireLogin { viewModel.vote(entry, rate) } },
         onAuthor = { other -> if (other != nick) navController.navigate(Screen.Author.createRoute(other)) },

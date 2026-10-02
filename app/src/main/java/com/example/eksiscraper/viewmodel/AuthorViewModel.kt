@@ -154,6 +154,8 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
+    suspend fun favoriters(entryId: String): List<String> = repository.getFavoriters(entryId)
+
     fun consumeMessage() {
         _message.value = null
     }

@@ -133,6 +133,7 @@ fun TopicDetailScreen(
 
     var showPagePicker by rememberSaveable { mutableStateOf(false) }
     var showLoginDialog by rememberSaveable { mutableStateOf(false) }
+    var favoritersOf by remember { mutableStateOf<com.example.eksiscraper.model.Entry?>(null) }
     var showComposer by rememberSaveable { mutableStateOf(false) }
     var commentTarget by remember { mutableStateOf<Entry?>(null) }
 
@@ -194,7 +195,16 @@ fun TopicDetailScreen(
     }
 
     val requireLogin: (() -> Unit) -> Unit = { action -> if (isLoggedIn) action() else showLoginDialog = true }
+    favoritersOf?.let { entry ->
+        com.example.eksiscraper.ui.components.FavoritersSheet(
+            entry = entry,
+            load = viewModel::favoriters,
+            onAuthor = { nick -> navController.navigate(Screen.Author.createRoute(nick)) },
+            onDismiss = { favoritersOf = null }
+        )
+    }
     val actions = EntryActions(
+        onShowFavoriters = { entry -> requireLogin { favoritersOf = entry } },
         onToggleFavorite = { entry -> requireLogin { viewModel.toggleEntryFavorite(entry) } },
         onVote = { entry, rate -> requireLogin { viewModel.vote(entry, rate) } },
         onAuthor = { nick -> navController.navigate(Screen.Author.createRoute(nick)) },
@@ -301,7 +311,14 @@ fun TopicDetailScreen(
         FloatingTopBar(
             title = displayTitle,
             // Pages are in the bottom toolbar; only say when this is a single entry
-            subtitle = if (loaded && topic?.url?.contains("/entry/") == true) "tek entry" else null,
+            subtitle = when {
+                !loaded -> null
+                topic?.url?.contains("/entry/") == true -> "tek entry · tamamı için dokun"
+                viewModel.isTodayOnly -> "bugünün entry'leri · tamamı için dokun"
+                else -> null
+            },
+            // The title opens the whole topic from its first page
+            onTitleClick = if (loaded) viewModel::showOlderEntries else null,
             onBack = { navController.popBackStack() },
             visible = barsVisible || phase != TopicPhase.Content,
             isLoading = isLoading && loaded,

@@ -57,6 +57,8 @@ class EksiRepository(
 
     suspend fun getChannels(): List<Channel> = EksiNetworkDataSource.fetchChannels()
 
+    suspend fun getFavoriters(entryId: String): List<String> = EksiNetworkDataSource.fetchFavoriters(entryId)
+
     suspend fun getMessageBox(archive: Boolean, page: Int): MessageBox =
         EksiNetworkDataSource.fetchMessageBox(archive, page)
 

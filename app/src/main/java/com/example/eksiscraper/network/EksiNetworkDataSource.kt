@@ -282,6 +282,17 @@ object EksiNetworkDataSource {
         HtmlParser.parseThread(response.parse())
     }
 
+    /** Nicks who favorited an entry (logged-in only; anonymous gets 403). */
+    suspend fun fetchFavoriters(entryId: String): List<String> = withContext(Dispatchers.IO) {
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/entry/favorileyenler?entryId=$entryId"))
+            .header("X-Requested-With", "XMLHttpRequest")
+            .timeout(30000)
+            .execute()
+        if (response.statusCode() == 403) throw IOException("Favorileyenleri görmek için giriş yap")
+        if (response.statusCode() != 200) throw IOException("Liste yüklenemedi (HTTP ${response.statusCode()})")
+        response.parse().select("li a[href^=/biri/]").map { it.text().trim() }.filter { it.isNotEmpty() }
+    }
+
     suspend fun fetchChannels(): List<Channel> = withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/kanallar")).execute()
         if (response.statusCode() != 200) throw IOException("Kanallar yüklenemedi (HTTP ${response.statusCode()})")
