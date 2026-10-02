@@ -17,7 +17,7 @@ import java.io.IOException
 import java.net.URLEncoder
 
 /** ekşi answered 404: no such topic (e.g. a search with no match). */
-class TopicNotFoundException : IOException("Böyle bir başlık yok")
+class TopicNotFoundException : IOException("böyle bir başlık yok")
 
 object EksiNetworkDataSource {
     private const val BASE_URL = EksiSession.BASE_URL
@@ -78,7 +78,7 @@ object EksiNetworkDataSource {
             // /basliklar/bugun without a page number is 404 for logged-out users
             "$BASE_URL/$urlPath/$page"
         } else {
-            val pageParam = if (page > 1) "?p=$page" else ""
+            val pageParam = if (page > 1) (if (urlPath.contains("?")) "&p=$page" else "?p=$page") else ""
             "$BASE_URL/$urlPath$pageParam"
         }
 
@@ -88,12 +88,20 @@ object EksiNetworkDataSource {
             .header("X-Requested-With", "XMLHttpRequest")
         val response = connection.execute()
 
+        // Follow lists (olay, takip, son, kenar, çaylaklar) are for logged-in users only
+        if (response.statusCode() == 403 || response.statusCode() == 401) {
+            throw IOException("bu listeyi görmek için giriş yapmalısın")
+        }
         if (response.statusCode() != 200) {
             throw IOException("ekşi sözlük şu an yanıt vermiyor (HTTP ${response.statusCode()})")
         }
 
-        val topics = HtmlParser.parseTopics(response.parse())
-        if (topics.isEmpty()) throw IOException("Başlık listesi okunamadı")
+        val document = response.parse()
+        val topics = HtmlParser.parseTopics(document)
+        // An empty follow list is fine ("hiç başlık yok"); a page without any list is not
+        if (topics.isEmpty() && document.selectFirst(".topic-list, #content-body, #partial-index") == null) {
+            throw IOException("başlık listesi okunamadı")
+        }
 
         return@withContext topics
     }
@@ -122,7 +130,7 @@ object EksiNetworkDataSource {
 
         if (response.statusCode() == 404) throw TopicNotFoundException()
         if (response.statusCode() != 200) {
-            throw IOException("Başlık yüklenemedi (HTTP ${response.statusCode()})")
+            throw IOException("başlık yüklenemedi (HTTP ${response.statusCode()})")
         }
 
         val document = response.parse()
@@ -233,7 +241,7 @@ object EksiNetworkDataSource {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/yorum/liste/$entryId"))
             .header("X-Requested-With", "XMLHttpRequest")
             .execute()
-        if (response.statusCode() != 200) throw IOException("Yorumlar yüklenemedi (HTTP ${response.statusCode()})")
+        if (response.statusCode() != 200) throw IOException("yorumlar yüklenemedi (HTTP ${response.statusCode()})")
         HtmlParser.parseComments(response.parse())
     }
 
@@ -244,8 +252,8 @@ object EksiNetworkDataSource {
             .followRedirects(false)
             .execute()
         // A redirect to /giris means the session expired
-        if (response.statusCode() in 300..399) throw IOException("Oturum süresi dolmuş; tekrar giriş yap")
-        if (response.statusCode() != 200) throw IOException("Mesajlar yüklenemedi (HTTP ${response.statusCode()})")
+        if (response.statusCode() in 300..399) throw IOException("oturum süresi dolmuş; tekrar giriş yap")
+        if (response.statusCode() != 200) throw IOException("mesajlar yüklenemedi (HTTP ${response.statusCode()})")
         HtmlParser.parseMessageBox(response.parse())
     }
 
@@ -270,15 +278,15 @@ object EksiNetworkDataSource {
                 .map { it.ownText().ifBlank { it.text() }.trim().trimEnd('×').trim() }
                 .firstOrNull { it.isNotEmpty() && it.length < 300 }
             android.util.Log.d("EksiForm", "POST ${form.action} -> ${response.statusCode()} $landed notice=${notice ?: "-"}")
-            if (response.statusCode() !in 200..399) "Mesaj gönderilemedi (HTTP ${response.statusCode()})" else notice
+            if (response.statusCode() !in 200..399) "mesaj gönderilemedi (HTTP ${response.statusCode()})" else notice
         } catch (e: Exception) {
-            e.message ?: "Mesaj gönderilemedi"
+            e.message ?: "mesaj gönderilemedi"
         }
     }
 
     suspend fun fetchThread(id: String): ThreadDetail = withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/mesaj/$id")).execute()
-        if (response.statusCode() != 200) throw IOException("Konuşma yüklenemedi (HTTP ${response.statusCode()})")
+        if (response.statusCode() != 200) throw IOException("konuşma yüklenemedi (HTTP ${response.statusCode()})")
         HtmlParser.parseThread(response.parse())
     }
 
@@ -288,14 +296,14 @@ object EksiNetworkDataSource {
             .header("X-Requested-With", "XMLHttpRequest")
             .timeout(30000)
             .execute()
-        if (response.statusCode() == 403) throw IOException("Favorileyenleri görmek için giriş yap")
-        if (response.statusCode() != 200) throw IOException("Liste yüklenemedi (HTTP ${response.statusCode()})")
+        if (response.statusCode() == 403) throw IOException("favorileyenleri görmek için giriş yap")
+        if (response.statusCode() != 200) throw IOException("liste yüklenemedi (HTTP ${response.statusCode()})")
         response.parse().select("li a[href^=/biri/]").map { it.text().trim() }.filter { it.isNotEmpty() }
     }
 
     suspend fun fetchChannels(): List<Channel> = withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/kanallar")).execute()
-        if (response.statusCode() != 200) throw IOException("Kanallar yüklenemedi (HTTP ${response.statusCode()})")
+        if (response.statusCode() != 200) throw IOException("kanallar yüklenemedi (HTTP ${response.statusCode()})")
         HtmlParser.parseChannels(response.parse())
     }
 
@@ -318,14 +326,14 @@ object EksiNetworkDataSource {
             val reply = response.body().trim().trim('"')
             android.util.Log.d("EksiForm", "POST ${path.substringBefore("?")} -> ${response.statusCode()} reply=${reply.take(40)}")
             when {
-                response.statusCode() !in 200..299 -> "Takip işlemi başarısız (HTTP ${response.statusCode()})"
-                reply == "LimitReached" -> "Takip sınırına ulaştın"
-                reply == "InvalidRelation" -> "Bu kullanıcıyla bu işlem yapılamıyor"
-                reply == "SystemUser" -> "Sistem kullanıcısı takip edilemez"
+                response.statusCode() !in 200..299 -> "işlem başarısız (HTTP ${response.statusCode()})"
+                reply == "LimitReached" -> "bu işlem için sınıra ulaştın"
+                reply == "InvalidRelation" -> "bu kullanıcıyla bu işlem yapılamıyor"
+                reply == "SystemUser" -> "sistem kullanıcısına bu yapılamaz"
                 else -> null
             }
         } catch (e: Exception) {
-            e.message ?: "Takip işlemi başarısız"
+            e.message ?: "işlem başarısız"
         }
     }
 
@@ -367,7 +375,7 @@ object EksiNetworkDataSource {
                         "type=${response.contentType()} len=${body.length} error=${error ?: "-"}"
                 )
                 when {
-                    response.statusCode() !in 200..399 -> "İşlem başarısız (HTTP ${response.statusCode()})"
+                    response.statusCode() !in 200..399 -> "işlem başarısız (HTTP ${response.statusCode()})"
                     error != null -> error
                     // XHR endpoints may answer {"Success":false,"Message":"..."}
                     body.trimStart().startsWith("{") && body.contains("\"Success\":false") ->
@@ -375,16 +383,116 @@ object EksiNetworkDataSource {
                     else -> null
                 }
             } catch (e: Exception) {
-                e.message ?: "İşlem başarısız"
+                e.message ?: "işlem başarısız"
             }
         }
+
+    /**
+     * The file behind an uploaded image. Entries link to a /img/<code> page that only wraps the
+     * picture (img#image, also in og:image); cdn addresses are already the file.
+     */
+    suspend fun resolveImageUrl(ref: String): String = withContext(Dispatchers.IO) {
+        if (ref.startsWith("http") && !ref.contains("eksisozluk.com/img/")) return@withContext ref
+        val path = if (ref.startsWith("http")) ref.substringAfter("eksisozluk.com") else ref
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))
+            .timeout(20000)
+            .execute()
+        if (response.statusCode() != 200) throw IOException("görsel bulunamadı (HTTP ${response.statusCode()})")
+        val document = response.parse()
+        val src = document.selectFirst("img#image")?.attr("src")?.ifBlank { null }
+            ?: document.selectFirst("meta[property=og:image]")?.attr("content")?.ifBlank { null }
+            ?: throw IOException("görsel bulunamadı")
+        if (src.startsWith("//")) "https:$src" else src
+    }
+
+    /** Followers (or, with [following], who they follow): the site's JSON list, up to 100 people. */
+    suspend fun fetchFollowList(nick: String, following: Boolean): List<com.example.eksiscraper.model.FollowUser> =
+        withContext(Dispatchers.IO) {
+            val kind = if (following) "following" else "follower"
+            val response = applyCommonConnectionSettings(
+                session.newRequest("$BASE_URL/$kind?nick=${URLEncoder.encode(nick, "UTF-8")}")
+            )
+                .header("X-Requested-With", "XMLHttpRequest")
+                .header("Accept", "application/json")
+                .execute()
+            if (response.statusCode() != 200) throw IOException("liste yüklenemedi (HTTP ${response.statusCode()})")
+            val array = org.json.JSONArray(response.body())
+            List(array.length()) { i ->
+                val item = array.getJSONObject(i)
+                val avatar = item.optString("AvatarUrl").ifBlank { item.optString("Picture") }
+                com.example.eksiscraper.model.FollowUser(
+                    nick = item.optJSONObject("Nick")?.optString("Value").orEmpty(),
+                    avatarUrl = avatar.takeIf { it.startsWith("http") && !it.contains("default-profile") },
+                    isVerified = item.optBoolean("IsVerified")
+                )
+            }.filter { it.nick.isNotBlank() }
+        }
+
+    /** The header lights the site polls (GET /top/led); null when it can't be read. */
+    suspend fun fetchSiteStatus(): com.example.eksiscraper.notify.SiteStatus? = withContext(Dispatchers.IO) {
+        try {
+            val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/top/led"))
+                .header("X-Requested-With", "XMLHttpRequest")
+                .header("Accept", "application/json")
+                .followRedirects(false)
+                .timeout(15000)
+                .execute()
+            if (response.statusCode() != 200) return@withContext null
+            val json = JSONObject(response.body())
+            com.example.eksiscraper.notify.SiteStatus(
+                hasMessages = json.optBoolean("HasMessages"),
+                hasEvents = json.optBoolean("HasEvents")
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /** "Başlığı açan" box: who opened the topic and when, as plain text lines. */
+    suspend fun fetchTopicCreator(topicId: String): com.example.eksiscraper.model.TopicCreator = withContext(Dispatchers.IO) {
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/topic/gettopiccreatorinfo?topicId=$topicId"))
+            .header("X-Requested-With", "XMLHttpRequest")
+            .execute()
+        if (response.statusCode() == 403) throw IOException("bunu görmek için giriş yapmalısın")
+        if (response.statusCode() != 200) throw IOException("bilgi alınamadı (HTTP ${response.statusCode()})")
+        val body = response.parse().body()
+        val nick = body.selectFirst("a[href^=/biri/]")?.text()?.trim()?.removePrefix("@")?.ifBlank { null }
+        // The box carries the site's own buttons (takip et, başlıklarını engelle, ...); drop them
+        body.select(
+            "a[data-add-url], a[data-remove-url], .relation-link, .mute-icon-link, button, form, .dropdown-menu, " +
+                "#remove-relation-dialog, [id*=dialog], .modal, [style*=display:none], [style*=display: none]"
+        ).remove()
+        body.select("a[href^=/biri/]").remove()
+        val actionWords = setOf(
+            "takip et", "takibi bırak", "takip etme", "engelle", "engeli kaldır",
+            "başlıklarını engelle", "sessize al", "sessizden çıkar", "mesaj gönder", "mesaj at"
+        )
+        // Leaf blocks only, so nested markup doesn't repeat the same text
+        val lines = body.select("p, li, div, span")
+            .filter { block -> block.children().none { it.tagName() in setOf("p", "li", "div", "span") } }
+            .map { it.text().trim().trim('·', '-', '|').trim() }
+            // Questions are leftovers of a confirmation dialog ("... emin misiniz?")
+            .filter { it.isNotEmpty() && it.lowercase() !in actionWords && it != nick && !it.contains("emin misiniz") }
+            .distinct()
+        com.example.eksiscraper.model.TopicCreator(nick, lines)
+    }
 
     suspend fun fetchProfile(nick: String): AuthorProfile = withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/biri/${encodePath(nick)}"))
             .execute()
-        if (response.statusCode() == 404) throw IOException("Böyle bir yazar yok")
-        if (response.statusCode() != 200) throw IOException("Profil yüklenemedi (HTTP ${response.statusCode()})")
+        if (response.statusCode() == 404) throw IOException("böyle bir yazar yok")
+        if (response.statusCode() != 200) throw IOException("profil yüklenemedi (HTTP ${response.statusCode()})")
         HtmlParser.parseProfile(response.parse(), nick)
+    }
+
+    /** The author's uploaded images ("görselleri"); the site sends them all at once. */
+    suspend fun fetchUserImages(nick: String): List<com.example.eksiscraper.model.AuthorImage> = withContext(Dispatchers.IO) {
+        val url = "$BASE_URL/gorselleri?nick=${URLEncoder.encode(nick, "UTF-8")}"
+        val response = applyCommonConnectionSettings(session.newRequest(url))
+            .header("X-Requested-With", "XMLHttpRequest")
+            .execute()
+        if (response.statusCode() != 200) throw IOException("görseller yüklenemedi (HTTP ${response.statusCode()})")
+        HtmlParser.parseUserImages(response.parse())
     }
 
     /** One page of a profile tab such as "son-entryleri" or "en-begenilenleri". */
@@ -393,7 +501,7 @@ object EksiNetworkDataSource {
         val response = applyCommonConnectionSettings(session.newRequest(url))
             .header("X-Requested-With", "XMLHttpRequest")
             .execute()
-        if (response.statusCode() != 200) throw IOException("Entry'ler yüklenemedi (HTTP ${response.statusCode()})")
+        if (response.statusCode() != 200) throw IOException("entry'ler yüklenemedi (HTTP ${response.statusCode()})")
         HtmlParser.parseUserEntries(response.parse())
     }
 

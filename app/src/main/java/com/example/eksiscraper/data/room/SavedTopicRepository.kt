@@ -19,6 +19,8 @@ class SavedTopicRepository(private val savedTopicDao: SavedTopicDao) {
         savedTopicDao.deleteSavedTopicByTitle(topic.title)
     }
     
+    suspend fun updateLastPage(title: String, page: Int) = savedTopicDao.updateLastPage(title, page)
+
     suspend fun isTopicSaved(title: String): Boolean {
         return savedTopicDao.isTopicSaved(title) > 0
     }

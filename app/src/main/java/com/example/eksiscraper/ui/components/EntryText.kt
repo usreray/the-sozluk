@@ -1,5 +1,19 @@
 package com.example.eksiscraper.ui.components
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.Icons
+import androidx.compose.material3.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.text.InlineTextContent
 import android.net.Uri
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -24,6 +38,8 @@ sealed interface EksiLink {
     data class EntryLink(val id: String) : EksiLink
     data class TopicPath(val path: String, val title: String) : EksiLink
     data class External(val url: String) : EksiLink
+    /** An image from ekşi's uploader: a /img/<code> page or a direct cdn address */
+    data class Image(val ref: String) : EksiLink
 }
 
 /** Maps an href from entry HTML to an in-app destination. */
@@ -34,6 +50,11 @@ fun eksiLinkFor(href: String, text: String): EksiLink? {
         else -> href
     }
     val uri = Uri.parse(url)
+    if (uri.host == "cdn.eksisozluk.com" || uri.host == "img.ekstat.com") return EksiLink.Image(url)
+    // Entries link uploads as soz.lk/i/<code>, which redirects to eksisozluk.com/img/<code>
+    if (uri.host == "soz.lk" && uri.path.orEmpty().startsWith("/i/")) {
+        return EksiLink.Image("/img/" + uri.path.orEmpty().removePrefix("/i/").substringBefore("/"))
+    }
     if (uri.host?.endsWith("eksisozluk.com") != true) {
         return if (uri.scheme == "http" || uri.scheme == "https") EksiLink.External(url) else null
     }
@@ -43,6 +64,7 @@ fun eksiLinkFor(href: String, text: String): EksiLink? {
             val query = uri.getQueryParameter("q").orEmpty()
             if (query.startsWith("@")) EksiLink.Author(query.removePrefix("@")) else EksiLink.Search(query)
         }
+        path.startsWith("/img/") -> EksiLink.Image(path)
         path.startsWith("/entry/") -> EksiLink.EntryLink(path.removePrefix("/entry/").substringBefore("/"))
         path.startsWith("/biri/") -> EksiLink.Author(path.removePrefix("/biri/").substringBefore("/"))
         path.contains("--") -> EksiLink.TopicPath(path, text)
@@ -82,6 +104,13 @@ fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): 
                         val label = node.text().ifBlank { "*" }
                         if (link == null) append(label)
                         else withLink(LinkAnnotation.Clickable(link.toString(), linkStyle) { onLink(link) }) {
+                            // bkz / hede stay plain; a link out of the sözlük or to an image shows
+                            // what it is, since its text ("görsel", "şurada") looks like a bkz
+                            when (link) {
+                                is EksiLink.External -> appendInlineContent(LINK_ICON_EXTERNAL, "[link]")
+                                is EksiLink.Image -> appendInlineContent(LINK_ICON_IMAGE, "[görsel]")
+                                else -> Unit
+                            }
                             append(label)
                         }
                         lineStart = false
@@ -91,6 +120,26 @@ fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): 
             }
             appendNodes(Jsoup.parseBodyFragment(html).body().childNodes())
         }.trimmed()
+    }
+}
+
+private const val LINK_ICON_EXTERNAL = "link_external"
+private const val LINK_ICON_IMAGE = "link_image"
+
+/** The icons [rememberEntryText] puts in front of links; pass to Text(inlineContent = ...). */
+@Composable
+fun rememberEntryInlineContent(): Map<String, InlineTextContent> {
+    val tint = MaterialTheme.colorScheme.primary
+    return remember(tint) {
+        fun icon(vector: ImageVector) = InlineTextContent(
+            Placeholder(width = 1.1.em, height = 1.em, placeholderVerticalAlign = PlaceholderVerticalAlign.Center)
+        ) {
+            Icon(vector, contentDescription = null, tint = tint, modifier = Modifier.fillMaxSize().padding(end = 2.dp))
+        }
+        mapOf(
+            LINK_ICON_EXTERNAL to icon(Icons.AutoMirrored.Rounded.OpenInNew),
+            LINK_ICON_IMAGE to icon(Icons.Rounded.Image)
+        )
     }
 }
 

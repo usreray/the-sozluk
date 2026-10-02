@@ -58,7 +58,7 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _error.value = e.message ?: "Mesajlar yüklenemedi"
+                _error.value = e.message ?: "mesajlar yüklenemedi"
             } finally {
                 _isLoading.value = false
             }
@@ -82,7 +82,7 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _threadError.value = e.message ?: "Konuşma yüklenemedi"
+                _threadError.value = e.message ?: "konuşma yüklenemedi"
             }
         }
     }
@@ -109,7 +109,7 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
             try {
                 // Some conversation pages carry no form; the message box always does
                 val form = sendForm ?: repository.getMessageBox(false, 1).sendForm
-                    ?: throw IllegalStateException("Mesaj formu bulunamadı")
+                    ?: throw IllegalStateException("mesaj formu bulunamadı")
                 sendForm = form
                 val error = repository.sendMessage(form, to, text)
                 if (error != null) {
@@ -122,7 +122,7 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
                     val detail = repository.getThread(id)
                     if (detail.messages.count { it.isOutgoing } <= sentBefore) {
                         markFailed()
-                        _message.value = "Mesaj ekşi'de görünmüyor; gönderilememiş olabilir"
+                        _message.value = "mesaj ekşi'de görünmüyor; gönderilememiş olabilir"
                         return@launch
                     }
                     _thread.value = detail
@@ -130,7 +130,7 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
                     // A new message: its conversation should now be on top of the box
                     val top = repository.getMessageBox(false, 1).threads.firstOrNull()
                     if (top == null || !top.nick.equals(to, ignoreCase = true)) {
-                        _message.value = "Mesaj ekşi'de görünmüyor; gönderilememiş olabilir"
+                        _message.value = "mesaj ekşi'de görünmüyor; gönderilememiş olabilir"
                         return@launch
                     }
                     _message.value = "mesaj gönderildi"
@@ -141,7 +141,7 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
                 throw e
             } catch (e: Exception) {
                 markFailed()
-                _message.value = e.message ?: "Mesaj gönderilemedi"
+                _message.value = e.message ?: "mesaj gönderilemedi"
             } finally {
                 _isSending.value = false
             }

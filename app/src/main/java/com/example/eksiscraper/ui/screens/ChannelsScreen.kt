@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.TopicListSkeleton
 import android.app.Application
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.ui.components.FloatingTopBar
 import com.example.eksiscraper.ui.components.ErrorState
+import androidx.compose.material.icons.rounded.Inbox
 import com.example.eksiscraper.ui.components.LoadingState
 import com.example.eksiscraper.ui.components.TopicRow
 import com.example.eksiscraper.ui.components.segmentedShape
@@ -98,8 +100,10 @@ fun ChannelsScreen(
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             Crossfade(
                 targetState = when {
-                    channelsError != null -> 0
+                    // The channel list only matters when no list was opened directly
+                    channelsError != null && selected == null -> 0
                     state.error != null -> 1
+                    state.isLoaded && state.topics.isEmpty() && !state.isLoading -> 4
                     state.topics.isEmpty() -> 2
                     else -> 3
                 },
@@ -108,7 +112,12 @@ fun ChannelsScreen(
                 when (phase) {
                     0 -> ErrorState(message = channelsError.orEmpty(), onRetry = viewModel::loadChannels)
                     1 -> ErrorState(message = state.error.orEmpty(), onRetry = viewModel::retry)
-                    2 -> LoadingState(messages = listOf("kanal açılıyor", "başlıklar diziliyor"))
+                    2 -> TopicListSkeleton(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp))
+                    4 -> com.example.eksiscraper.ui.components.MessageState(
+                        icon = androidx.compose.material.icons.Icons.Rounded.Inbox,
+                        title = "hiç başlık yok",
+                        message = "burada şu an gösterilecek bir şey yok."
+                    )
                     else -> PullToRefreshBox(isRefreshing = state.isLoading, onRefresh = viewModel::retry) {
                         LazyColumn(
                             state = listState,

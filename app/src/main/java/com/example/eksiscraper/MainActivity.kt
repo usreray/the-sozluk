@@ -1,5 +1,9 @@
 package com.example.eksiscraper
 
+import com.example.eksiscraper.viewmodel.HomeTabRequest
+import com.example.eksiscraper.viewmodel.HomeCategory
+import androidx.activity.result.contract.ActivityResultContracts
+import android.os.Build
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -42,12 +46,31 @@ import com.example.eksiscraper.ui.navigation.Navigation
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.ui.theme.EksiScraperTheme
 import com.example.eksiscraper.ui.theme.isAppInDarkTheme
+import com.example.eksiscraper.notify.Notifier
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.ui.graphics.Brush
+import android.content.Intent
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         EksiSession.init(this)
         AppSettings.init(this)
+        com.example.eksiscraper.settings.Drafts.init(this)
+        Notifier.schedule(this, AppSettings.notifications.value && EksiSession.isLoggedIn.value)
+        // Logged in on Android 13+: ask once for the permission the message / olay alerts need
+        if (EksiSession.isLoggedIn.value && AppSettings.notifications.value && !Notifier.canNotify(this) &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && AppSettings.takeNotificationPrompt()
+        ) {
+            notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+        pendingOpen.value = intent?.getStringExtra(Notifier.EXTRA_OPEN)
         enableEdgeToEdge()
         setContent {
             // Status / navigation bar icons follow the app theme, not only the system one
@@ -60,21 +83,52 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
             EksiScraperTheme {
-                MainScreen()
+                MainScreen(pendingOpen)
             }
         }
     }
+
+    // A notification tapped while the app is open
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra(Notifier.EXTRA_OPEN)?.let { pendingOpen.value = it }
+    }
+
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) {
+            AppSettings.setNotifications(false)
+            Notifier.schedule(this, false)
+        }
+    }
+
+    /** Where a tapped notification wants to go ("messages" / "olay"), until handled */
+    private val pendingOpen = mutableStateOf<String?>(null)
 }
 
 private val topLevelDestinations = listOf(
-    NavDestination(Screen.Home.route, "Akış", Icons.Rounded.Home, Icons.Outlined.Home),
-    NavDestination(Screen.Search.route, "Ara", Icons.Rounded.Search, Icons.Rounded.Search),
-    NavDestination(Screen.Profile.route, "Profil", Icons.Rounded.Person, Icons.Outlined.Person)
+    NavDestination(Screen.Home.route, "akış", Icons.Rounded.Home, Icons.Outlined.Home),
+    NavDestination(Screen.Search.route, "ara", Icons.Rounded.Search, Icons.Rounded.Search),
+    NavDestination(Screen.Profile.route, "profil", Icons.Rounded.Person, Icons.Outlined.Person)
 )
 
 @Composable
-fun MainScreen() {
+fun MainScreen(pendingOpen: MutableState<String?>) {
     val navController = rememberNavController()
+    LaunchedEffect(pendingOpen.value) {
+        when (pendingOpen.value) {
+            Notifier.OPEN_MESSAGES -> navController.navigate(Screen.Messages.createRoute())
+            // The olay tab on the home screen (or the olay list if that tab is turned off)
+            Notifier.OPEN_EVENTS -> {
+                HomeTabRequest.tab.value = HomeCategory.Olay
+                navController.navigate(Screen.Home.route) {
+                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+        pendingOpen.value = null
+    }
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     // Reading, profiles, settings and login are full screen; the bar belongs to the tabs
     val showBar = topLevelDestinations.any { it.route == currentRoute }
@@ -82,6 +136,17 @@ fun MainScreen() {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         CompositionLocalProvider(LocalBottomBarInset provides if (showBar) FloatingNavBarInset else 0.dp) {
             Navigation(navController)
+        }
+        // Edge to edge: content scrolls under the status bar, so the bar gets a soft scrim of the
+        // surface color that keeps the clock and icons readable (not over full-screen images)
+        if (currentRoute?.startsWith(Screen.Image.route) != true) {
+            val surface = MaterialTheme.colorScheme.surface
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsTopHeight(WindowInsets.statusBars)
+                    .background(Brush.verticalGradient(listOf(surface.copy(alpha = 0.85f), surface.copy(alpha = 0f))))
+            )
         }
         AnimatedVisibility(
             visible = showBar,

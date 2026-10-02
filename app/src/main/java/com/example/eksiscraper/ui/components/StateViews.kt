@@ -105,6 +105,8 @@ fun MessageState(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLargeEmphasized,
+                // Explicit: inside the search bar the inherited content color isn't the theme's
+                color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center
             )
             if (message != null) {
@@ -124,13 +126,13 @@ fun MessageState(
 fun ErrorState(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     MessageState(
         icon = Icons.Rounded.CloudOff,
-        title = "Bağlantı kurulamadı",
+        title = "bağlantı kurulamadı",
         message = message,
         modifier = modifier
     ) {
         Button(onClick = onRetry, contentPadding = ButtonDefaults.ButtonWithIconContentPadding) {
             Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text("Tekrar dene", modifier = Modifier.padding(start = 8.dp))
+            Text("tekrar dene", modifier = Modifier.padding(start = 8.dp))
         }
     }
 }

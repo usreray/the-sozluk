@@ -14,10 +14,30 @@ import com.example.eksiscraper.model.withFavorite
 import com.example.eksiscraper.model.withVote
 import com.example.eksiscraper.network.TopicNotFoundException
 import com.example.eksiscraper.repository.EksiRepository
+import com.example.eksiscraper.settings.AppSettings
 import java.net.URI
+import java.net.URLEncoder
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+
+/** Which entries of the topic are shown; [query] is appended to the topic path. */
+sealed class TopicFilter(val label: String, val query: String?) {
+    data object All : TopicFilter("tümü", null)
+    /** "bugün" links: today's entries only */
+    data class Day(val param: String) : TopicFilter("bugün", param)
+    data object Nice : TopicFilter("şükela", "a=nice")
+    data object DailyNice : TopicFilter("bugünün şükelaları", "a=dailynice")
+    data object Buddies : TopicFilter("takip ettiklerim", "a=buddyrecent")
+    data object Rookies : TopicFilter("çaylaklar", "a=caylaklar")
+    data object Images : TopicFilter("görseller", "a=gorseller")
+    data class Find(val keywords: String) :
+        TopicFilter("\"$keywords\"", "a=find&keywords=" + URLEncoder.encode(keywords, "UTF-8"))
+    data class Author(val nick: String) :
+        TopicFilter("@$nick", "a=search&author=" + URLEncoder.encode(nick, "UTF-8"))
+}
 
 data class CommentsState(
     val comments: List<Comment> = emptyList(),
@@ -71,22 +91,32 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     val scrollState = LazyListState()
 
-    // False: only today's entries (?day= links from "bugün"); true: the whole topic
-    private var showAllEntries = true
+    private val _filter = mutableStateOf<TopicFilter>(TopicFilter.All)
+    val filter: State<TopicFilter> = _filter
 
     /** Showing just today's entries; the title then offers the whole topic */
-    val isTodayOnly: Boolean get() = !showAllEntries
+    val isTodayOnly: Boolean get() = _filter.value is TopicFilter.Day
+
+    /** Entry numbers only make sense for the whole topic read in order */
+    val numbersEntries: Boolean
+        get() = _filter.value == TopicFilter.All && _selectedTopic.value?.url?.contains("/entry/") != true
+
     private var pageJob: Job? = null
 
-    fun loadTopic(title: String, url: String) {
+    // The page after the last loaded one, fetched ahead of time
+    private var prefetch: Pair<Int, Deferred<Topic>>? = null
+
+    fun loadTopic(title: String, url: String, startPage: Int = 1) {
         if (_selectedTopic.value != null) return
         // "bugün" links (?day=) open on today's entries like the site; everything else at page 1
-        showAllEntries = !url.contains("day=")
+        val day = url.substringAfter("?", "").split("&").firstOrNull { it.startsWith("day=") }
+        _filter.value = if (day != null) TopicFilter.Day(day) else TopicFilter.All
         _selectedTopic.value = Topic(title = title, url = url)
         viewModelScope.launch {
             val isSaved = repository.isTopicSaved(title)
             _selectedTopic.value = _selectedTopic.value?.copy(isSaved = isSaved)
-            jumpTo(1)
+            // Saved topics reopen where the reader left off
+            jumpTo(startPage.coerceAtLeast(1))
         }
     }
 
@@ -94,6 +124,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
     fun jumpTo(page: Int) {
         val topic = _selectedTopic.value ?: return
         pageJob?.cancel()
+        clearPrefetch()
         _isLoading.value = true
         _isLoadingNext.value = false
         _isLoadingPrevious.value = false
@@ -107,14 +138,18 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 _firstPage.value = loadedPage
                 _lastPage.value = loadedPage
                 _totalPages.value = result.totalPages
+                // From the top: on a jumped-to page the "previous page" row shows in full below the
+                // bar (starting one row down left it half hidden under the bar). The previous page
+                // still loads only when the reader scrolls up.
                 scrollState.scrollToItem(0)
+                prefetchAfter(loadedPage)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TopicNotFoundException) {
                 // Not a connection problem: show the "no entries" state instead of an error
                 _selectedTopic.value = topic.copy(entries = emptyList(), entriesLoaded = true)
             } catch (e: Exception) {
-                _error.value = e.message ?: "Başlık yüklenemedi"
+                _error.value = e.message ?: "başlık yüklenemedi"
             } finally {
                 _isLoading.value = false
             }
@@ -130,7 +165,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         _isLoadingNext.value = true
         viewModelScope.launch {
             try {
-                val result = request(topic, page)
+                val result = takePrefetched(page) ?: request(topic, page)
                 val current = _selectedTopic.value ?: return@launch
                 val known = current.entries.map { it.entryId }.toSet()
                 _selectedTopic.value = merge(current, result).copy(
@@ -138,10 +173,11 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 )
                 _lastPage.value = page
                 _totalPages.value = maxOf(result.totalPages, page)
+                prefetchAfter(page)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _message.value = "Sonraki sayfa yüklenemedi"
+                _message.value = "sonraki sayfa yüklenemedi"
             } finally {
                 _isLoadingNext.value = false
             }
@@ -166,7 +202,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _message.value = "Önceki sayfa yüklenemedi"
+                _message.value = "önceki sayfa yüklenemedi"
             } finally {
                 _isLoadingPrevious.value = false
             }
@@ -174,11 +210,39 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
     }
 
     /** Opens the whole topic from its first page (from a single entry, today's entries, or the title). */
-    fun showOlderEntries() {
+    fun showOlderEntries() = applyFilter(TopicFilter.All)
+
+    /** Shows the topic through [filter] (şükela, search, an author...) from its first page. */
+    fun applyFilter(filter: TopicFilter) {
         val topic = _selectedTopic.value ?: return
         if (topic.topicPath.isNotBlank()) _selectedTopic.value = topic.copy(url = topic.topicPath, olderEntriesCount = 0)
-        showAllEntries = true
+        _filter.value = filter
         jumpTo(1)
+    }
+
+    private fun prefetchAfter(page: Int) {
+        clearPrefetch()
+        val topic = _selectedTopic.value ?: return
+        if (!AppSettings.prefetchNextPage.value || page >= _totalPages.value) return
+        val next = page + 1
+        prefetch = next to viewModelScope.async { request(topic, next) }
+    }
+
+    private suspend fun takePrefetched(page: Int): Topic? {
+        val pending = prefetch?.takeIf { it.first == page }?.second ?: return null
+        prefetch = null
+        return try {
+            pending.await()
+        } catch (e: CancellationException) {
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun clearPrefetch() {
+        prefetch?.second?.cancel()
+        prefetch = null
     }
 
     fun retry() = jumpTo(_firstPage.value)
@@ -191,12 +255,9 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             null
         }
         val path = uri?.path
-        // Gündem (?a=popular) and bugün (?day=YYYY-MM-DD) links show only today's
-        // entries, like the site and other clients; "N entry daha" switches to the full
-        // topic. Other params (an old ?p=, ?focusto=) are dropped: the data source adds
-        // the page itself.
-        val filter = if (showAllEntries) null
-        else uri?.query?.split("&")?.firstOrNull { it.startsWith("day=") }
+        // The filter decides the query (?day=, ?a=nice, ?a=find&keywords=...). Other params
+        // of the link (an old ?p=, ?focusto=) are dropped: the data source adds the page itself.
+        val filter = _filter.value.query
         return if (path.isNullOrBlank() || path == "/") {
             // No topic path (e.g. a search or an old saved search URL): search by title
             repository.searchTopic(topic.title, page)
@@ -210,7 +271,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         url = current.url.ifEmpty { result.url },
         isSaved = current.isSaved,
         // "N entry daha" leads from a single entry or today's entries to the whole topic
-        olderEntriesCount = if (current.url.contains("/entry/") || !showAllEntries) result.olderEntriesCount else 0
+        olderEntriesCount = if (current.url.contains("/entry/") || isTodayOnly) result.olderEntriesCount else 0
     )
 
     private fun List<Entry>.withPage(page: Int) = map { it.copy(page = page) }
@@ -223,7 +284,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         viewModelScope.launch {
             if (!repository.vote(entry.entryId, entry.authorId, rate, previous)) {
                 _selectedTopic.value = _selectedTopic.value?.updateEntry(entry.entryId) { it.withVote(previous) }
-                _message.value = "Oy kaydedilemedi"
+                _message.value = "oy kaydedilemedi"
             }
         }
     }
@@ -243,8 +304,9 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 }
                 onSuccess()
                 _message.value = "entry girildi"
+                com.example.eksiscraper.settings.Drafts.delete(topic.title)
                 // The new entry is at the end of the whole topic
-                showAllEntries = true
+                _filter.value = TopicFilter.All
                 val last = request(topic, maxOf(1, _totalPages.value))
                 jumpTo(last.totalPages)
             } catch (e: CancellationException) {
@@ -261,7 +323,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
     fun deleteEntry(entry: Entry) {
         val form = _selectedTopic.value?.deleteForm
         if (form == null) {
-            _message.value = "Silme formu bulunamadı; sayfayı yenileyip tekrar dene"
+            _message.value = "silme formu bulunamadı; sayfayı yenileyip tekrar dene"
             return
         }
         val idField = form.fields.keys.firstOrNull { it.equals("id", ignoreCase = true) } ?: "id"
@@ -302,7 +364,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _comments[entryId] = comments(entryId).copy(isLoading = false, error = e.message ?: "Yorumlar yüklenemedi")
+                _comments[entryId] = comments(entryId).copy(isLoading = false, error = e.message ?: "yorumlar yüklenemedi")
             }
         }
     }
@@ -319,7 +381,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         viewModelScope.launch {
             if (!repository.voteComment(comment.id, comment.authorId, rate, previous)) {
                 apply(previous)
-                _message.value = "Oy kaydedilemedi"
+                _message.value = "oy kaydedilemedi"
             }
         }
     }
@@ -353,6 +415,29 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     suspend fun favoriters(entryId: String): List<String> = repository.getFavoriters(entryId)
 
+    /** "Başlığı açan": who opened the topic and when. */
+    suspend fun topicCreator(): com.example.eksiscraper.model.TopicCreator {
+        val id = _selectedTopic.value?.topicId?.ifBlank { null } ?: throw IllegalStateException("başlık bilgisi yok")
+        return repository.getTopicCreator(id)
+    }
+
+    /** Follows or stops following the topic (new entries then show up in "olay"). */
+    fun toggleTrack() {
+        val topic = _selectedTopic.value ?: return
+        val url = (if (topic.isTracked) topic.untrackUrl else topic.trackUrl) ?: return
+        val target = !topic.isTracked
+        _selectedTopic.value = topic.copy(isTracked = target)
+        viewModelScope.launch {
+            val error = repository.postAction(url)
+            if (error != null) {
+                _selectedTopic.value = _selectedTopic.value?.copy(isTracked = !target)
+                _message.value = error
+            } else {
+                _message.value = if (target) "başlık takibe alındı" else "başlık takibi bırakıldı"
+            }
+        }
+    }
+
     fun consumeMessage() {
         _message.value = null
     }
@@ -370,15 +455,24 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         viewModelScope.launch {
             if (!repository.setFavorite(entry.entryId, target)) {
                 _selectedTopic.value = _selectedTopic.value?.withFavorite(entry.entryId, !target)
-                _message.value = "Favori kaydedilemedi"
+                _message.value = "favori kaydedilemedi"
             }
         }
     }
 
-    fun saveTopic() {
+    /** Remembers the page being read for saved topics (whole topic only, not filters). */
+    fun rememberPage(page: Int) {
+        val topic = _selectedTopic.value ?: return
+        if (!topic.isSaved || _filter.value != TopicFilter.All || topic.url.contains("/entry/")) return
+        viewModelScope.launch { repository.updateLastPage(topic.title, page) }
+    }
+
+    fun saveTopic(page: Int = _firstPage.value) {
         _selectedTopic.value?.let { topic ->
             viewModelScope.launch {
-                repository.saveTopic(topic)
+                // Only a position in the whole topic is worth coming back to
+                val position = if (_filter.value == TopicFilter.All && !topic.url.contains("/entry/")) page else 1
+                repository.saveTopic(topic.copy(currentPage = position))
                 _selectedTopic.value = _selectedTopic.value?.copy(isSaved = true)
             }
         }

@@ -49,7 +49,7 @@ fun LoginScreen(navController: NavController) {
     Scaffold(
         topBar = {
             FloatingTopBar(
-                title = "Giriş yap",
+                title = "giriş yap",
                 subtitle = "ekşi sözlük hesabınla",
                 onBack = { navController.popBackStack() }
             )
@@ -86,6 +86,11 @@ fun LoginScreen(navController: NavController) {
                                     if (confirmed && !loggedIn) {
                                         loggedIn = true
                                         EksiSession.saveLogin(cookies, userAgent)
+                                        // Message / olay checks start with the session
+                                        com.example.eksiscraper.notify.Notifier.schedule(
+                                            view.context,
+                                            com.example.eksiscraper.settings.AppSettings.notifications.value
+                                        )
                                         navController.popBackStack()
                                     } else if (!confirmed) {
                                         // Wandered off without logging in: back to the form

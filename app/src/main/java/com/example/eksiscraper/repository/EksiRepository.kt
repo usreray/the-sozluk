@@ -57,6 +57,15 @@ class EksiRepository(
 
     suspend fun getChannels(): List<Channel> = EksiNetworkDataSource.fetchChannels()
 
+    /** Posts a relation / track url; null on success, otherwise the reason. */
+    suspend fun postAction(url: String): String? = EksiNetworkDataSource.postRelation(url)
+
+    suspend fun getFollowList(nick: String, following: Boolean) = EksiNetworkDataSource.fetchFollowList(nick, following)
+
+    suspend fun getUserImages(nick: String) = EksiNetworkDataSource.fetchUserImages(nick)
+
+    suspend fun getTopicCreator(topicId: String) = EksiNetworkDataSource.fetchTopicCreator(topicId)
+
     suspend fun getFavoriters(entryId: String): List<String> = EksiNetworkDataSource.fetchFavoriters(entryId)
 
     suspend fun getMessageBox(archive: Boolean, page: Int): MessageBox =
@@ -81,6 +90,8 @@ class EksiRepository(
     suspend fun unsaveTopic(topic: Topic) {
         savedTopicRepository.unsaveTopic(topic)
     }
+
+    suspend fun updateLastPage(title: String, page: Int) = savedTopicRepository.updateLastPage(title, page)
 
     suspend fun isTopicSaved(title: String): Boolean {
         return savedTopicRepository.isTopicSaved(title)

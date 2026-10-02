@@ -1,6 +1,10 @@
 package com.example.eksiscraper.ui.screens
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import android.os.Build
+import androidx.compose.ui.platform.LocalContext
+import com.example.eksiscraper.network.EksiSession
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -51,6 +55,17 @@ import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.example.eksiscraper.notify.Notifier
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Add
+import com.example.eksiscraper.ui.components.TextPromptDialog
+import com.example.eksiscraper.viewmodel.HomeCategory
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
@@ -73,17 +88,46 @@ fun SettingsScreen(navController: NavController) {
     val dynamicColor by AppSettings.dynamicColor
     val pureBlack by AppSettings.pureBlack
     val textScale by AppSettings.textScale
+    val showEntryNumbers by AppSettings.showEntryNumbers
+    val showAvatars by AppSettings.showAvatars
+    val keepScreenOn by AppSettings.keepScreenOn
+    val prefetchNextPage by AppSettings.prefetchNextPage
+    val hiddenTabs by AppSettings.hiddenTabs
+    val blockedWords by AppSettings.blockedWords
+    var addingWord by remember { mutableStateOf(false) }
+    val notifications by AppSettings.notifications
+    val isLoggedIn by EksiSession.isLoggedIn
+    val context = LocalContext.current
+    // Android 13+ asks before the first notification; turn on only if allowed
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        AppSettings.setNotifications(granted)
+        Notifier.schedule(context, granted)
+    }
 
     val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     val scrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     Scaffold(
         // A bare back button over a big "ayarlar"; the small title appears after scrolling
-        topBar = { FloatingTopBar(title = if (scrolled) "ayarlar" else null, onBack = { navController.popBackStack() }) }
+        topBar = {
+            FloatingTopBar(
+                title = if (scrolled) "ayarlar" else null,
+                onBack = { navController.popBackStack() },
+                // Tapping the title goes back to the top
+                onTitleClick = { scope.launch { listState.animateScrollToItem(0) } }
+            )
+        }
     ) { padding ->
+        // Edge to edge: the list starts below the bars but scrolls under them and the status bar
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = padding.calculateTopPadding(),
+                bottom = 32.dp + padding.calculateBottomPadding()
+            ),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             item { LargeTitle("ayarlar") }
@@ -124,7 +168,7 @@ fun SettingsScreen(navController: NavController) {
                 SwitchRow(
                     title = "dinamik renk",
                     subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "renkleri duvar kâğıdından al"
-                    else "Android 12 ve üstünde",
+                    else "android 12 ve üstünde",
                     checked = dynamicColor,
                     enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
                     shape = segmentedShape(1, 3),
@@ -201,7 +245,7 @@ fun SettingsScreen(navController: NavController) {
 
             item { SectionTitle("okuma") }
             item {
-                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Surface(shape = segmentedShape(0, 5), color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "yazı boyutu · %${(textScale * 100).roundToInt()}",
@@ -221,7 +265,137 @@ fun SettingsScreen(navController: NavController) {
                     }
                 }
             }
+            item {
+                SwitchRow(
+                    title = "entry sıra numarası",
+                    subtitle = "her entry'nin başlıktaki sırası (#12)",
+                    checked = showEntryNumbers,
+                    enabled = true,
+                    shape = segmentedShape(1, 5),
+                    onCheckedChange = AppSettings::setShowEntryNumbers
+                )
+            }
+            item {
+                SwitchRow(
+                    title = "profil resimleri",
+                    subtitle = "entry'lerde yazarın resmini göster",
+                    checked = showAvatars,
+                    enabled = true,
+                    shape = segmentedShape(2, 5),
+                    onCheckedChange = AppSettings::setShowAvatars
+                )
+            }
+            item {
+                SwitchRow(
+                    title = "ekranı açık tut",
+                    subtitle = "başlık okurken ekran kararmasın",
+                    checked = keepScreenOn,
+                    enabled = true,
+                    shape = segmentedShape(3, 5),
+                    onCheckedChange = AppSettings::setKeepScreenOn
+                )
+            }
+            item {
+                SwitchRow(
+                    title = "sonraki sayfayı önceden yükle",
+                    subtitle = "kaydırırken beklememek için",
+                    checked = prefetchNextPage,
+                    enabled = true,
+                    shape = segmentedShape(4, 5),
+                    onCheckedChange = AppSettings::setPrefetchNextPage
+                )
+            }
+
+            item { SectionTitle("bildirimler") }
+            item {
+                SwitchRow(
+                    title = "mesaj ve olay bildirimleri",
+                    subtitle = if (isLoggedIn) "yeni mesaj ya da takip ettiğin başlıkta yeni entry olunca (15 dakikada bir bakar)"
+                    else "giriş yapınca kullanılabilir",
+                    checked = notifications,
+                    enabled = isLoggedIn,
+                    shape = RoundedCornerShape(24.dp),
+                    onCheckedChange = { enabled ->
+                        if (enabled && !Notifier.canNotify(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            AppSettings.setNotifications(enabled)
+                            Notifier.schedule(context, enabled)
+                        }
+                    }
+                )
+            }
+
+            item { SectionTitle("ana sayfa listeleri") }
+            item {
+                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "olay, takip, son, kenar ve çaylaklar giriş yapınca görünür",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            HomeCategory.entries.forEach { category ->
+                                val visible = category.name !in hiddenTabs
+                                FilterChip(
+                                    selected = visible,
+                                    onClick = { AppSettings.setTabVisible(category.name, !visible) },
+                                    label = { Text(category.label) },
+                                    leadingIcon = if (visible) ({ Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }) else null
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            item { SectionTitle("engellenen kelimeler") }
+            item {
+                Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "bu kelimeleri içeren başlıklar listelerde gösterilmez",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            blockedWords.sorted().forEach { word ->
+                                InputChip(
+                                    selected = false,
+                                    onClick = { AppSettings.removeBlockedWord(word) },
+                                    label = { Text(word) },
+                                    trailingIcon = { Icon(Icons.Rounded.Close, contentDescription = "kaldır", modifier = Modifier.size(18.dp)) }
+                                )
+                            }
+                            AssistChip(
+                                onClick = { addingWord = true },
+                                label = { Text("kelime ekle") },
+                                leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                    }
+                }
+            }
         }
+    }
+    if (addingWord) {
+        TextPromptDialog(
+            title = "kelime engelle",
+            placeholder = "örn. burç",
+            confirmLabel = "ekle",
+            onConfirm = {
+                AppSettings.addBlockedWord(it)
+                addingWord = false
+            },
+            onDismiss = { addingWord = false }
+        )
     }
 }
 

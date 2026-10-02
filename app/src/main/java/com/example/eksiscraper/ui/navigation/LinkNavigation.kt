@@ -12,5 +12,6 @@ fun NavController.openEksiLink(link: EksiLink, uriHandler: UriHandler) {
         is EksiLink.EntryLink -> navigate(Screen.TopicDetail.createRoute("#${link.id}", "/entry/${link.id}"))
         is EksiLink.Author -> navigate(Screen.Author.createRoute(link.nick))
         is EksiLink.External -> runCatching { uriHandler.openUri(link.url) }
+        is EksiLink.Image -> navigate(Screen.Image.createRoute(link.ref))
     }
 }

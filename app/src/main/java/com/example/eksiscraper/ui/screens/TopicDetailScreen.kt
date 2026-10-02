@@ -1,5 +1,7 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.foundation.interaction.DragInteraction
+import com.example.eksiscraper.ui.components.EntryListSkeleton
 import android.app.Application
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
@@ -9,6 +11,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -91,6 +95,18 @@ import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.ui.navigation.openEksiLink
 import com.example.eksiscraper.viewmodel.EksiViewModelFactory
 import com.example.eksiscraper.viewmodel.TopicDetailViewModel
+import com.example.eksiscraper.viewmodel.TopicFilter
+import com.example.eksiscraper.settings.AppSettings
+import com.example.eksiscraper.settings.Drafts
+import com.example.eksiscraper.ui.components.TextPromptDialog
+import com.example.eksiscraper.ui.components.TopicCreatorDialog
+import com.example.eksiscraper.ui.components.TopicMenu
+import com.example.eksiscraper.ui.components.TopicMenuAction
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.NotificationsNone
 import kotlinx.coroutines.launch
 
 private enum class TopicPhase { Loading, Error, Empty, Content }
@@ -99,9 +115,11 @@ private enum class TopicPhase { Loading, Error, Empty, Content }
 private sealed interface TopicRow {
     val key: String
     data object Intro : TopicRow { override val key = "intro" }
+    data object Header : TopicRow { override val key = "header" }
+    data object FilterBanner : TopicRow { override val key = "filter" }
     data object Previous : TopicRow { override val key = "previous" }
     data class PageMarker(val page: Int) : TopicRow { override val key = "page:$page" }
-    data class EntryItem(val entry: Entry) : TopicRow { override val key = "entry:${entry.entryId}" }
+    data class EntryItem(val entry: Entry, val number: Int?) : TopicRow { override val key = "entry:${entry.entryId}" }
     data object Footer : TopicRow { override val key = "footer" }
 }
 
@@ -111,6 +129,7 @@ fun TopicDetailScreen(
     title: String,
     url: String,
     navController: NavController,
+    startPage: Int = 1,
     viewModel: TopicDetailViewModel = viewModel(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
@@ -136,8 +155,20 @@ fun TopicDetailScreen(
     var favoritersOf by remember { mutableStateOf<com.example.eksiscraper.model.Entry?>(null) }
     var showComposer by rememberSaveable { mutableStateOf(false) }
     var commentTarget by remember { mutableStateOf<Entry?>(null) }
+    var prompt by remember { mutableStateOf<TopicMenuAction?>(null) }
+    val context = LocalContext.current
+    var showCreator by remember { mutableStateOf(false) }
+    val filter by viewModel.filter
 
-    LaunchedEffect(title, url) { viewModel.loadTopic(title, url) }
+    // Keep the screen awake while reading, if chosen in settings
+    val keepScreenOn by AppSettings.keepScreenOn
+    val view = LocalView.current
+    DisposableEffect(keepScreenOn) {
+        view.keepScreenOn = keepScreenOn
+        onDispose { view.keepScreenOn = false }
+    }
+
+    LaunchedEffect(title, url) { viewModel.loadTopic(title, url, startPage) }
     LaunchedEffect(message) {
         message?.let {
             snackbar.showSnackbar(it)
@@ -157,17 +188,26 @@ fun TopicDetailScreen(
     val displayTitle = topic?.title?.takeIf { it.isNotBlank() } ?: title
 
     // Entries with a marker wherever a new page starts
-    val rows = remember(topic?.entries, firstPage, lastPage, totalPages, topic?.olderEntriesCount) {
+    val rows = remember(topic?.entries, firstPage, lastPage, totalPages, topic?.olderEntriesCount, filter) {
+        val numbered = viewModel.numbersEntries
         buildList {
+            // The full title, however long, above page 1; the bar shows a short copy once this
+            // scrolls away, and on a page jumped to in the middle (no header there)
+            if (firstPage == 1) add(TopicRow.Header)
+            if (filter !is TopicFilter.All && filter !is TopicFilter.Day) add(TopicRow.FilterBanner)
             if ((topic?.olderEntriesCount ?: 0) > 0 && firstPage == 1) add(TopicRow.Intro)
             if (firstPage > 1) add(TopicRow.Previous)
             var page = -1
+            var indexInPage = 0
             topic?.entries.orEmpty().forEach { entry ->
                 if (entry.page != page) {
                     page = entry.page
+                    indexInPage = 0
                     if (totalPages > 1) add(TopicRow.PageMarker(page))
                 }
-                add(TopicRow.EntryItem(entry))
+                // The site shows 10 entries a page, so the position follows from the page
+                add(TopicRow.EntryItem(entry, if (numbered) (page - 1) * 10 + indexInPage + 1 else null))
+                indexInPage++
             }
             add(TopicRow.Footer)
         }
@@ -187,9 +227,42 @@ fun TopicDetailScreen(
     }
     LaunchedEffect(nearEnd, lastPage, phase) { if (nearEnd && phase == TopicPhase.Content) viewModel.loadNext() }
     val atTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
-    LaunchedEffect(atTop, firstPage, phase) { if (atTop && firstPage > 1 && phase == TopicPhase.Content) viewModel.loadPrevious() }
+    // The page before the first loaded one comes in only when the reader scrolls up to it, and the
+    // list then stays on the entry that was on top. Without this, a page jump sat at the top,
+    // pulled the previous page, was still at the top, and so on back to page 1.
+    var anchorKey by remember { mutableStateOf<String?>(null) }
+    fun loadPrevious() {
+        anchorKey = rows.firstOrNull { it is TopicRow.EntryItem }?.key
+        viewModel.loadPrevious()
+    }
+    LaunchedEffect(atTop, firstPage, phase) {
+        if (atTop && firstPage > 1 && phase == TopicPhase.Content && listState.lastScrolledBackward) loadPrevious()
+    }
+    LaunchedEffect(firstPage) {
+        val key = anchorKey ?: return@LaunchedEffect
+        anchorKey = null
+        val index = rows.indexOfFirst { it.key == key }
+        // One row above the old top entry: its page marker stays in view
+        if (index > 0) listState.scrollToItem(index - 1)
+    }
+
+    // Saved topics keep the reading position, written once the reader settles on a page
+    LaunchedEffect(visiblePage, topic?.isSaved) {
+        if (topic?.isSaved == true && phase == TopicPhase.Content) {
+            kotlinx.coroutines.delay(800)
+            viewModel.rememberPage(visiblePage)
+        }
+    }
+
+    // Page buttons scroll the list themselves; that is not the reader scrolling down, so the
+    // bars stay put until the next drag
+    var pinBars by remember { mutableStateOf(false) }
+    LaunchedEffect(listState) {
+        listState.interactionSource.interactions.collect { if (it is DragInteraction.Start) pinBars = false }
+    }
 
     fun goToPage(page: Int) {
+        pinBars = true
         val index = rows.indexOfFirst { it is TopicRow.PageMarker && it.page == page }
         if (index >= 0) scope.launch { listState.animateScrollToItem(index) } else viewModel.jumpTo(page)
     }
@@ -216,8 +289,47 @@ fun TopicDetailScreen(
         },
         onToggleComments = viewModel::toggleComments,
         onVoteComment = { entry, comment, rate -> requireLogin { viewModel.voteComment(entry.entryId, comment, rate) } },
-        onWriteComment = if (canComment) ({ entry -> commentTarget = entry }) else null
+        onWriteComment = if (canComment) ({ entry -> commentTarget = entry }) else null,
+        onAuthorInTopic = { entry -> viewModel.applyFilter(TopicFilter.Author(entry.author)) }
     )
+    val onMenu: (TopicMenuAction) -> Unit = { action ->
+        when (action) {
+            is TopicMenuAction.Filter -> viewModel.applyFilter(action.filter)
+            TopicMenuAction.Creator -> showCreator = true
+            TopicMenuAction.Share -> topic?.let { shareTopic(context, it) }
+            else -> prompt = action
+        }
+    }
+    when (prompt) {
+        TopicMenuAction.SearchInTopic -> TextPromptDialog(
+            title = "başlıkta ara",
+            placeholder = "kelime",
+            initial = (filter as? TopicFilter.Find)?.keywords.orEmpty(),
+            onConfirm = {
+                prompt = null
+                viewModel.applyFilter(TopicFilter.Find(it))
+            },
+            onDismiss = { prompt = null }
+        )
+        TopicMenuAction.SearchAuthor -> TextPromptDialog(
+            title = "yazarın bu başlıktaki entry'leri",
+            placeholder = "yazar",
+            initial = (filter as? TopicFilter.Author)?.nick.orEmpty(),
+            onConfirm = {
+                prompt = null
+                viewModel.applyFilter(TopicFilter.Author(it.removePrefix("@")))
+            },
+            onDismiss = { prompt = null }
+        )
+        else -> Unit
+    }
+    if (showCreator) {
+        TopicCreatorDialog(
+            load = viewModel::topicCreator,
+            onAuthor = { nick -> navController.navigate(Screen.Author.createRoute(nick)) },
+            onDismiss = { showCreator = false }
+        )
+    }
 
     if (showPagePicker) {
         PagePickerDialog(
@@ -240,11 +352,15 @@ fun TopicDetailScreen(
         )
     }
     if (showComposer) {
+        // Continue a draft saved on this device, or one left "kenarda" on the site
+        val draftKey = topic?.title ?: displayTitle
         EntryComposerSheet(
             topicTitle = displayTitle,
             isSubmitting = isSubmitting,
             onSubmit = { text -> viewModel.submitEntry(text) { showComposer = false } },
-            onDismiss = { if (!isSubmitting) showComposer = false }
+            onDismiss = { if (!isSubmitting) showComposer = false },
+            initialText = remember { Drafts.get(draftKey)?.text ?: topic?.entryForm?.textValue.orEmpty() },
+            onTextChange = { text -> Drafts.save(draftKey, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty(), text) }
         )
     }
     commentTarget?.let { entry ->
@@ -257,7 +373,8 @@ fun TopicDetailScreen(
         )
     }
 
-    val barsVisible = listState.isScrollingUp()
+    val barsVisible = listState.isScrollingUp() || pinBars
+    val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || firstPage > 1 } }
     // Room under the floating header so the first row starts below it
     val topInset = floatingTopBarInset()
 
@@ -266,12 +383,19 @@ fun TopicDetailScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Crossfade(targetState = phase, label = "topicPhase") { current ->
             when (current) {
-                TopicPhase.Loading -> LoadingState(messages = listOf("entry'ler getiriliyor", "sayfa çevriliyor", "neredeyse hazır"))
+                TopicPhase.Loading -> Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = topInset)) {
+                    if (startPage <= 1) TopicHeader(displayTitle, onClick = null)
+                    EntryListSkeleton(contentPadding = PaddingValues(top = 12.dp))
+                }
                 TopicPhase.Error -> ErrorState(message = error.orEmpty(), onRetry = viewModel::retry)
                 TopicPhase.Empty -> MessageState(
                     icon = Icons.Rounded.SearchOff,
-                    title = "Burada bir şey yok",
-                    message = "Böyle bir başlık yok ya da gösterilecek entry kalmamış."
+                    title = "burada bir şey yok",
+                    message = if (filter is TopicFilter.All) "böyle bir başlık yok ya da gösterilecek entry kalmamış."
+                    else "${filter.label} için entry bulunamadı.",
+                    action = if (filter is TopicFilter.All) null else ({
+                        FilledTonalButton(onClick = viewModel::showOlderEntries) { Text("tüm entry'leri göster") }
+                    })
                 )
                 TopicPhase.Content -> LazyColumn(
                     state = listState,
@@ -281,14 +405,18 @@ fun TopicDetailScreen(
                 ) {
                     items(rows, key = { it.key }) { row ->
                         when (row) {
+                            // Like the bar title: the whole topic from its first page
+                            TopicRow.Header -> TopicHeader(displayTitle, onClick = viewModel::showOlderEntries)
                             TopicRow.Intro -> OlderEntriesCard(topic!!.olderEntriesCount, viewModel::showOlderEntries)
+                            TopicRow.FilterBanner -> FilterBanner(filter.label, onClear = viewModel::showOlderEntries)
                             TopicRow.Previous -> Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
                                 if (isLoadingPrevious) LoadingIndicator()
-                                else TextButton(onClick = viewModel::loadPrevious) { Text("önceki sayfayı yükle") }
+                                else TextButton(onClick = ::loadPrevious) { Text("önceki sayfayı yükle") }
                             }
                             is TopicRow.PageMarker -> PageMarker(row.page, totalPages)
                             is TopicRow.EntryItem -> EntryCard(
                                 entry = row.entry,
+                                number = row.number,
                                 isExpanded = viewModel.isEntryExpanded(row.entry.entryId),
                                 onToggleExpand = { viewModel.toggleEntryExpansion(row.entry.entryId) },
                                 actions = actions,
@@ -311,7 +439,10 @@ fun TopicDetailScreen(
         }
 
         FloatingTopBar(
-            title = displayTitle,
+            // The page shows the title itself while loading and at the top of the list
+            title = if (headerGone || phase == TopicPhase.Error || phase == TopicPhase.Empty ||
+                (phase == TopicPhase.Loading && startPage > 1)
+            ) displayTitle else null,
             // Pages are in the bottom toolbar; only say when this is a single entry
             // The title opens the whole topic from its first page
             onTitleClick = if (loaded) viewModel::showOlderEntries else null,
@@ -321,18 +452,29 @@ fun TopicDetailScreen(
             modifier = Modifier.align(Alignment.TopCenter),
             // Nothing to save or share for a topic that doesn't exist
             actions = if (phase != TopicPhase.Content) null else ({
-                TopicShareButton(topic)
+                // "takip et": new entries then show up in the olay list
+                if (isLoggedIn && topic?.trackUrl != null) {
+                    IconToggleButton(checked = topic?.isTracked == true, onCheckedChange = { viewModel.toggleTrack() }) {
+                        Icon(
+                            imageVector = if (topic?.isTracked == true) Icons.Rounded.NotificationsActive else Icons.Rounded.NotificationsNone,
+                            contentDescription = if (topic?.isTracked == true) "takibi bırak" else "başlığı takip et",
+                            tint = if (topic?.isTracked == true) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 IconToggleButton(
                     checked = topic?.isSaved == true,
-                    onCheckedChange = { saved -> if (saved) viewModel.saveTopic() else viewModel.unsaveTopic() }
+                    onCheckedChange = { saved -> if (saved) viewModel.saveTopic(visiblePage) else viewModel.unsaveTopic() }
                 ) {
                     Icon(
                         imageVector = if (topic?.isSaved == true) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                        contentDescription = if (topic?.isSaved == true) "Kaydedildi" else "Kaydet",
+                        contentDescription = if (topic?.isSaved == true) "kaydedildi" else "kaydet",
                         tint = if (topic?.isSaved == true) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                TopicMenu(current = filter, isLoggedIn = isLoggedIn, onAction = onMenu)
             })
         )
 
@@ -350,6 +492,44 @@ fun TopicDetailScreen(
 
         SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 88.dp))
     }
+    }
+}
+
+/** The full topic title above the entries, however long. */
+@Composable
+private fun TopicHeader(title: String, onClick: (() -> Unit)?) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.headlineSmallEmphasized,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+    )
+}
+
+/** Which filter is on, with a way back to the whole topic. */
+@Composable
+private fun FilterBanner(label: String, onClear: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, end = 4.dp)) {
+            Icon(Icons.Rounded.FilterList, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+            Text(
+                label,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
+            )
+            TextButton(onClick = onClear) { Text("tümü") }
+        }
     }
 }
 
@@ -406,7 +586,7 @@ private fun BottomToolbar(
         val colors = FloatingToolbarDefaults.standardFloatingToolbarColors()
         val pageControls: @Composable () -> Unit = {
             IconButton(onClick = onPrevious, enabled = currentPage > 1) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "Önceki sayfa")
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "önceki sayfa")
             }
             TextButton(onClick = onPickPage) {
                 Text(
@@ -416,7 +596,7 @@ private fun BottomToolbar(
                 )
             }
             IconButton(onClick = onNext, enabled = currentPage < totalPages) {
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "Sonraki sayfa")
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "sonraki sayfa")
             }
         }
         if (canWrite) {
@@ -435,16 +615,11 @@ private fun BottomToolbar(
     }
 }
 
-@Composable
-private fun TopicShareButton(topic: Topic?) {
-    val context = LocalContext.current
-    val link = topic?.url?.let { if (it.startsWith("http")) it else EksiSession.BASE_URL + it } ?: return
-    IconButton(onClick = {
-        val send = Intent(Intent.ACTION_SEND)
-            .setType("text/plain")
-            .putExtra(Intent.EXTRA_TEXT, "${topic.title}\n$link")
-        context.startActivity(Intent.createChooser(send, null))
-    }) {
-        Icon(Icons.Rounded.Share, contentDescription = "Başlığı paylaş", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+private fun shareTopic(context: android.content.Context, topic: Topic) {
+    val path = topic.topicPath.ifBlank { topic.url }
+    val link = if (path.startsWith("http")) path else EksiSession.BASE_URL + path
+    val send = Intent(Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(Intent.EXTRA_TEXT, "${topic.title}\n$link")
+    context.startActivity(Intent.createChooser(send, null))
 }

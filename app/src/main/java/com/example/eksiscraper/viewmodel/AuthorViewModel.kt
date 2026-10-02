@@ -18,11 +18,17 @@ enum class AuthorTab(val path: String, val label: String) {
     Latest("son-entryleri", "son entry'ler"),
     MostLiked("en-begenilenleri", "en beğenilenler"),
     MostFavorited("en-cok-favorilenen-entryleri", "en çok favorilenenler"),
-    Favorites("favori-entryleri", "favorileri")
+    ThisWeek("bu-hafta-dikkat-cekenleri", "bu hafta dikkat çekenler"),
+    Handmade("el-emegi-goz-nuru", "el emeği göz nuru"),
+    RecentVotes("son-oylananlari", "son oylananlar"),
+    Favorites("favori-entryleri", "favorileri"),
+    Images("gorselleri", "görselleri")
 }
 
 data class AuthorTabState(
     val entries: List<Entry> = emptyList(),
+    /** Only for [AuthorTab.Images] */
+    val images: List<com.example.eksiscraper.model.AuthorImage> = emptyList(),
     val page: Int = 0,
     val isLoading: Boolean = false,
     val canLoadMore: Boolean = true,
@@ -57,7 +63,7 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _profileError.value = e.message ?: "Profil yüklenemedi"
+                _profileError.value = e.message ?: "profil yüklenemedi"
             }
         }
     }
@@ -86,6 +92,12 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         update(tab) { it.copy(isLoading = true, error = null) }
         tabJobs[tab] = viewModelScope.launch {
             try {
+                if (tab == AuthorTab.Images) {
+                    // One list, no pages
+                    val images = repository.getUserImages(nick)
+                    update(tab) { it.copy(images = images, page = 1, isLoading = false, canLoadMore = false) }
+                    return@launch
+                }
                 val result = repository.getUserEntries(nick, tab.path, page)
                 update(tab) {
                     it.copy(
@@ -98,7 +110,7 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                update(tab) { it.copy(isLoading = false, error = e.message ?: "Yüklenemedi") }
+                update(tab) { it.copy(isLoading = false, error = e.message ?: "yüklenemedi") }
             }
         }
     }
@@ -111,7 +123,7 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         viewModelScope.launch {
             if (!repository.setFavorite(entry.entryId, target)) {
                 updateEntry(entry.entryId) { it.copy(isFavorited = !target, favoriteCount = entry.favoriteCount) }
-                _message.value = "Favori kaydedilemedi"
+                _message.value = "favori kaydedilemedi"
             }
         }
     }
@@ -123,7 +135,7 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         viewModelScope.launch {
             if (!repository.vote(entry.entryId, entry.authorId, rate, previous)) {
                 updateEntry(entry.entryId) { it.withVote(previous) }
-                _message.value = "Oy kaydedilemedi"
+                _message.value = "oy kaydedilemedi"
             }
         }
     }
@@ -134,7 +146,7 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         val url = (if (current.isFollowing) current.followRemoveUrl else current.followAddUrl)
         if (url == null) {
             // Loaded before logging in: the page had no follow button; fetch it again
-            _message.value = "Takip bilgisi alınamadı, profil yenileniyor"
+            _message.value = "takip bilgisi alınamadı, profil yenileniyor"
             retry()
             return
         }
@@ -154,7 +166,30 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
+    /** Engelle / başlıklarını engelle / sessize al (or undo); the profile is reloaded afterwards like on the site. */
+    fun toggleRelation(action: com.example.eksiscraper.model.RelationAction) {
+        val url = if (action.isAdded) action.removeUrl else action.addUrl
+        if (url.isBlank()) return
+        viewModelScope.launch {
+            val error = repository.postAction(url)
+            if (error == null) {
+                _message.value = if (action.isAdded) "${action.removeLabel}: tamam" else "${action.label}: tamam"
+                _profile.value = try {
+                    repository.getProfile(nick)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _profile.value
+                }
+            } else {
+                _message.value = error
+            }
+        }
+    }
+
     suspend fun favoriters(entryId: String): List<String> = repository.getFavoriters(entryId)
+
+    suspend fun followList(following: Boolean) = repository.getFollowList(nick, following)
 
     fun consumeMessage() {
         _message.value = null

@@ -1,5 +1,6 @@
 package com.example.eksiscraper.data.room
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.eksiscraper.model.Topic
@@ -9,15 +10,21 @@ data class SavedTopicEntity(
     @PrimaryKey val title: String,
     val url: String,
     val commentCount: Int,
-    val redirectedUrl: String
+    val redirectedUrl: String,
+    /** Page the reader was last on, to continue from there */
+    @ColumnInfo(defaultValue = "1") val lastPage: Int = 1,
+    @ColumnInfo(defaultValue = "0") val savedAt: Long = 0
 ) {
     companion object {
         fun fromTopic(topic: Topic): SavedTopicEntity {
             return SavedTopicEntity(
                 title = topic.title,
-                url = topic.url,
-                commentCount = topic.commentCount,
-                redirectedUrl = topic.redirectedUrl
+                // The whole topic, not the single entry or "bugün" link it was opened from
+                url = topic.topicPath.ifBlank { topic.url },
+                commentCount = 0,
+                redirectedUrl = topic.redirectedUrl,
+                lastPage = topic.currentPage.coerceAtLeast(1),
+                savedAt = System.currentTimeMillis()
             )
         }
         
@@ -25,9 +32,9 @@ data class SavedTopicEntity(
             return Topic(
                 title = entity.title,
                 url = entity.url,
-                commentCount = entity.commentCount,
                 redirectedUrl = entity.redirectedUrl,
-                isSaved = true
+                isSaved = true,
+                currentPage = entity.lastPage
             )
         }
     }

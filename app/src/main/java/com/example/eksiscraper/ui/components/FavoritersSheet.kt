@@ -7,7 +7,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -50,11 +52,14 @@ fun FavoritersSheet(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            error = e.message ?: "Liste yüklenemedi"
+            error = e.message ?: "liste yüklenemedi"
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // Fully open from the start and one fixed height for loading and list alike: the sheet used
+    // to settle at a half state and shrink once the list replaced the loading indicator
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 12.dp)
@@ -66,14 +71,14 @@ fun FavoritersSheet(
                 modifier = Modifier.padding(start = 10.dp)
             )
         }
-        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth().height(420.dp), contentAlignment = Alignment.Center) {
             val list = nicks
             when {
                 error != null -> Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))
                 list == null -> LoadingIndicator()
                 list.isEmpty() -> Text("henüz favorileyen yok", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> LazyColumn(
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp),
+                    modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)
                 ) {

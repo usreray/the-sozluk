@@ -10,6 +10,7 @@ import com.example.eksiscraper.model.Message
 import com.example.eksiscraper.model.MessageBox
 import com.example.eksiscraper.model.MessageThread
 import com.example.eksiscraper.model.ThreadDetail
+import com.example.eksiscraper.model.RelationAction
 import com.example.eksiscraper.model.Topic
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -142,6 +143,7 @@ object HtmlParser {
                         olderLink?.text()?.substringBefore(" ")?.toIntOrNull() ?: 0
 
                 val entries = entryListItems.take(10).mapNotNull(::parseEntry)
+                val trackLink = document.selectFirst("#track-topic-link")
 
                 // Determine redirected URL
                 val finalUrl = document.location()
@@ -156,7 +158,6 @@ object HtmlParser {
                         title = cleanTitle,
                         // The topic's own address (after any search redirect), without the page
                         url = baseUrl + redirectedPath.substringBefore("?"),
-                        commentCount = entries.size,
                         entries = entries,
                         entriesLoaded = true,
                         redirectedUrl = redirectedPath,
@@ -166,7 +167,12 @@ object HtmlParser {
                         entryForm = findEntryForm(document),
                         deleteForm = findDeleteForm(document),
                         commentForm = document.selectFirst("form#comment-entry-form")?.let(::formSpec),
-                        topicPath = heading?.selectFirst("a[href]")?.attr("href")?.substringBefore("?").orEmpty()
+                        topicPath = heading?.selectFirst("a[href]")?.attr("href")?.substringBefore("?").orEmpty(),
+                        topicId = heading?.attr("data-id").orEmpty(),
+                        // The site toggles data-tracked (0/1) and posts to data-trackurl / data-untrackurl
+                        isTracked = trackLink?.attr("data-tracked") == "1",
+                        trackUrl = trackLink?.attr("data-trackurl")?.ifBlank { null },
+                        untrackUrl = trackLink?.attr("data-untrackurl")?.ifBlank { null }
                 )
         }
 
@@ -339,7 +345,8 @@ object HtmlParser {
                 return FormSpec(
                         action = form.attr("action"),
                         fields = fields,
-                        textFieldName = form.selectFirst("textarea[name]")?.attr("name")
+                        textFieldName = form.selectFirst("textarea[name]")?.attr("name"),
+                        textValue = form.selectFirst("textarea[name]")?.wholeText()?.trim().orEmpty()
                 )
         }
 
@@ -363,6 +370,20 @@ object HtmlParser {
                         followAddUrl = document.selectFirst("#buddy-link")?.attr("data-add-url")?.ifBlank { null },
                         followRemoveUrl = document.selectFirst("#buddy-link")?.attr("data-remove-url")?.ifBlank { null },
                         isFollowing = document.selectFirst("#buddy-link")?.attr("data-added") == "true",
+                        relations = document.select("a.relation-link[data-add-url], a.mute-icon-link[data-add-url]")
+                                .filter { it.id() != "buddy-link" }
+                                .mapNotNull { link ->
+                                        val label = link.attr("data-add-caption").ifBlank { link.text().trim() }
+                                        if (label.isBlank()) return@mapNotNull null
+                                        RelationAction(
+                                                label = label,
+                                                removeLabel = link.attr("data-remove-caption").ifBlank { "$label (geri al)" },
+                                                addUrl = link.attr("data-add-url"),
+                                                removeUrl = link.attr("data-remove-url"),
+                                                isAdded = link.attr("data-added") == "true"
+                                        )
+                                }
+                                .distinctBy { it.addUrl },
                         badges = document.select("a.user-profile-badge-item").map {
                                 Badge(
                                         name = it.attr("data-name"),
@@ -372,6 +393,15 @@ object HtmlParser {
                         }
                 )
         }
+
+        /** "görselleri": links to /img/<code> pages, each with its picture as a CSS background. */
+        fun parseUserImages(document: Document): List<com.example.eksiscraper.model.AuthorImage> =
+                document.select("#img-row a[href^=/img/], a[href^=/img/]").mapNotNull { link ->
+                        val style = link.selectFirst("[style]")?.attr("style").orEmpty()
+                        val thumb = Regex("url\\('?([^')]+)'?\\)").find(style)?.groupValues?.get(1)
+                                ?: return@mapNotNull null
+                        com.example.eksiscraper.model.AuthorImage(link.attr("href"), thumb)
+                }.distinctBy { it.ref }
 
         /** Profile tabs (son entryleri, en beğenilenleri, ...): entries with their topic. */
         fun parseUserEntries(document: Document): List<Entry> =

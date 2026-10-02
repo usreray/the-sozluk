@@ -10,10 +10,24 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-enum class HomeCategory(val key: String, val label: String) {
+/** Home lists; [needsLogin] ones are the site's personal lists (403 when logged out). */
+enum class HomeCategory(val key: String, val label: String, val needsLogin: Boolean = false) {
     Gundem("popular", "gündem"),
     Bugun("today", "bugün"),
-    Debe("debe", "debe")
+    Debe("debe", "debe"),
+    Olay("basliklar/olay", "olay", needsLogin = true),
+    Takip("basliklar/takipentry", "takip", needsLogin = true),
+    TakipFav("basliklar/takipfav", "takip fav", needsLogin = true),
+    Son("basliklar/son", "son", needsLogin = true),
+    Kenar("basliklar/kenar", "kenar", needsLogin = true),
+    Caylaklar("basliklar/caylaklar/bugun", "çaylaklar", needsLogin = true),
+    TarihteBugun("basliklar/tarihte-bugun", "tarihte bugün"),
+    Basiboslar("basliklar/basiboslar", "başıboşlar")
+}
+
+/** A tab the home screen should switch to (e.g. olay, from a notification). */
+object HomeTabRequest {
+    val tab = androidx.compose.runtime.mutableStateOf<HomeCategory?>(null)
 }
 
 data class CategoryState(
@@ -26,7 +40,10 @@ data class CategoryState(
     val error: String? = null,
     val page: Int = 0,
     val canLoadMore: Boolean = true
-)
+) {
+    /** Loaded at least once; an empty list then means "nothing here" rather than "loading" */
+    val isLoaded: Boolean get() = page > 0
+}
 
 /** Each tab keeps its own list, so swiping between tabs never shows another tab's topics. */
 class HomeViewModel(private val repository: EksiRepository) : ViewModel() {
@@ -74,7 +91,7 @@ class HomeViewModel(private val repository: EksiRepository) : ViewModel() {
                         topics = (if (page == 1) result else it.topics + result).distinctBy { t -> t.url },
                         page = page,
                         // debe is a single list; the others have ~50 topics per page
-                        canLoadMore = category != HomeCategory.Debe && result.size >= 40,
+                        canLoadMore = category != HomeCategory.Debe && result.size >= 20,
                         isLoading = false,
                         isRefreshing = false,
                         isLoadingMore = false
@@ -88,7 +105,7 @@ class HomeViewModel(private val repository: EksiRepository) : ViewModel() {
                         isLoading = false,
                         isRefreshing = false,
                         // Keep a list that is already on screen; only show the error if empty
-                        error = if (it.topics.isEmpty()) e.message ?: "Bir şeyler ters gitti" else null
+                        error = if (it.topics.isEmpty()) e.message ?: "bir şeyler ters gitti" else null
                     ) else it.copy(isLoadingMore = false, canLoadMore = false)
                 }
             }

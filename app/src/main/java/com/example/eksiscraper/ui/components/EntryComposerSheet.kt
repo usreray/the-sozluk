@@ -53,9 +53,13 @@ fun EntryComposerSheet(
     heading: String = "entry gir",
     isSubmitting: Boolean,
     onSubmit: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** A saved draft (or the site's "kenar" text) to continue from */
+    initialText: String = "",
+    /** Called on every edit so the text survives closing the sheet */
+    onTextChange: ((String) -> Unit)? = null
 ) {
-    var value by remember { mutableStateOf(TextFieldValue("")) }
+    var value by remember { mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length))) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -65,9 +69,19 @@ fun EntryComposerSheet(
         ) {
             Text(heading, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(topicTitle, style = MaterialTheme.typography.titleLargeEmphasized)
+            if (initialText.isNotEmpty()) {
+                Text(
+                    "taslaktan devam ediyorsun",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             OutlinedTextField(
                 value = value,
-                onValueChange = { value = it },
+                onValueChange = {
+                    if (it.text != value.text) onTextChange?.invoke(it.text)
+                    value = it
+                },
                 placeholder = { Text("ne düşünüyorsun?") },
                 enabled = !isSubmitting,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
@@ -80,7 +94,10 @@ fun EntryComposerSheet(
             ) {
                 markups.forEach { markup ->
                     SuggestionChip(
-                        onClick = { value = value.wrapSelection(markup) },
+                        onClick = {
+                            value = value.wrapSelection(markup)
+                            onTextChange?.invoke(value.text)
+                        },
                         label = { Text(markup.label) },
                         enabled = !isSubmitting
                     )

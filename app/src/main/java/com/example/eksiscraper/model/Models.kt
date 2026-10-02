@@ -18,7 +18,12 @@ data class Topic(
     val deleteForm: FormSpec? = null,
     val commentForm: FormSpec? = null,
     /** The topic's own path (/slug--id) as linked from its heading; differs on /entry/<id> pages */
-    val topicPath: String = ""
+    val topicPath: String = "",
+    val topicId: String = "",
+    // "takip et" on the topic (logged in only): current state and the urls it posts to
+    val isTracked: Boolean = false,
+    val trackUrl: String? = null,
+    val untrackUrl: String? = null
 )
 
 data class Entry(
@@ -52,7 +57,18 @@ data class Entry(
 data class FormSpec(
     val action: String,
     val fields: Map<String, String>,
-    val textFieldName: String? = null
+    val textFieldName: String? = null,
+    /** Text already in the field, e.g. an entry left "kenarda" (saved as a draft on the site) */
+    val textValue: String = ""
+)
+
+/** A relation button on a profile (engelle, başlıklarını engelle, sessize al, ...). */
+data class RelationAction(
+    val label: String,
+    val removeLabel: String,
+    val addUrl: String,
+    val removeUrl: String,
+    val isAdded: Boolean
 )
 
 data class Badge(val name: String, val description: String, val imageUrl: String)
@@ -72,8 +88,19 @@ data class AuthorProfile(
     // Follow endpoints from the profile's "takip et" button; null when logged out
     val followAddUrl: String? = null,
     val followRemoveUrl: String? = null,
-    val isFollowing: Boolean = false
+    val isFollowing: Boolean = false,
+    /** Other relation buttons besides "takip et"; empty when logged out */
+    val relations: List<RelationAction> = emptyList()
 )
+
+/** "Başlığı açan": the author's nick plus the plain facts (date, counts) from the site's box. */
+data class TopicCreator(val nick: String?, val details: List<String>)
+
+/** An image an author uploaded: its /img/<code> page and the thumbnail file. */
+data class AuthorImage(val ref: String, val thumbnailUrl: String)
+
+/** Someone in a follower / following list. */
+data class FollowUser(val nick: String, val avatarUrl: String?, val isVerified: Boolean)
 
 /** A comment ("yorum") under an entry. */
 data class Comment(

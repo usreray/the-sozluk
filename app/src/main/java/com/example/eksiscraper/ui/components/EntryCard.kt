@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.components
 
+import androidx.compose.foundation.layout.offset
 import android.content.ClipData
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
@@ -78,6 +79,9 @@ import coil3.compose.AsyncImage
 import com.example.eksiscraper.model.Comment
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.network.EksiSession
+import com.example.eksiscraper.settings.AppSettings
+import androidx.compose.material.icons.rounded.FilterList
+import androidx.compose.material.icons.rounded.Link
 import kotlinx.coroutines.launch
 
 private const val COLLAPSED_LINES = 8
@@ -97,7 +101,9 @@ data class EntryActions(
     val onVoteComment: (Entry, Comment, Int) -> Unit = { _, _, _ -> },
     val onWriteComment: ((Entry) -> Unit)? = null,
     /** Tapping the favorite count shows who favorited */
-    val onShowFavoriters: ((Entry) -> Unit)? = null
+    val onShowFavoriters: ((Entry) -> Unit)? = null,
+    /** "Bu başlıktaki entry'leri": the author's entries in the current topic */
+    val onAuthorInTopic: ((Entry) -> Unit)? = null
 )
 
 /** What the card needs to show an entry's comments. */
@@ -115,9 +121,13 @@ fun EntryCard(
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     actions: EntryActions,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Position in the topic, shown when enabled in settings */
+    number: Int? = null
 ) {
     var overflows by remember(entry.entryId) { mutableStateOf(false) }
+    val showAvatars by AppSettings.showAvatars
+    val showNumbers by AppSettings.showEntryNumbers
     var confirmDelete by remember { mutableStateOf(false) }
     val text = rememberEntryText(entry.contentHtml, entry.content, actions.onLink)
 
@@ -125,15 +135,15 @@ fun EntryCard(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
-            title = { Text("Entry silinsin mi?") },
-            text = { Text("Bu entry ekşi sözlük'ten silinecek. Bu işlem geri alınamaz.") },
+            title = { Text("entry silinsin mi?") },
+            text = { Text("bu entry ekşi sözlük'ten silinecek. bu işlem geri alınamaz.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     actions.onDelete(entry)
-                }) { Text("Sil", color = MaterialTheme.colorScheme.error) }
+                }) { Text("sil", color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Vazgeç") } }
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("vazgeç") } }
         )
     }
 
@@ -169,6 +179,7 @@ fun EntryCard(
             SelectionContainer {
                 Text(
                     text = text,
+                    inlineContent = rememberEntryInlineContent(),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = if (isExpanded) Int.MAX_VALUE else COLLAPSED_LINES,
@@ -200,14 +211,16 @@ fun EntryCard(
                         }) {
                             Icon(
                                 if (comments.isOpen) Icons.Rounded.ChatBubble else Icons.Outlined.ChatBubbleOutline,
-                                contentDescription = "Yorumlar",
+                                contentDescription = "yorumlar",
                                 tint = if (comments.isOpen) MaterialTheme.colorScheme.primary
                                 else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
+                // The nick takes whatever room is left and ellipsizes, so a long one never pushes
+                // the avatar and the menu off the card
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                 Column(
                     horizontalAlignment = Alignment.End,
                     modifier = Modifier
@@ -223,21 +236,27 @@ fun EntryCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = entry.date,
+                        text = (if (showNumbers && number != null) "#$number · ${entry.date}" else entry.date)
+                            .replace(" ~ ", "\n~ "),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.End
+                        textAlign = TextAlign.End,
+                        maxLines = 2
                     )
                 }
-                Spacer(Modifier.width(4.dp))
-                AuthorAvatar(
-                    entry.author,
-                    avatarUrl = entry.avatarUrl,
-                    modifier = Modifier.clip(CircleShape).clickable { actions.onAuthor(entry.author) }
-                )
+                }
+                if (showAvatars) {
+                    Spacer(Modifier.width(4.dp))
+                    AuthorAvatar(
+                        entry.author,
+                        avatarUrl = entry.avatarUrl,
+                        modifier = Modifier.clip(CircleShape).clickable { actions.onAuthor(entry.author) }
+                    )
+                }
                 EntryMenu(
                     entry = entry,
                     onAuthor = { actions.onAuthor(entry.author) },
+                    onAuthorInTopic = actions.onAuthorInTopic?.let { show -> { show(entry) } },
                     onDelete = if (entry.canDelete && actions.onDelete != null) ({ confirmDelete = true }) else null
                 )
             }
@@ -312,6 +331,7 @@ private fun CommentsSection(
                     SelectionContainer {
                         Text(
                             rememberEntryText(comment.contentHtml, comment.content, onLink),
+                            inlineContent = rememberEntryInlineContent(),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(top = 6.dp, end = 10.dp)
                         )
@@ -379,7 +399,7 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
         IconToggleButton(checked = isFavorited, onCheckedChange = { onToggle() }) {
             Icon(
                 imageVector = if (isFavorited) Icons.Rounded.WaterDrop else Icons.Outlined.WaterDrop,
-                contentDescription = if (isFavorited) "Favoriden çıkar" else "Favorile",
+                contentDescription = if (isFavorited) "favoriden çıkar" else "favorile",
                 tint = if (isFavorited) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.scale(scale)
@@ -392,7 +412,9 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
                 slideInVertically { if (up) it else -it } togetherWith
                     slideOutVertically { if (up) -it else it }
             },
-            label = "favCount"
+            label = "favCount",
+            // The icon button has a wide touch area; pull the count in next to the drop
+            modifier = Modifier.offset(x = (-10).dp)
         ) { value ->
             Text(
                 text = if (value > 0) value.toString() else "",
@@ -408,20 +430,20 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun EntryMenu(entry: Entry, onAuthor: () -> Unit, onDelete: (() -> Unit)?) {
+private fun EntryMenu(entry: Entry, onAuthor: () -> Unit, onAuthorInTopic: (() -> Unit)?, onDelete: (() -> Unit)?) {
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
     Box {
         IconButton(onClick = { open = true }) {
-            Icon(Icons.Rounded.MoreVert, contentDescription = "Diğer", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Rounded.MoreVert, contentDescription = "diğer", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
                 if (entry.entryId.isNotEmpty()) {
                     DropdownMenuItem(
-                        text = { Text("Paylaş") },
+                        text = { Text("paylaş") },
                         leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
                         onClick = {
                             open = false
@@ -433,13 +455,34 @@ private fun EntryMenu(entry: Entry, onAuthor: () -> Unit, onDelete: (() -> Unit)
                     )
                 }
                 DropdownMenuItem(
-                    text = { Text("Metni kopyala") },
+                    text = { Text("metni kopyala") },
                     leadingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = null) },
                     onClick = {
                         open = false
                         scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", entry.content))) }
                     }
                 )
+                if (entry.entryId.isNotEmpty()) {
+                    DropdownMenuItem(
+                        text = { Text("linki kopyala") },
+                        leadingIcon = { Icon(Icons.Rounded.Link, contentDescription = null) },
+                        onClick = {
+                            open = false
+                            val link = "${EksiSession.BASE_URL}/entry/${entry.entryId}"
+                            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", link))) }
+                        }
+                    )
+                }
+                if (onAuthorInTopic != null) {
+                    DropdownMenuItem(
+                        text = { Text("${entry.author} · bu başlıktakiler") },
+                        leadingIcon = { Icon(Icons.Rounded.FilterList, contentDescription = null) },
+                        onClick = {
+                            open = false
+                            onAuthorInTopic()
+                        }
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text("${entry.author} profili") },
                     leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
@@ -450,7 +493,7 @@ private fun EntryMenu(entry: Entry, onAuthor: () -> Unit, onDelete: (() -> Unit)
                 )
                 if (onDelete != null) {
                     DropdownMenuItem(
-                        text = { Text("Sil", color = MaterialTheme.colorScheme.error) },
+                        text = { Text("sil", color = MaterialTheme.colorScheme.error) },
                         leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                         onClick = {
                             open = false

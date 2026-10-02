@@ -1,5 +1,10 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import com.example.eksiscraper.ui.components.EntryListSkeleton
 import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -33,6 +38,13 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuGroup
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenuPopup
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -143,6 +155,18 @@ fun AuthorScreen(
     }
 
     val requireLogin: (() -> Unit) -> Unit = { action -> if (isLoggedIn) action() else showLoginDialog = true }
+    // true: who they follow, false: their followers, null: closed
+    var followSheet by remember { mutableStateOf<Boolean?>(null) }
+    followSheet?.let { following ->
+        com.example.eksiscraper.ui.components.FollowListSheet(
+            title = if (following) "takip ettikleri" else "takipçileri",
+            total = if (following) profile?.followingCount ?: 0 else profile?.followerCount ?: 0,
+            load = { viewModel.followList(following) },
+            onAuthor = { other -> navController.navigate(Screen.Author.createRoute(other)) },
+            onDismiss = { followSheet = null }
+        )
+    }
+    var pendingRelation by remember { mutableStateOf<com.example.eksiscraper.model.RelationAction?>(null) }
     favoritersOf?.let { entry ->
         com.example.eksiscraper.ui.components.FavoritersSheet(
             entry = entry,
@@ -189,11 +213,32 @@ fun AuthorScreen(
                             profile = profile!!,
                             isOwn = nick.equals(EksiSession.nick.value, ignoreCase = true),
                             onFollow = { requireLogin { viewModel.toggleFollow() } },
-                            onMessage = { requireLogin { navController.navigate(Screen.Messages.createRoute(nick)) } }
+                            onMessage = { requireLogin { navController.navigate(Screen.Messages.createRoute(nick)) } },
+                            onShowFollows = { following -> followSheet = following },
+                            onAvatarClick = { url -> navController.navigate(Screen.Image.createRoute(url)) }
                         )
                     }
                     item(key = "tabs") {
                         TabButtons(selected = selectedTab, onSelect = { selectedTab = it })
+                    }
+                    // Images as a three-column grid of square thumbnails; a tap opens the viewer
+                    items(tabState.images.chunked(3), key = { "img:${it.first().ref}" }) { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                            row.forEach { image ->
+                                AsyncImage(
+                                    model = image.thumbnailUrl,
+                                    contentDescription = "görsel",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                        .clickable { navController.navigate(Screen.Image.createRoute(image.ref)) }
+                                )
+                            }
+                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                        }
                     }
                     items(tabState.entries, key = { "${selectedTab.name}:${it.entryId}" }) { entry ->
                         EntryCard(
@@ -209,13 +254,16 @@ fun AuthorScreen(
                     item(key = "footer:${selectedTab.name}") {
                         Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                             when {
+                                // First page of a tab: entry-shaped placeholders; later pages: a small indicator
+                                tabState.isLoading && selectedTab == AuthorTab.Images -> LoadingIndicator()
+                                tabState.isLoading && tabState.entries.isEmpty() -> EntryListSkeleton(contentPadding = PaddingValues(0.dp))
                                 tabState.isLoading -> LoadingIndicator()
                                 tabState.error != null -> TextButton(onClick = { viewModel.retryTab(selectedTab) }) {
-                                    Text("Yüklenemedi, tekrar dene")
+                                    Text("yüklenemedi, tekrar dene")
                                 }
-                                tabState.page > 0 && tabState.entries.isEmpty() -> MessageState(
+                                tabState.page > 0 && tabState.entries.isEmpty() && tabState.images.isEmpty() -> MessageState(
                                     icon = Icons.Rounded.Inbox,
-                                    title = "Burada entry yok"
+                                    title = if (selectedTab == AuthorTab.Images) "hiç görsel paylaşmamış" else "burada entry yok"
                                 )
                             }
                         }
@@ -238,8 +286,25 @@ fun AuthorScreen(
                     .putExtra(android.content.Intent.EXTRA_TEXT, link)
                 context.startActivity(android.content.Intent.createChooser(send, null))
             }) {
-                Icon(Icons.Rounded.Share, contentDescription = "Profili paylaş")
+                Icon(Icons.Rounded.Share, contentDescription = "profili paylaş")
             }
+            val relations = profile?.relations.orEmpty()
+            if (relations.isNotEmpty()) RelationMenu(relations, onPick = { pendingRelation = it })
+        }
+        pendingRelation?.let { action ->
+            val label = if (action.isAdded) action.removeLabel else action.label
+            AlertDialog(
+                onDismissRequest = { pendingRelation = null },
+                title = { Text("$label?") },
+                text = { Text("$nick için \"$label\" uygulanacak.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        pendingRelation = null
+                        viewModel.toggleRelation(action)
+                    }) { Text("evet") }
+                },
+                dismissButton = { TextButton(onClick = { pendingRelation = null }) { Text("vazgeç") } }
+            )
         }
         SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
@@ -248,7 +313,15 @@ fun AuthorScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ProfileHeader(profile: AuthorProfile, isOwn: Boolean, onFollow: () -> Unit, onMessage: () -> Unit) {
+private fun ProfileHeader(
+    profile: AuthorProfile,
+    isOwn: Boolean,
+    onFollow: () -> Unit,
+    onMessage: () -> Unit,
+    onShowFollows: (following: Boolean) -> Unit,
+    /** Opens the profile picture full screen */
+    onAvatarClick: (String) -> Unit
+) {
     var openBadge by remember { mutableStateOf<Badge?>(null) }
     openBadge?.let { badge ->
         AlertDialog(
@@ -258,7 +331,7 @@ private fun ProfileHeader(profile: AuthorProfile, isOwn: Boolean, onFollow: () -
             },
             title = { Text(badge.name) },
             text = { Text(badge.description) },
-            confirmButton = { TextButton(onClick = { openBadge = null }) { Text("Tamam") } }
+            confirmButton = { TextButton(onClick = { openBadge = null }) { Text("tamam") } }
         )
     }
 
@@ -273,7 +346,10 @@ private fun ProfileHeader(profile: AuthorProfile, isOwn: Boolean, onFollow: () -
                 model = profile.avatarUrl,
                 contentDescription = profile.nick,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.size(112.dp).clip(avatarShape)
+                modifier = Modifier
+                    .size(112.dp)
+                    .clip(avatarShape)
+                    .clickable { profile.avatarUrl?.let(onAvatarClick) }
             )
         } else {
             AuthorAvatar(profile.nick, size = 112)
@@ -321,8 +397,8 @@ private fun ProfileHeader(profile: AuthorProfile, isOwn: Boolean, onFollow: () -
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             StatTile("entry", profile.entryCount, Modifier.weight(1f))
-            StatTile("takipçi", profile.followerCount, Modifier.weight(1f))
-            StatTile("takip", profile.followingCount, Modifier.weight(1f))
+            StatTile("takipçi", profile.followerCount, Modifier.weight(1f)) { onShowFollows(false) }
+            StatTile("takip", profile.followingCount, Modifier.weight(1f)) { onShowFollows(true) }
         }
         if (!isOwn) {
             // Follow / message, as on the site's profile buttons
@@ -382,7 +458,10 @@ private fun ProfileHeader(profile: AuthorProfile, isOwn: Boolean, onFollow: () -
                                 badge.name,
                                 style = MaterialTheme.typography.labelSmall,
                                 textAlign = TextAlign.Center,
+                                // Always two lines tall, so one-line and two-line names make equal cards
+                                minLines = 2,
                                 maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(top = 6.dp)
                             )
                         }
@@ -395,8 +474,14 @@ private fun ProfileHeader(profile: AuthorProfile, isOwn: Boolean, onFollow: () -
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun StatTile(label: String, value: Int, modifier: Modifier = Modifier) {
-    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = modifier) {
+private fun StatTile(label: String, value: Int, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    Surface(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 14.dp)) {
             Text(
                 "%,d".format(value).replace(',', '.'),
@@ -427,6 +512,40 @@ private fun TabButtons(selected: AuthorTab, onSelect: (AuthorTab) -> Unit) {
                     else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                 }
             ) { Text(tab.label) }
+        }
+    }
+}
+
+/** The profile's other relation buttons (block, block topics, mute) in a menu. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RelationMenu(
+    relations: List<com.example.eksiscraper.model.RelationAction>,
+    onPick: (com.example.eksiscraper.model.RelationAction) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(Icons.Rounded.MoreVert, contentDescription = "diğer")
+        }
+        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+                relations.forEach { action ->
+                    DropdownMenuItem(
+                        text = { Text(if (action.isAdded) action.removeLabel else action.label) },
+                        leadingIcon = {
+                            Icon(
+                                if (action.isAdded) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.Block,
+                                contentDescription = null
+                            )
+                        },
+                        onClick = {
+                            open = false
+                            onPick(action)
+                        }
+                    )
+                }
+            }
         }
     }
 }

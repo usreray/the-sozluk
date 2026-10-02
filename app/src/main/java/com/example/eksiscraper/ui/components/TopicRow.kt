@@ -1,6 +1,7 @@
 package com.example.eksiscraper.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -36,6 +37,7 @@ fun TopicRow(
     shape: Shape,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
     trailing: (@Composable () -> Unit)? = null
 ) {
     Surface(
@@ -49,12 +51,20 @@ fun TopicRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = topic.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = topic.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             if (topic.commentCount > 0) CountPill(topic.commentCount)
             trailing?.invoke()
         }

@@ -50,7 +50,7 @@ class ChannelsViewModel(private val repository: EksiRepository) : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _channelsError.value = e.message ?: "Kanallar yüklenemedi"
+                _channelsError.value = e.message ?: "kanallar yüklenemedi"
             }
         }
     }
@@ -81,14 +81,14 @@ class ChannelsViewModel(private val repository: EksiRepository) : ViewModel() {
                 _topics.value = _topics.value.copy(
                     topics = (if (page == 1) result else _topics.value.topics + result).distinctBy { it.url },
                     page = page,
-                    canLoadMore = result.size >= 40,
+                    canLoadMore = result.size >= 20,
                     isLoading = false,
                     isLoadingMore = false
                 )
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _topics.value = if (page == 1) _topics.value.copy(isLoading = false, error = e.message ?: "Yüklenemedi")
+                _topics.value = if (page == 1) _topics.value.copy(isLoading = false, error = e.message ?: "yüklenemedi")
                 else _topics.value.copy(isLoadingMore = false, canLoadMore = false)
             }
         }

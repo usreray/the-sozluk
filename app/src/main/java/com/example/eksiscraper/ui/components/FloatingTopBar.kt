@@ -1,5 +1,7 @@
 package com.example.eksiscraper.ui.components
 
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
@@ -86,7 +88,7 @@ fun FloatingTopBar(
             if (onBack != null) {
                 FloatingSurface(shape = CircleShape) {
                     IconButton(onClick = onBack, modifier = Modifier.size(52.dp)) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "geri")
                     }
                 }
             }
@@ -102,10 +104,12 @@ fun FloatingTopBar(
                         shape = RoundedCornerShape(26.dp),
                         onClick = onTitleClick
                     ) {
-                        Column {
+                        // Same height as the back button and the actions, so the bar reads as one row;
+                        // pages show their full title themselves, so one line is enough here
+                        Box(modifier = Modifier.height(52.dp)) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier = Modifier.fillMaxHeight().padding(horizontal = 16.dp)
                             ) {
                                 leading?.let {
                                     it()
@@ -120,13 +124,14 @@ fun FloatingTopBar(
                                             title,
                                             style = MaterialTheme.typography.titleMediumEmphasized,
                                             textAlign = TextAlign.Center,
-                                            maxLines = 2,
+                                            maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                     if (subtitle != null) {
                                         Text(
                                             subtitle,
+                                            maxLines = 1,
                                             style = MaterialTheme.typography.labelMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -134,7 +139,13 @@ fun FloatingTopBar(
                                 }
                             }
                             if (isLoading) {
-                                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
+                                // Along the bottom edge inside the card, not below it
+                                LinearWavyProgressIndicator(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 18.dp, vertical = 3.dp)
+                                )
                             }
                         }
                     }
@@ -154,7 +165,7 @@ fun FloatingTopBar(
 
 /** One floating piece of the top bar. */
 @Composable
-private fun FloatingSurface(
+fun FloatingSurface(
     shape: androidx.compose.ui.graphics.Shape,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,

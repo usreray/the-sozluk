@@ -1,5 +1,7 @@
 package com.example.eksiscraper.ui.screens
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import android.app.Application
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +50,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.rounded.DeleteOutline
+import com.example.eksiscraper.settings.Drafts
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -76,6 +81,7 @@ fun ProfileScreen(
     val savedTopics by viewModel.savedTopics
     val isLoggedIn by EksiSession.isLoggedIn
     val nick by EksiSession.nick
+    val drafts by Drafts.all
 
     // The nick isn't part of the login itself; look it up once from the site header
     LaunchedEffect(isLoggedIn, nick) {
@@ -83,25 +89,30 @@ fun ProfileScreen(
     }
 
     val scrolled by remember { derivedStateOf { viewModel.scrollState.firstVisibleItemIndex > 0 } }
+    val scope = rememberCoroutineScope()
     Scaffold(
         topBar = {
             // The page shows a big "profil"; the bar takes the title only once it scrolled away
-            FloatingTopBar(title = if (scrolled) "profil" else null) {
-                    if (isLoggedIn) {
-                        IconButton(onClick = { navController.navigate(Screen.Messages.createRoute()) }) {
-                            Icon(Icons.Rounded.Mail, contentDescription = "Mesajlar")
-                        }
-                    }
+            FloatingTopBar(
+                title = if (scrolled) "profil" else null,
+                onTitleClick = { scope.launch { viewModel.scrollState.animateScrollToItem(0) } }
+            ) {
                     IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
-                        Icon(Icons.Rounded.Settings, contentDescription = "Ayarlar")
+                        Icon(Icons.Rounded.Settings, contentDescription = "ayarlar")
                     }
             }
         }
     ) { padding ->
+        // Edge to edge: the list starts below the bar but scrolls under it and the status bar
         LazyColumn(
             state = viewModel.scrollState,
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp + LocalBottomBarInset.current),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = padding.calculateTopPadding(),
+                bottom = 24.dp + LocalBottomBarInset.current
+            ),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             item(key = "title") { LargeTitle("profil") }
@@ -113,6 +124,48 @@ fun ProfileScreen(
                     onLogout = { EksiSession.logout() },
                     onOpenProfile = { nick?.let { navController.navigate(Screen.Author.createRoute(it)) } }
                 )
+            }
+            // Unsent entries kept on the device; tapping one opens its topic to continue
+            if (drafts.isNotEmpty()) {
+                item(key = "draftsHeader") {
+                    Text(
+                        text = "taslaklar",
+                        style = MaterialTheme.typography.titleMediumEmphasized,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 8.dp, top = 28.dp, bottom = 10.dp)
+                    )
+                }
+                itemsIndexed(drafts, key = { _, draft -> "draft:${draft.title}" }) { index, draft ->
+                    Surface(
+                        onClick = { navController.navigate(Screen.TopicDetail.createRoute(draft.title, draft.url)) },
+                        shape = segmentedShape(index, drafts.size),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.fillMaxWidth().animateItem()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(draft.title, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    draft.text,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(onClick = { Drafts.delete(draft.title) }) {
+                                Icon(
+                                    Icons.Rounded.DeleteOutline,
+                                    contentDescription = "taslağı sil",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
             item(key = "savedHeader") {
                 Text(
@@ -126,8 +179,8 @@ fun ProfileScreen(
                 item(key = "empty") {
                     MessageState(
                         icon = Icons.Rounded.Bookmarks,
-                        title = "Henüz kayıt yok",
-                        message = "Bir başlıktaki yer imi simgesine dokun, buraya eklensin.",
+                        title = "henüz kayıt yok",
+                        message = "bir başlıktaki yer imi simgesine dokun, buraya eklensin.",
                         modifier = Modifier.padding(top = 8.dp)
                     )
                 }
@@ -136,13 +189,14 @@ fun ProfileScreen(
                 TopicRow(
                     topic = topic,
                     shape = segmentedShape(index, savedTopics.size),
-                    onClick = { navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url)) },
+                    onClick = { navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url, topic.currentPage)) },
                     modifier = Modifier.animateItem(),
+                    subtitle = if (topic.currentPage > 1) "${topic.currentPage}. sayfada kaldın" else null,
                     trailing = {
                         IconButton(onClick = { viewModel.unsaveTopic(topic) }) {
                             Icon(
                                 Icons.Rounded.BookmarkRemove,
-                                contentDescription = "Kayıttan çıkar",
+                                contentDescription = "kayıttan çıkar",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -192,12 +246,12 @@ private fun AccountCard(
                     }
                     Column(modifier = Modifier.padding(start = 16.dp)) {
                         Text(
-                            text = if (loggedIn) nick ?: "Giriş yapıldı" else "Misafir",
+                            text = if (loggedIn) nick ?: "giriş yapıldı" else "misafir",
                             style = MaterialTheme.typography.titleLargeEmphasized
                         )
                         Text(
-                            text = if (loggedIn) "Favorilerin ekşi hesabına işleniyor"
-                            else "Favorilemek için ekşi hesabınla giriş yap",
+                            text = if (loggedIn) "favorilerin ekşi hesabına işleniyor"
+                            else "favorilemek için ekşi hesabınla giriş yap",
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -209,7 +263,7 @@ private fun AccountCard(
                             onDismissRequest = { confirmLogout = false },
                             icon = { Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null) },
                             title = { Text("çıkış yapılsın mı?") },
-                            text = { Text("Favorileme, oylama ve mesajlar için tekrar giriş yapman gerekecek.") },
+                            text = { Text("favorileme, oylama ve mesajlar için tekrar giriş yapman gerekecek.") },
                             confirmButton = {
                                 TextButton(onClick = {
                                     confirmLogout = false

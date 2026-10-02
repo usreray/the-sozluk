@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.rememberEntryInlineContent
 import android.app.Application
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -108,14 +109,14 @@ fun MessageThreadScreen(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Konuşma silinsin mi?") },
+            title = { Text("konuşma silinsin mi?") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false
                     viewModel.threadAction("delete") { navController.popBackStack() }
-                }) { Text("Sil", color = MaterialTheme.colorScheme.error) }
+                }) { Text("sil", color = MaterialTheme.colorScheme.error) }
             },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Vazgeç") } }
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("vazgeç") } }
         )
     }
 
@@ -136,10 +137,10 @@ fun MessageThreadScreen(
                 },
                 actions = if (thread?.threadForm == null) null else ({
                         Box {
-                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "Diğer") }
+                            IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "diğer") }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                 DropdownMenuItem(
-                                    text = { Text("Arşivle") },
+                                    text = { Text("arşivle") },
                                     leadingIcon = { Icon(Icons.Rounded.Archive, contentDescription = null) },
                                     onClick = {
                                         menuOpen = false
@@ -147,7 +148,7 @@ fun MessageThreadScreen(
                                     }
                                 )
                                 DropdownMenuItem(
-                                    text = { Text("Sil", color = MaterialTheme.colorScheme.error) },
+                                    text = { Text("sil", color = MaterialTheme.colorScheme.error) },
                                     leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                                     onClick = {
                                         menuOpen = false
@@ -180,7 +181,7 @@ fun MessageThreadScreen(
                         modifier = Modifier.padding(start = 8.dp).size(52.dp)
                     ) {
                         if (isSending) LoadingIndicator(modifier = Modifier.size(24.dp))
-                        else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Gönder")
+                        else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "gönder")
                     }
                 }
             }
@@ -222,7 +223,11 @@ private fun Bubble(message: Message, onLink: (com.example.eksiscraper.ui.compone
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                 // Long-press to select and copy, as in any messaging app
                 SelectionContainer {
-                    Text(rememberEntryText(message.html, message.text, onLink), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        rememberEntryText(message.html, message.text, onLink),
+                        inlineContent = rememberEntryInlineContent(),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                 }
                 Text(
                     if (message.isFailed) "gönderilemedi" else message.time,

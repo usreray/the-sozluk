@@ -22,15 +22,19 @@ sealed class Screen(val route: String) {
         fun createRoute(id: String, nick: String): String =
             "message_thread?id=${Uri.encode(id)}&nick=${Uri.encode(nick)}"
     }
+    object Image : Screen("image") {
+        const val pattern = "image?ref={ref}"
+        fun createRoute(ref: String): String = "image?ref=${Uri.encode(ref)}"
+    }
     object Author : Screen("author") {
         const val pattern = "author?nick={nick}"
         fun createRoute(nick: String): String = "author?nick=${Uri.encode(nick.trim().removePrefix("@"))}"
     }
     object TopicDetail : Screen("topic_detail") {
-        const val pattern = "topic_detail?title={title}&url={url}"
+        const val pattern = "topic_detail?title={title}&url={url}&page={page}"
 
         // Uri.encode keeps '/', '?' and spaces intact through Navigation's argument decoding
-        fun createRoute(title: String, url: String): String =
-            "topic_detail?title=${Uri.encode(title)}&url=${Uri.encode(url)}"
+        fun createRoute(title: String, url: String, page: Int = 1): String =
+            "topic_detail?title=${Uri.encode(title)}&url=${Uri.encode(url)}&page=$page"
     }
 }

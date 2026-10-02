@@ -1,5 +1,9 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.TopicListSkeleton
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import android.app.Application
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Arrangement
@@ -103,11 +107,17 @@ fun MessagesScreen(
         )
     }
 
+    val threadListState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             Column {
-                FloatingTopBar(title = "mesajlar", onBack = { navController.popBackStack() })
+                FloatingTopBar(
+                    title = "mesajlar",
+                    onBack = { navController.popBackStack() },
+                    onTitleClick = { scope.launch { threadListState.animateScrollToItem(0) } }
+                )
                 if (isLoggedIn) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -143,19 +153,20 @@ fun MessagesScreen(
             when {
                 !isLoggedIn -> MessageState(
                     icon = Icons.Rounded.Mail,
-                    title = "Mesajlar için giriş yap",
-                    message = "Mesajlaşmak ekşi sözlük hesabıyla mümkün."
+                    title = "mesajlar için giriş yap",
+                    message = "mesajlaşmak ekşi sözlük hesabıyla mümkün."
                 ) {
-                    Button(onClick = { navController.navigate(Screen.Login.route) }) { Text("Giriş yap") }
+                    Button(onClick = { navController.navigate(Screen.Login.route) }) { Text("giriş yap") }
                 }
                 error != null && box == null -> ErrorState(message = error.orEmpty(), onRetry = { viewModel.loadBox() })
-                box == null -> LoadingState(messages = listOf("mesajlar getiriliyor"))
+                box == null -> TopicListSkeleton(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp))
                 else -> PullToRefreshBox(isRefreshing = isLoading, onRefresh = { viewModel.loadBox() }) {
                     val threads = box!!.threads
                     if (threads.isEmpty() && !isLoading) {
-                        MessageState(icon = Icons.Rounded.Inbox, title = if (archive) "Arşiv boş" else "Mesaj yok")
+                        MessageState(icon = Icons.Rounded.Inbox, title = if (archive) "arşiv boş" else "mesaj yok")
                     }
                     LazyColumn(
+                        state = threadListState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)

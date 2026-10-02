@@ -105,7 +105,7 @@ fun SearchScreen(
             leadingIcon = {
                 if (searchBarState.currentValue == SearchBarValue.Expanded) {
                     IconButton(onClick = { scope.launch { searchBarState.animateToCollapsed() } }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "geri")
                     }
                 } else {
                     Icon(Icons.Rounded.Search, contentDescription = null)
@@ -114,7 +114,7 @@ fun SearchScreen(
             trailingIcon = {
                 if (textFieldState.text.isNotEmpty()) {
                     IconButton(onClick = { textFieldState.clearText() }) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Temizle")
+                        Icon(Icons.Rounded.Close, contentDescription = "temizle")
                     }
                 }
             }
@@ -171,18 +171,33 @@ fun SearchScreen(
             if (blank) {
                 MessageState(
                     icon = Icons.Rounded.Search,
-                    title = "Yazmaya başla",
-                    message = "Öneriler burada belirecek."
+                    title = "yazmaya başla",
+                    message = "öneriler burada belirecek."
                 )
             } else {
-                SuggestionList(query = query, suggestions = suggestions, onSelect = ::open)
+                SuggestionList(
+                    query = query,
+                    suggestions = suggestions,
+                    onSelect = ::open,
+                    onSearchTitles = { text ->
+                        scope.launch { searchBarState.animateToCollapsed() }
+                        // The site's detailed search: every topic whose title contains the words
+                        val path = "basliklar/ara?SearchForm.Keywords=" + java.net.URLEncoder.encode(text.trim(), "UTF-8")
+                        navController.navigate(Screen.Channels.createRoute(path, "“${text.trim()}”"))
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun SuggestionList(query: String, suggestions: List<String>, onSelect: (String) -> Unit) {
+private fun SuggestionList(
+    query: String,
+    suggestions: List<String>,
+    onSelect: (String) -> Unit,
+    onSearchTitles: (String) -> Unit
+) {
     // The typed text itself always comes first, so a search is one tap away
     val rows = listOf(query.trim()) + suggestions.filterNot { it.equals(query.trim(), ignoreCase = true) }
     LazyColumn(
@@ -190,6 +205,17 @@ private fun SuggestionList(query: String, suggestions: List<String>, onSelect: (
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
+        if (!query.trim().startsWith("@") && !query.trim().startsWith("#")) {
+            item(key = "searchTitles") {
+                androidx.compose.material3.FilledTonalButton(
+                    onClick = { onSearchTitles(query) },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                ) {
+                    Icon(Icons.Rounded.Search, contentDescription = null)
+                    Text("başlıklarda ara", modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+        }
         itemsIndexed(rows, key = { index, text -> "$index:$text" }) { index, text ->
             TopicRow(
                 topic = Topic(title = text),

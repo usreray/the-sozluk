@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SavedTopicDao {
-    @Query("SELECT * FROM saved_topics")
+    @Query("SELECT * FROM saved_topics ORDER BY savedAt DESC")
     fun getAllSavedTopics(): Flow<List<SavedTopicEntity>>
     
     @Query("SELECT * FROM saved_topics WHERE title = :title LIMIT 1")
@@ -21,6 +21,9 @@ interface SavedTopicDao {
     @Query("DELETE FROM saved_topics WHERE title = :title")
     suspend fun deleteSavedTopicByTitle(title: String)
     
+    @Query("UPDATE saved_topics SET lastPage = :page WHERE title = :title")
+    suspend fun updateLastPage(title: String, page: Int)
+
     @Query("SELECT COUNT(*) FROM saved_topics WHERE title = :title")
     suspend fun isTopicSaved(title: String): Int
 } 
