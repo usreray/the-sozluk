@@ -50,6 +50,9 @@ object EksiNetworkDataSource {
             .header("Priority", "u=0, i")
             .header("TE", "trailers")
             .ignoreHttpErrors(true)
+            // XHR endpoints (follow, votes) answer with JSON or plain text, which Jsoup
+            // otherwise rejects with "Unhandled content type"
+            .ignoreContentType(true)
         // Logged-in users: send the cookies captured from the WebView login
         EksiSession.cookies.split(";").forEach { pair ->
             val name = pair.substringBefore("=").trim()
@@ -286,11 +289,32 @@ object EksiNetworkDataSource {
     }
 
     /** Follow / unfollow with the URL from the profile's "takip et" button. */
-    suspend fun postRelation(url: String): Boolean = withContext(Dispatchers.IO) {
+    /**
+     * Returns null on success or the reason. Like the site's script, judges by the reply text:
+     * "LimitReached", "InvalidRelation" and "SystemUser" are refusals even with HTTP 200.
+     */
+    suspend fun postRelation(url: String): String? = withContext(Dispatchers.IO) {
         try {
-            ajaxPost(if (url.startsWith("http")) url.removePrefix(BASE_URL) else url, emptyMap())
+            val path = if (url.startsWith("http")) url.removePrefix(BASE_URL) else url
+            val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))
+                .method(org.jsoup.Connection.Method.POST)
+                .referrer("$BASE_URL/")
+                .header("Origin", BASE_URL)
+                .header("X-Requested-With", "XMLHttpRequest")
+                .header("Accept", "*/*")
+                .requestBody("")
+                .execute()
+            val reply = response.body().trim().trim('"')
+            android.util.Log.d("EksiForm", "POST ${path.substringBefore("?")} -> ${response.statusCode()} reply=${reply.take(40)}")
+            when {
+                response.statusCode() !in 200..299 -> "Takip işlemi başarısız (HTTP ${response.statusCode()})"
+                reply == "LimitReached" -> "Takip sınırına ulaştın"
+                reply == "InvalidRelation" -> "Bu kullanıcıyla bu işlem yapılamıyor"
+                reply == "SystemUser" -> "Sistem kullanıcısı takip edilemez"
+                else -> null
+            }
         } catch (e: Exception) {
-            false
+            e.message ?: "Takip işlemi başarısız"
         }
     }
 

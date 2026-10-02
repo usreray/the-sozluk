@@ -14,6 +14,7 @@ import com.example.eksiscraper.model.Topic
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.TextNode
 import org.jsoup.select.Elements
 
 object HtmlParser {
@@ -225,7 +226,8 @@ object HtmlParser {
                                 id = link.attr("href").removePrefix("/mesaj/"),
                                 nick = heading?.text().orEmpty(),
                                 messageCount = count,
-                                preview = link.selectFirst("p")?.text().orEmpty(),
+                                // Our own last message carries the same "sender -> recipient:" prefix
+                                preview = link.selectFirst("p")?.also(::stripSenderPrefix)?.text().orEmpty(),
                                 time = article.selectFirst("time")?.text().orEmpty()
                         )
                 },
@@ -237,18 +239,47 @@ object HtmlParser {
                 // The title shows "@nick"; the form and profile URLs want the bare nick
                 nick = document.selectFirst("#message-thread-title a[href^=/biri/]")?.text().orEmpty().trim().removePrefix("@"),
                 messages = document.select("#message-thread > article").map { article ->
+                        // Received messages are marked "incoming"; the rest are ours
+                        val outgoing = !article.hasClass("incoming")
                         val paragraph = article.selectFirst("p")
+                        if (outgoing && paragraph != null) stripSenderPrefix(paragraph)
                         Message(
                                 text = paragraph?.let(::toPlainText).orEmpty(),
                                 html = paragraph?.html().orEmpty(),
                                 time = article.selectFirst("footer time")?.text().orEmpty(),
-                                // Received messages are marked "incoming"; the rest are ours
-                                isOutgoing = !article.hasClass("incoming")
+                                isOutgoing = outgoing
                         )
                 },
                 sendForm = document.selectFirst("form#message-send-form")?.let(::formSpec),
                 threadForm = document.selectFirst("form#message-thread-form")?.let(::formSpec)
         )
+
+        /**
+         * The site writes our own messages as "sender -> recipient: text" (the nicks sometimes as
+         * links). The bubble already says who wrote it, so drop that prefix.
+         */
+        private fun stripSenderPrefix(paragraph: Element) {
+                val prefix = Regex("^\\s*.{1,40}? -> .{1,40}?: ")
+                val nodes = paragraph.childNodes().toList()
+                val seen = StringBuilder()
+                for ((index, node) in nodes.withIndex()) {
+                        val text = when (node) {
+                                is TextNode -> node.wholeText
+                                is Element -> node.text()
+                                else -> ""
+                        }
+                        val match = prefix.find(seen.toString() + text)
+                        if (match != null) {
+                                // The prefix ends inside this node: drop what came before and its head
+                                val cut = match.range.last + 1 - seen.length
+                                nodes.take(index).forEach { it.remove() }
+                                if (node is TextNode) node.text(node.wholeText.substring(cut)) else node.remove()
+                                return
+                        }
+                        seen.append(text)
+                        if (seen.length > 100) return
+                }
+        }
 
         /** Channels linked from the site navigation (/basliklar/kanal/...). */
         fun parseChannels(document: Document): List<Channel> =

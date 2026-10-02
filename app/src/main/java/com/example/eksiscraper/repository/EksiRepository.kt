@@ -66,7 +66,8 @@ class EksiRepository(
     suspend fun sendMessage(form: FormSpec, to: String, text: String): String? =
         EksiNetworkDataSource.sendMessage(form, to, text)
 
-    suspend fun setFollowing(url: String): Boolean = EksiNetworkDataSource.postRelation(url)
+    /** Null on success, otherwise the reason. */
+    suspend fun setFollowing(url: String): String? = EksiNetworkDataSource.postRelation(url)
 
     // Local operations (delegated to SavedTopicRepository)
     val allSavedTopics: Flow<List<Topic>> = savedTopicRepository.allSavedTopics

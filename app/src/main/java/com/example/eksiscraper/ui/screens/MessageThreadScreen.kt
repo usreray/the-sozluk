@@ -33,6 +33,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -226,7 +227,8 @@ private fun Bubble(message: Message, onLink: (com.example.eksiscraper.ui.compone
                 Text(
                     if (message.isFailed) "gönderilemedi" else message.time,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (message.isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    // A muted tone of the bubble's own text color, so it fits both bubble colors
+                    color = if (message.isFailed) MaterialTheme.colorScheme.error else LocalContentColor.current.copy(alpha = 0.7f),
                     modifier = Modifier.align(Alignment.End).padding(top = 4.dp)
                 )
             }
