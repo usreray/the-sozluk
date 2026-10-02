@@ -22,3 +22,4 @@ build_*.txt
 *.jks
 *.keystore
 /app/release
+keystore.properties
