@@ -1,5 +1,20 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.foundation.shape.CircleShape
+import com.example.eksiscraper.ui.components.FloatingSurface
+import com.example.eksiscraper.ui.components.rememberAvatarUrl
 import com.example.eksiscraper.ui.components.TopicListSkeleton
 import androidx.compose.foundation.lazy.rememberLazyListState
 import kotlinx.coroutines.launch
@@ -109,10 +124,97 @@ fun MessagesScreen(
 
     val threadListState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    var headerHeight by remember { mutableIntStateOf(0) }
+    var headerOffset by remember { mutableFloatStateOf(0f) }
+    val headerConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                headerOffset = (headerOffset + available.y).coerceIn(-headerHeight.toFloat(), 0f)
+                return Offset.Zero
+            }
+        }
+    }
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            Column {
+        floatingActionButton = {
+            if (isLoggedIn) {
+                ExtendedFloatingActionButton(
+                    onClick = { composing = true },
+                    icon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                    text = { Text("yeni mesaj") }
+                )
+            }
+        }
+    ) { padding ->
+        val top = with(density) { headerHeight.toDp() }
+        Box(modifier = Modifier.fillMaxSize().padding(bottom = padding.calculateBottomPadding()).nestedScroll(headerConnection)) {
+            when {
+                !isLoggedIn -> MessageState(
+                    modifier = Modifier.padding(top = top),
+                    icon = Icons.Rounded.Mail,
+                    title = "mesajlar için giriş yap",
+                    message = "mesajlaşmak ekşi sözlük hesabıyla mümkün."
+                ) {
+                    Button(onClick = { navController.navigate(Screen.Login.route) }) { Text("giriş yap") }
+                }
+                error != null && box == null -> ErrorState(
+                    message = error.orEmpty(),
+                    onRetry = { viewModel.loadBox() },
+                    modifier = Modifier.padding(top = top)
+                )
+                box == null -> TopicListSkeleton(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 4.dp))
+                else -> {
+                    // Pull to refresh with the same expressive indicator as the home lists
+                    val refreshState = rememberPullToRefreshState()
+                    PullToRefreshBox(
+                        isRefreshing = isLoading,
+                        onRefresh = { viewModel.loadBox() },
+                        state = refreshState,
+                        indicator = {
+                            PullToRefreshDefaults.LoadingIndicator(
+                                state = refreshState,
+                                isRefreshing = isLoading,
+                                modifier = Modifier.align(Alignment.TopCenter).padding(top = top)
+                            )
+                        }
+                    ) {
+                    val threads = box!!.threads
+                    if (threads.isEmpty() && !isLoading) {
+                        MessageState(
+                            icon = Icons.Rounded.Inbox,
+                            title = if (archive) "arşiv boş" else "mesaj yok",
+                            modifier = Modifier.padding(top = top)
+                        )
+                    }
+                    LazyColumn(
+                        state = threadListState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 4.dp, bottom = 96.dp),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        itemsIndexed(threads, key = { _, t -> t.id }) { index, thread ->
+                            ThreadRow(
+                                thread = thread,
+                                index = index,
+                                count = threads.size,
+                                onClick = { navController.navigate(Screen.MessageThread.createRoute(thread.id, thread.nick)) },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                    }
+                    }
+                }
+            }
+            // Like the home screen: the bar and the tabs sit on one solid header that slides
+            // away while scrolling down and comes back on scrolling up
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onSizeChanged { headerHeight = it.height }
+                    .graphicsLayer { translationY = headerOffset }
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
                 FloatingTopBar(
                     title = "mesajlar",
                     onBack = { navController.popBackStack() },
@@ -137,52 +239,7 @@ fun MessagesScreen(
                         ) { Text("arşiv") }
                     }
                 }
-            }
-        },
-        floatingActionButton = {
-            if (isLoggedIn) {
-                ExtendedFloatingActionButton(
-                    onClick = { composing = true },
-                    icon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                    text = { Text("yeni mesaj") }
-                )
-            }
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when {
-                !isLoggedIn -> MessageState(
-                    icon = Icons.Rounded.Mail,
-                    title = "mesajlar için giriş yap",
-                    message = "mesajlaşmak ekşi sözlük hesabıyla mümkün."
-                ) {
-                    Button(onClick = { navController.navigate(Screen.Login.route) }) { Text("giriş yap") }
-                }
-                error != null && box == null -> ErrorState(message = error.orEmpty(), onRetry = { viewModel.loadBox() })
-                box == null -> TopicListSkeleton(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp))
-                else -> PullToRefreshBox(isRefreshing = isLoading, onRefresh = { viewModel.loadBox() }) {
-                    val threads = box!!.threads
-                    if (threads.isEmpty() && !isLoading) {
-                        MessageState(icon = Icons.Rounded.Inbox, title = if (archive) "arşiv boş" else "mesaj yok")
-                    }
-                    LazyColumn(
-                        state = threadListState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        itemsIndexed(threads, key = { _, t -> t.id }) { index, thread ->
-                            ThreadRow(
-                                thread = thread,
-                                index = index,
-                                count = threads.size,
-                                onClick = { navController.navigate(Screen.MessageThread.createRoute(thread.id, thread.nick)) },
-                                modifier = Modifier.animateItem()
-                            )
                         }
-                    }
-                }
-            }
         }
     }
 }
@@ -197,7 +254,7 @@ private fun ThreadRow(thread: MessageThread, index: Int, count: Int, onClick: ()
         modifier = modifier.fillMaxWidth()
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            AuthorAvatar(thread.nick, size = 44)
+            AuthorAvatar(thread.nick, size = 44, avatarUrl = rememberAvatarUrl(thread.nick))
             Column(modifier = Modifier.weight(1f).padding(horizontal = 14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(

@@ -1,5 +1,14 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.foundation.layout.height
+import com.example.eksiscraper.ui.components.shimmer
+import com.example.eksiscraper.ui.components.rememberAvatarUrl
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TextField
+import com.example.eksiscraper.ui.components.FloatingSurface
 import com.example.eksiscraper.ui.components.rememberEntryInlineContent
 import android.app.Application
 import androidx.compose.foundation.clickable
@@ -132,6 +141,7 @@ fun MessageThreadScreen(
                     AuthorAvatar(
                         otherNick,
                         size = 36,
+                        avatarUrl = rememberAvatarUrl(otherNick),
                         modifier = Modifier.clickable { navController.navigate(Screen.Author.createRoute(otherNick)) }
                     )
                 },
@@ -161,24 +171,40 @@ fun MessageThreadScreen(
             )
         },
         bottomBar = {
-            // Reply box: replies go through the "yeni mesaj" form to the same nick
-            Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(12.dp)
-                ) {
-                    OutlinedTextField(
+            // Reply box: replies go through the "yeni mesaj" form to the same nick. Floating like
+            // the top bar: a pill for the text and a separate round send button, with the
+            // conversation scrolling behind them
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                FloatingSurface(shape = RoundedCornerShape(28.dp), modifier = Modifier.weight(1f)) {
+                    TextField(
                         value = reply,
                         onValueChange = { reply = it },
                         placeholder = { Text("yanıt yaz") },
-                        shape = RoundedCornerShape(28.dp),
                         maxLines = 5,
-                        modifier = Modifier.weight(1f)
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent
+                        ),
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp)
                     )
+                }
+                FloatingSurface(shape = CircleShape) {
                     FilledIconButton(
                         onClick = { viewModel.send(otherNick, reply.trim()) { reply = "" } },
                         enabled = reply.isNotBlank(),
-                        modifier = Modifier.padding(start = 8.dp).size(52.dp)
+                        modifier = Modifier.size(56.dp)
                     ) {
                         if (isSending) LoadingIndicator(modifier = Modifier.size(24.dp))
                         else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "gönder")
@@ -187,20 +213,42 @@ fun MessageThreadScreen(
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+        // The list runs under both floating bars; its padding keeps the first and last
+        // messages clear of them
+        Box(modifier = Modifier.fillMaxSize()) {
             when {
                 threadError != null && thread == null -> ErrorState(message = threadError.orEmpty(), onRetry = viewModel::refreshThread)
-                thread == null -> LoadingState(messages = listOf("konuşma açılıyor"))
+                thread == null -> BubbleSkeleton(
+                    Modifier.padding(start = 12.dp, end = 12.dp, top = padding.calculateTopPadding() + 12.dp)
+                )
                 else -> LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp),
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = padding.calculateTopPadding() + 12.dp,
+                        bottom = padding.calculateBottomPadding() + 12.dp
+                    ),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     itemsIndexed(thread!!.messages) { _, item ->
                         Bubble(item) { link -> navController.openEksiLink(link, uriHandler) }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Placeholder bubbles, alternating sides, while a conversation loads. */
+@Composable
+private fun BubbleSkeleton(modifier: Modifier = Modifier) {
+    val bubbles = listOf(false to 0.6f, false to 0.45f, true to 0.7f, false to 0.5f, true to 0.4f, true to 0.65f, false to 0.55f)
+    Column(modifier = modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        bubbles.forEach { (outgoing, width) ->
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = if (outgoing) Alignment.CenterEnd else Alignment.CenterStart) {
+                Box(Modifier.fillMaxWidth(width).height(52.dp).shimmer(RoundedCornerShape(20.dp)))
             }
         }
     }
