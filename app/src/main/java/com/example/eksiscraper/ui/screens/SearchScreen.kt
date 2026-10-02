@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
@@ -25,12 +26,21 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SearchBarValue
+import androidx.compose.material3.ExpandedFullScreenSearchBar
+import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -50,56 +60,77 @@ fun SearchScreen(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
 ) {
-    val query by viewModel.query
     val suggestions by viewModel.suggestions
     val isLoading by viewModel.isLoadingSuggestions
-    val focusManager = LocalFocusManager.current
+    val searchBarState = rememberSearchBarState()
+    val textFieldState = rememberTextFieldState()
+    val scope = rememberCoroutineScope()
+    val query = textFieldState.text.toString()
+
+    // The field owns the text; the ViewModel only turns it into autocomplete suggestions
+    LaunchedEffect(textFieldState) {
+        snapshotFlow { textFieldState.text.toString() }.collectLatest(viewModel::updateQuery)
+    }
 
     // ekşi redirects a query to its topic (or entry for "#123"), so a search opens the topic screen
     fun open(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
-        focusManager.clearFocus()
+        scope.launch { searchBarState.animateToCollapsed() }
         navController.navigate(Screen.TopicDetail.createRoute(trimmed, ""))
+    }
+
+    val inputField = @Composable {
+        SearchBarDefaults.InputField(
+            textFieldState = textFieldState,
+            searchBarState = searchBarState,
+            onSearch = ::open,
+            placeholder = { Text("başlık, #entry ya da @yazar") },
+            leadingIcon = {
+                if (searchBarState.currentValue == SearchBarValue.Expanded) {
+                    IconButton(onClick = { scope.launch { searchBarState.animateToCollapsed() } }) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
+                    }
+                } else {
+                    Icon(Icons.Rounded.Search, contentDescription = null)
+                }
+            },
+            trailingIcon = {
+                if (textFieldState.text.isNotEmpty()) {
+                    IconButton(onClick = { textFieldState.clearText() }) {
+                        Icon(Icons.Rounded.Close, contentDescription = "Temizle")
+                    }
+                }
+            }
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         SearchBar(
-            inputField = {
-                SearchBarDefaults.InputField(
-                    query = query,
-                    onQueryChange = viewModel::updateQuery,
-                    onSearch = ::open,
-                    expanded = false,
-                    onExpandedChange = {},
-                    placeholder = { Text("başlık, #entry ya da @yazar") },
-                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = viewModel::clear) {
-                                Icon(Icons.Rounded.Close, contentDescription = "Temizle")
-                            }
-                        }
-                    }
-                )
-            },
-            expanded = false,
-            onExpandedChange = {},
+            state = searchBarState,
+            inputField = inputField,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
-        ) {}
+        )
+        MessageState(
+            icon = Icons.Rounded.TravelExplore,
+            title = "Ne arıyorsun?",
+            message = "Bir başlık yaz, #numara ile bir entry'ye git ya da @ ile bir yazar ara."
+        )
+    }
 
+    // Tapping the bar opens the full-screen search with live suggestions
+    ExpandedFullScreenSearchBar(state = searchBarState, inputField = inputField) {
         AnimatedVisibility(visible = isLoading) {
             LinearWavyProgressIndicator(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 8.dp)
             )
         }
-
         Crossfade(targetState = query.isBlank(), label = "searchBody") { blank ->
             if (blank) {
                 MessageState(
-                    icon = Icons.Rounded.TravelExplore,
-                    title = "Ne arıyorsun?",
-                    message = "Bir başlık yaz, #numara ile bir entry'ye git ya da @ ile bir yazar ara."
+                    icon = Icons.Rounded.Search,
+                    title = "Yazmaya başla",
+                    message = "Öneriler burada belirecek."
                 )
             } else {
                 SuggestionList(query = query, suggestions = suggestions, onSelect = ::open)

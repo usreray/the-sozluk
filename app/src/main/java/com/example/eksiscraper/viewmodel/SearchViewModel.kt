@@ -11,13 +11,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Query and autocomplete for the search screen. Running a search opens the topic screen
+ * Autocomplete for the search screen (the search field owns the text). Running a search opens the topic screen
  * (ekşi redirects a query to its topic), so results, paging and favorites live there.
  */
 class SearchViewModel(private val repository: EksiRepository) : ViewModel() {
-
-    private val _query = mutableStateOf("")
-    val query: State<String> = _query
 
     private val _suggestions = mutableStateOf<List<String>>(emptyList())
     val suggestions: State<List<String>> = _suggestions
@@ -28,7 +25,6 @@ class SearchViewModel(private val repository: EksiRepository) : ViewModel() {
     private var suggestionJob: Job? = null
 
     fun updateQuery(query: String) {
-        _query.value = query
         suggestionJob?.cancel()
         if (query.trim().length < 2) {
             _suggestions.value = emptyList()
@@ -49,6 +45,4 @@ class SearchViewModel(private val repository: EksiRepository) : ViewModel() {
             }
         }
     }
-
-    fun clear() = updateQuery("")
 }

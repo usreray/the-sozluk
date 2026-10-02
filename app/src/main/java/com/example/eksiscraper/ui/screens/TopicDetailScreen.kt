@@ -148,7 +148,8 @@ fun TopicDetailScreen(
                     }
                 },
                 actions = {
-                    if (loaded) {
+                    // Nothing to save or share for a topic that doesn't exist
+                    if (loaded && !topic?.entries.isNullOrEmpty()) {
                         TopicShareButton(topic)
                         IconToggleButton(
                             checked = topic?.isSaved == true,
@@ -177,8 +178,8 @@ fun TopicDetailScreen(
                     TopicPhase.Error -> ErrorState(message = error.orEmpty(), onRetry = viewModel::retry)
                     TopicPhase.Empty -> MessageState(
                         icon = Icons.Rounded.SearchOff,
-                        title = "Entry bulunamadı",
-                        message = "Bu başlık ya yok ya da bu sayfada gösterilecek entry kalmamış."
+                        title = "Burada bir şey yok",
+                        message = "Böyle bir başlık yok ya da bu sayfada gösterilecek entry kalmamış."
                     )
                     TopicPhase.Content -> EntryList(
                         topic = topic!!,

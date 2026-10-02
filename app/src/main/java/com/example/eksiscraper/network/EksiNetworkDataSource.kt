@@ -9,6 +9,9 @@ import org.jsoup.Jsoup
 import java.io.IOException
 import java.net.URLEncoder
 
+/** ekşi answered 404: no such topic (e.g. a search with no match). */
+class TopicNotFoundException : IOException("Böyle bir başlık yok")
+
 object EksiNetworkDataSource {
     private const val BASE_URL = EksiSession.BASE_URL
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"
@@ -101,6 +104,7 @@ object EksiNetworkDataSource {
         val connection = applyCommonConnectionSettings(session.newRequest("$BASE_URL$searchUrl"))
         val response = connection.execute()
 
+        if (response.statusCode() == 404) throw TopicNotFoundException()
         if (response.statusCode() != 200) {
             throw IOException("Başlık yüklenemedi (HTTP ${response.statusCode()})")
         }

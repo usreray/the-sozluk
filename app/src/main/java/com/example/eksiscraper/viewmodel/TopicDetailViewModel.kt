@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.model.withFavorite
+import com.example.eksiscraper.network.TopicNotFoundException
 import com.example.eksiscraper.repository.EksiRepository
 import java.net.URI
 import kotlinx.coroutines.CancellationException
@@ -117,6 +118,9 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 _currentPage.value = page
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: TopicNotFoundException) {
+                // Not a connection problem: show the "no entries" state instead of an error
+                _selectedTopic.value = topic.copy(entries = emptyList(), entriesLoaded = true)
             } catch (e: Exception) {
                 _error.value = e.message ?: "Başlık yüklenemedi"
             } finally {
