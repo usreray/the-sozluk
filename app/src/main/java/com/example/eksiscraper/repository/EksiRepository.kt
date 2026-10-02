@@ -2,8 +2,12 @@ package com.example.eksiscraper.repository
 
 import com.example.eksiscraper.data.room.SavedTopicRepository
 import com.example.eksiscraper.model.AuthorProfile
+import com.example.eksiscraper.model.Channel
+import com.example.eksiscraper.model.Comment
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.FormSpec
+import com.example.eksiscraper.model.MessageBox
+import com.example.eksiscraper.model.ThreadDetail
 import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.network.EksiNetworkDataSource
 import kotlinx.coroutines.flow.Flow
@@ -45,6 +49,20 @@ class EksiRepository(
         EksiNetworkDataSource.fetchUserEntries(nick, tab, page)
 
     suspend fun getOwnNick(): String? = EksiNetworkDataSource.fetchOwnNick()
+
+    suspend fun getComments(entryId: String): List<Comment> = EksiNetworkDataSource.fetchComments(entryId)
+
+    suspend fun voteComment(commentId: String, authorId: String, rate: Int, previous: Int): Boolean =
+        EksiNetworkDataSource.voteComment(commentId, authorId, rate, previous)
+
+    suspend fun getChannels(): List<Channel> = EksiNetworkDataSource.fetchChannels()
+
+    suspend fun getMessageBox(archive: Boolean, page: Int): MessageBox =
+        EksiNetworkDataSource.fetchMessageBox(archive, page)
+
+    suspend fun getThread(id: String): ThreadDetail = EksiNetworkDataSource.fetchThread(id)
+
+    suspend fun setFollowing(url: String): Boolean = EksiNetworkDataSource.postRelation(url)
 
     // Local operations (delegated to SavedTopicRepository)
     val allSavedTopics: Flow<List<Topic>> = savedTopicRepository.allSavedTopics

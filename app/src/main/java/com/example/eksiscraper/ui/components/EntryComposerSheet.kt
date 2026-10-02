@@ -50,6 +50,7 @@ private val markups = listOf(
 @Composable
 fun EntryComposerSheet(
     topicTitle: String,
+    heading: String = "entry gir",
     isSubmitting: Boolean,
     onSubmit: (String) -> Unit,
     onDismiss: () -> Unit
@@ -62,7 +63,7 @@ fun EntryComposerSheet(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("entry gir", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Text(heading, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Text(topicTitle, style = MaterialTheme.typography.titleLargeEmphasized)
             OutlinedTextField(
                 value = value,

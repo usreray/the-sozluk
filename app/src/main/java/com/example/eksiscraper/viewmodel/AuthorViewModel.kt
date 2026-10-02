@@ -128,6 +128,25 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
+    /** Follows or unfollows with the profile's own endpoints; reverts on failure. */
+    fun toggleFollow() {
+        val current = _profile.value ?: return
+        val url = (if (current.isFollowing) current.followRemoveUrl else current.followAddUrl) ?: return
+        val target = !current.isFollowing
+        _profile.value = current.copy(
+            isFollowing = target,
+            followerCount = (current.followerCount + if (target) 1 else -1).coerceAtLeast(0)
+        )
+        viewModelScope.launch {
+            if (repository.setFollowing(url)) {
+                _message.value = if (target) "${current.nick} takip ediliyor" else "takip bırakıldı"
+            } else {
+                _profile.value = current
+                _message.value = "Takip işlemi başarısız"
+            }
+        }
+    }
+
     fun consumeMessage() {
         _message.value = null
     }

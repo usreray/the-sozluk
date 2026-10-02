@@ -1,8 +1,12 @@
 package com.example.eksiscraper.network
 
 import com.example.eksiscraper.model.AuthorProfile
+import com.example.eksiscraper.model.Channel
+import com.example.eksiscraper.model.Comment
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.FormSpec
+import com.example.eksiscraper.model.MessageBox
+import com.example.eksiscraper.model.ThreadDetail
 import com.example.eksiscraper.model.Topic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -58,7 +62,8 @@ object EksiNetworkDataSource {
         val urlPath = when (category) {
             "today" -> "basliklar/bugun"
             "debe" -> "debe"
-            else -> "basliklar/gundem"
+            // Channels pass their own path, e.g. "basliklar/kanal/spor"
+            else -> if (category.startsWith("basliklar/")) category else "basliklar/gundem"
         }
 
         val randomDelayMs = (100L..500L).random()
@@ -206,6 +211,61 @@ object EksiNetworkDataSource {
                 false
             }
         }
+
+    /** Comment votes use the same payload as entries, on /yorum/vote. */
+    suspend fun voteComment(commentId: String, authorId: String, rate: Int, previous: Int): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                if (previous != 0) {
+                    val removed = ajaxPost("/yorum/removevote", mapOf("id" to commentId, "rate" to "$previous", "owner" to authorId))
+                    if (!removed || rate == 0) return@withContext removed
+                }
+                ajaxPost("/yorum/vote", mapOf("id" to commentId, "rate" to "$rate", "owner" to authorId))
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+    suspend fun fetchComments(entryId: String): List<Comment> = withContext(Dispatchers.IO) {
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/yorum/liste/$entryId"))
+            .header("X-Requested-With", "XMLHttpRequest")
+            .execute()
+        if (response.statusCode() != 200) throw IOException("Yorumlar yüklenemedi (HTTP ${response.statusCode()})")
+        HtmlParser.parseComments(response.parse())
+    }
+
+    /** The message box (or its archive), with the forms to send and to delete / archive. */
+    suspend fun fetchMessageBox(archive: Boolean, page: Int): MessageBox = withContext(Dispatchers.IO) {
+        val path = if (archive) "/mesaj/arsiv" else "/mesaj"
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path?p=$page"))
+            .followRedirects(false)
+            .execute()
+        // A redirect to /giris means the session expired
+        if (response.statusCode() in 300..399) throw IOException("Oturum süresi dolmuş; tekrar giriş yap")
+        if (response.statusCode() != 200) throw IOException("Mesajlar yüklenemedi (HTTP ${response.statusCode()})")
+        HtmlParser.parseMessageBox(response.parse())
+    }
+
+    suspend fun fetchThread(id: String): ThreadDetail = withContext(Dispatchers.IO) {
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/mesaj/$id")).execute()
+        if (response.statusCode() != 200) throw IOException("Konuşma yüklenemedi (HTTP ${response.statusCode()})")
+        HtmlParser.parseThread(response.parse())
+    }
+
+    suspend fun fetchChannels(): List<Channel> = withContext(Dispatchers.IO) {
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/kanallar")).execute()
+        if (response.statusCode() != 200) throw IOException("Kanallar yüklenemedi (HTTP ${response.statusCode()})")
+        HtmlParser.parseChannels(response.parse())
+    }
+
+    /** Follow / unfollow with the URL from the profile's "takip et" button. */
+    suspend fun postRelation(url: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            ajaxPost(if (url.startsWith("http")) url.removePrefix(BASE_URL) else url, emptyMap())
+        } catch (e: Exception) {
+            false
+        }
+    }
 
     private fun ajaxPost(path: String, data: Map<String, String>): Boolean {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))

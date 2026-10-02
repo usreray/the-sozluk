@@ -6,8 +6,9 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.model.Comment
 import com.example.eksiscraper.model.Entry
+import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.model.updateEntry
 import com.example.eksiscraper.model.withFavorite
 import com.example.eksiscraper.model.withVote
@@ -15,24 +16,48 @@ import com.example.eksiscraper.network.TopicNotFoundException
 import com.example.eksiscraper.repository.EksiRepository
 import java.net.URI
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
+data class CommentsState(
+    val comments: List<Comment> = emptyList(),
+    val isLoading: Boolean = false,
+    val isOpen: Boolean = false,
+    val error: String? = null
+)
+
+/**
+ * One topic read as an endless list: pages are appended while scrolling down (and prepended
+ * when scrolling up after a jump), so there is no page boundary to click through.
+ */
 class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel() {
 
+    /** Topic metadata plus every entry loaded so far, in page order */
     private val _selectedTopic = mutableStateOf<Topic?>(null)
     val selectedTopic: State<Topic?> = _selectedTopic
 
+    /** First load or a jump to another page: the list is replaced */
     private val _isLoading = mutableStateOf(false)
     val isLoading: State<Boolean> = _isLoading
 
-    private val _currentPage = mutableStateOf(1)
-    val currentPage: State<Int> = _currentPage
+    private val _isLoadingNext = mutableStateOf(false)
+    val isLoadingNext: State<Boolean> = _isLoadingNext
+
+    private val _isLoadingPrevious = mutableStateOf(false)
+    val isLoadingPrevious: State<Boolean> = _isLoadingPrevious
+
+    private val _firstPage = mutableStateOf(1)
+    val firstPage: State<Int> = _firstPage
+
+    private val _lastPage = mutableStateOf(1)
+    val lastPage: State<Int> = _lastPage
 
     private val _totalPages = mutableStateOf(1)
     val totalPages: State<Int> = _totalPages
 
     private val _expandedEntries = mutableStateMapOf<String, Boolean>()
-    val expandedEntries: Map<String, Boolean> = _expandedEntries
+
+    private val _comments = mutableStateMapOf<String, CommentsState>()
 
     private val _error = mutableStateOf<String?>(null)
     val error: State<String?> = _error
@@ -48,60 +73,36 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     // False: only today's entries (?a=popular / ?day=); true: the whole topic
     private var showAllEntries = false
+    private var pageJob: Job? = null
 
-    fun loadTopic(title: String, url: String, page: Int = 1) {
-        val initialTopic =
-                Topic(
-                        title = title,
-                        url = url,
-                        commentCount = 0,
-                        entries = emptyList(),
-                        entriesLoaded = false
-                )
-
-        // Check if saved
+    fun loadTopic(title: String, url: String) {
+        if (_selectedTopic.value != null) return
+        _selectedTopic.value = Topic(title = title, url = url)
         viewModelScope.launch {
             val isSaved = repository.isTopicSaved(title)
-            val topicWithSavedStatus = initialTopic.copy(isSaved = isSaved)
-            selectTopic(topicWithSavedStatus, page)
+            _selectedTopic.value = _selectedTopic.value?.copy(isSaved = isSaved)
+            jumpTo(1)
         }
     }
 
-    fun selectTopic(topic: Topic, page: Int = 1) {
-        // Check if we're already viewing this topic and page
-        if (_selectedTopic.value?.title == topic.title && _currentPage.value == page) {
-            return
-        }
-
-        // Clear expanded entries when switching to a different page or topic
-        if (_selectedTopic.value?.title != topic.title || _currentPage.value != page) {
-            clearExpandedEntries()
-            viewModelScope.launch { scrollState.scrollToItem(0) }
-        }
-
-        _selectedTopic.value = topic
-        _currentPage.value = page
-
-        // Fetch entries
-        fetchEntries(topic, page)
-    }
-
-    /** Leaves today's entries for the full topic, starting from its first entry. */
-    fun showOlderEntries() {
+    /** Replaces the list with [page] (page picker, first load, retry). */
+    fun jumpTo(page: Int) {
         val topic = _selectedTopic.value ?: return
-        showAllEntries = true
-        clearExpandedEntries()
-        _currentPage.value = 1
-        viewModelScope.launch { scrollState.scrollToItem(0) }
-        fetchEntries(topic, 1)
-    }
-
-    private fun fetchEntries(topic: Topic, page: Int) {
+        pageJob?.cancel()
         _isLoading.value = true
+        _isLoadingNext.value = false
+        _isLoadingPrevious.value = false
         _error.value = null
-        viewModelScope.launch {
+        pageJob = viewModelScope.launch {
             try {
-                show(topic, page, request(topic, page))
+                val result = request(topic, page)
+                val loadedPage = result.currentPage
+                _expandedEntries.clear()
+                _selectedTopic.value = merge(topic, result).copy(entries = result.entries.withPage(loadedPage))
+                _firstPage.value = loadedPage
+                _lastPage.value = loadedPage
+                _totalPages.value = result.totalPages
+                scrollState.scrollToItem(0)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: TopicNotFoundException) {
@@ -114,6 +115,66 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             }
         }
     }
+
+    /** Appends the next page; called as the list nears its end. */
+    fun loadNext() {
+        val topic = _selectedTopic.value ?: return
+        if (!topic.entriesLoaded || _isLoading.value || _isLoadingNext.value) return
+        if (_lastPage.value >= _totalPages.value) return
+        val page = _lastPage.value + 1
+        _isLoadingNext.value = true
+        viewModelScope.launch {
+            try {
+                val result = request(topic, page)
+                val current = _selectedTopic.value ?: return@launch
+                val known = current.entries.map { it.entryId }.toSet()
+                _selectedTopic.value = merge(current, result).copy(
+                    entries = current.entries + result.entries.withPage(page).filterNot { it.entryId in known }
+                )
+                _lastPage.value = page
+                _totalPages.value = maxOf(result.totalPages, page)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = "Sonraki sayfa yüklenemedi"
+            } finally {
+                _isLoadingNext.value = false
+            }
+        }
+    }
+
+    /** Prepends the page before the first loaded one (after jumping into the middle). */
+    fun loadPrevious() {
+        val topic = _selectedTopic.value ?: return
+        if (!topic.entriesLoaded || _isLoading.value || _isLoadingPrevious.value || _firstPage.value <= 1) return
+        val page = _firstPage.value - 1
+        _isLoadingPrevious.value = true
+        viewModelScope.launch {
+            try {
+                val result = request(topic, page)
+                val current = _selectedTopic.value ?: return@launch
+                val known = current.entries.map { it.entryId }.toSet()
+                _selectedTopic.value = current.copy(
+                    entries = result.entries.withPage(page).filterNot { it.entryId in known } + current.entries
+                )
+                _firstPage.value = page
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = "Önceki sayfa yüklenemedi"
+            } finally {
+                _isLoadingPrevious.value = false
+            }
+        }
+    }
+
+    /** Leaves today's entries for the full topic, starting from its first entry. */
+    fun showOlderEntries() {
+        showAllEntries = true
+        jumpTo(1)
+    }
+
+    fun retry() = jumpTo(_firstPage.value)
 
     private suspend fun request(topic: Topic, page: Int): Topic {
         val uri = try {
@@ -128,7 +189,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         // topic. Other params (an old ?p=, ?focusto=) are dropped: the data source adds
         // the page itself.
         val filter = if (showAllEntries) null
-                else uri?.query?.split("&")?.firstOrNull { it == "a=popular" || it.startsWith("day=") }
+        else uri?.query?.split("&")?.firstOrNull { it == "a=popular" || it.startsWith("day=") }
         return if (path.isNullOrBlank() || path == "/") {
             // No topic path (e.g. a search or an old saved search URL): search by title
             repository.searchTopic(topic.title, page)
@@ -137,12 +198,15 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
-    private fun show(topic: Topic, page: Int, result: Topic) {
-        // Keep the link we were opened with so paging stays in the same (popular/full) mode
-        _selectedTopic.value = if (topic.url.isNotEmpty()) result.copy(url = topic.url) else result
-        _totalPages.value = result.totalPages
-        _currentPage.value = page
-    }
+    /** Takes the fresh page's metadata but keeps the link we were opened with and the saved flag. */
+    private fun merge(current: Topic, result: Topic): Topic = result.copy(
+        url = current.url.ifEmpty { result.url },
+        isSaved = current.isSaved,
+        // The "N entry daha" count only belongs to the first page of today's entries
+        olderEntriesCount = if (showAllEntries) 0 else maxOf(current.olderEntriesCount, result.olderEntriesCount)
+    )
+
+    private fun List<Entry>.withPage(page: Int) = map { it.copy(page = page) }
 
     /** +1 şükela, -1 çok kötü, 0 takes the vote back; reverts if the site rejects it. */
     fun vote(entry: Entry, rate: Int) {
@@ -156,9 +220,6 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             }
         }
     }
-
-    /** Whether the page offered an entry form, i.e. the user may write here. */
-    val canWrite: Boolean get() = _selectedTopic.value?.entryForm?.textFieldName != null
 
     /** Posts a new entry through the topic's own form, then shows the last page where it lands. */
     fun submitEntry(text: String, onSuccess: () -> Unit) {
@@ -177,10 +238,8 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 _message.value = "entry girildi"
                 // The new entry is at the end of the whole topic
                 showAllEntries = true
-                var result = request(topic, maxOf(1, _totalPages.value))
-                if (result.totalPages > _totalPages.value) result = request(topic, result.totalPages)
-                show(topic, result.currentPage, result)
-                scrollState.animateScrollToItem(maxOf(0, result.entries.size))
+                val last = request(topic, maxOf(1, _totalPages.value))
+                jumpTo(last.totalPages)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -212,21 +271,84 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
+    // --- comments ---
+
+    fun comments(entryId: String): CommentsState = _comments[entryId] ?: CommentsState()
+
+    /** Opens or closes an entry's comments, loading them the first time. */
+    fun toggleComments(entry: Entry) {
+        val state = comments(entry.entryId)
+        if (state.isOpen) {
+            _comments[entry.entryId] = state.copy(isOpen = false)
+            return
+        }
+        _comments[entry.entryId] = state.copy(isOpen = true)
+        if (state.comments.isEmpty()) loadComments(entry.entryId)
+    }
+
+    private fun loadComments(entryId: String) {
+        _comments[entryId] = comments(entryId).copy(isLoading = true, error = null)
+        viewModelScope.launch {
+            try {
+                val list = repository.getComments(entryId)
+                _comments[entryId] = comments(entryId).copy(comments = list, isLoading = false)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _comments[entryId] = comments(entryId).copy(isLoading = false, error = e.message ?: "Yorumlar yüklenemedi")
+            }
+        }
+    }
+
+    fun voteComment(entryId: String, comment: Comment, rate: Int) {
+        val previous = if (comment.isLiked) 1 else if (comment.isDisliked) -1 else 0
+        if (previous == rate) return
+        fun apply(r: Int) {
+            _comments[entryId] = comments(entryId).let { s ->
+                s.copy(comments = s.comments.map { if (it.id == comment.id) it.withVote(r, previous) else it })
+            }
+        }
+        apply(rate)
+        viewModelScope.launch {
+            if (!repository.voteComment(comment.id, comment.authorId, rate, previous)) {
+                apply(previous)
+                _message.value = "Oy kaydedilemedi"
+            }
+        }
+    }
+
+    /** Whether the page offered a comment form (logged in, comments enabled). */
+    val canComment: Boolean get() = _selectedTopic.value?.commentForm?.textFieldName != null
+
+    fun submitComment(entry: Entry, text: String, onSuccess: () -> Unit) {
+        val form = _selectedTopic.value?.commentForm ?: return
+        val field = form.textFieldName ?: return
+        val idField = form.fields.keys.firstOrNull { it.equals("id", ignoreCase = true) } ?: "Id"
+        _isSubmitting.value = true
+        viewModelScope.launch {
+            try {
+                val error = repository.submitForm(form, mapOf(idField to entry.entryId, field to text))
+                if (error != null) {
+                    _message.value = error
+                } else {
+                    onSuccess()
+                    _message.value = "yorum eklendi"
+                    _selectedTopic.value = _selectedTopic.value?.updateEntry(entry.entryId) {
+                        it.copy(commentCount = it.commentCount + 1)
+                    }
+                    loadComments(entry.entryId)
+                }
+            } finally {
+                _isSubmitting.value = false
+            }
+        }
+    }
+
     fun consumeMessage() {
         _message.value = null
     }
 
-    fun retry() {
-        _selectedTopic.value?.let { fetchEntries(it, _currentPage.value) }
-    }
-
-    fun navigateToPage(page: Int) {
-        _selectedTopic.value?.let { topic -> selectTopic(topic, page) }
-    }
-
-    fun isEntryExpanded(entryId: String): Boolean {
-        return _expandedEntries[entryId] ?: false
-    }
+    fun isEntryExpanded(entryId: String): Boolean = _expandedEntries[entryId] ?: false
 
     fun toggleEntryExpansion(entryId: String) {
         _expandedEntries[entryId] = !(_expandedEntries[entryId] ?: false)
@@ -244,15 +366,11 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
-    private fun clearExpandedEntries() {
-        _expandedEntries.clear()
-    }
-
     fun saveTopic() {
         _selectedTopic.value?.let { topic ->
             viewModelScope.launch {
                 repository.saveTopic(topic)
-                _selectedTopic.value = topic.copy(isSaved = true)
+                _selectedTopic.value = _selectedTopic.value?.copy(isSaved = true)
             }
         }
     }
@@ -261,7 +379,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         _selectedTopic.value?.let { topic ->
             viewModelScope.launch {
                 repository.unsaveTopic(topic)
-                _selectedTopic.value = topic.copy(isSaved = false)
+                _selectedTopic.value = _selectedTopic.value?.copy(isSaved = false)
             }
         }
     }

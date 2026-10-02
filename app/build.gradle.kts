@@ -20,6 +20,15 @@ android {
     }
 
     buildTypes {
+        // material-icons-extended alone makes an unshrunk APK ~70 MB, too big for small
+        // emulators; R8 keeps only the icons and code the app uses
+        debug {
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(

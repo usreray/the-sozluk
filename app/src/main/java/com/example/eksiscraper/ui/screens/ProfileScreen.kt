@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.BookmarkRemove
 import androidx.compose.material.icons.rounded.Bookmarks
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.Button
@@ -76,6 +77,11 @@ fun ProfileScreen(
             TopAppBar(
                 title = { Text("profil", style = MaterialTheme.typography.headlineMediumEmphasized) },
                 actions = {
+                    if (isLoggedIn) {
+                        IconButton(onClick = { navController.navigate(Screen.Messages.createRoute()) }) {
+                            Icon(Icons.Rounded.Mail, contentDescription = "Mesajlar")
+                        }
+                    }
                     IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
                         Icon(Icons.Rounded.Settings, contentDescription = "Ayarlar")
                     }

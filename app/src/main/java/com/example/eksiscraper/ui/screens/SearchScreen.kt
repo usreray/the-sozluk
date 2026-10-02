@@ -51,6 +51,14 @@ import com.example.eksiscraper.ui.components.segmentedShape
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.viewmodel.EksiViewModelFactory
 import com.example.eksiscraper.viewmodel.SearchViewModel
+import com.example.eksiscraper.viewmodel.ChannelsViewModel
+import com.example.eksiscraper.ui.components.LocalBottomBarInset
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ElevatedSuggestionChip
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.ui.Alignment
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -58,8 +66,12 @@ fun SearchScreen(
     navController: NavController,
     viewModel: SearchViewModel = viewModel(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+    ),
+    channelsViewModel: ChannelsViewModel = viewModel(
+        factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
 ) {
+    val channels by channelsViewModel.channels
     val suggestions by viewModel.suggestions
     val isLoading by viewModel.isLoadingSuggestions
     val searchBarState = rememberSearchBarState()
@@ -115,11 +127,37 @@ fun SearchScreen(
             inputField = inputField,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         )
-        MessageState(
-            icon = Icons.Rounded.TravelExplore,
-            title = "Ne arıyorsun?",
-            message = "Bir başlık yaz, #numara ile bir entry'ye git ya da @ ile bir yazar ara."
-        )
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp + LocalBottomBarInset.current),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                "başlık yaz, #numara ile bir entry'ye git ya da @ ile bir yazar ara",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                "kanallar",
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+            if (channels.isEmpty()) {
+                LoadingIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                channels.forEach { channel ->
+                    ElevatedSuggestionChip(
+                        onClick = { navController.navigate(Screen.Channels.createRoute(channel.path, channel.name)) },
+                        label = { Text("#${channel.name}") }
+                    )
+                }
+            }
+        }
     }
 
     // Tapping the bar opens the full-screen search with live suggestions

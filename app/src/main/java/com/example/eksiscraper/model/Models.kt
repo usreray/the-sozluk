@@ -15,7 +15,8 @@ data class Topic(
     val olderEntriesCount: Int = 0,
     // Forms the site renders for logged-in users; null when logged out or not allowed
     val entryForm: FormSpec? = null,
-    val deleteForm: FormSpec? = null
+    val deleteForm: FormSpec? = null,
+    val commentForm: FormSpec? = null
 )
 
 data class Entry(
@@ -35,7 +36,11 @@ data class Entry(
     val commentCount: Int = 0,
     // Set for entries listed outside their topic (profile tabs)
     val topicTitle: String = "",
-    val topicUrl: String = ""
+    val topicUrl: String = "",
+    /** Profile picture; null for the default placeholder */
+    val avatarUrl: String? = null,
+    /** Topic page the entry was loaded from (the list spans many pages) */
+    val page: Int = 1
 ) {
     val canVote: Boolean get() = "vote" in flags
     val canDelete: Boolean get() = "deleteself" in flags
@@ -61,8 +66,65 @@ data class AuthorProfile(
     val followerCount: Int,
     val followingCount: Int,
     val joinedDate: String,
-    val badges: List<Badge>
+    val badges: List<Badge>,
+    // Follow endpoints from the profile's "takip et" button; null when logged out
+    val followAddUrl: String? = null,
+    val followRemoveUrl: String? = null,
+    val isFollowing: Boolean = false
 )
+
+/** A comment ("yorum") under an entry. */
+data class Comment(
+    val id: String,
+    val author: String,
+    val authorId: String,
+    val content: String,
+    val contentHtml: String,
+    val date: String,
+    val avatarUrl: String?,
+    val upVotes: Int,
+    val downVotes: Int,
+    val isLiked: Boolean = false,
+    val isDisliked: Boolean = false
+) {
+    /** New vote [rate] replacing [previous], keeping the counts in step. */
+    fun withVote(rate: Int, previous: Int): Comment {
+        val up = upVotes - (if (previous > 0) 1 else 0) + (if (rate > 0) 1 else 0)
+        val down = downVotes - (if (previous < 0) 1 else 0) + (if (rate < 0) 1 else 0)
+        return copy(isLiked = rate > 0, isDisliked = rate < 0, upVotes = up.coerceAtLeast(0), downVotes = down.coerceAtLeast(0))
+    }
+}
+
+/** A conversation in the message box. */
+data class MessageThread(
+    val id: String,
+    val nick: String,
+    /** Messages in the conversation (the number next to the nick) */
+    val messageCount: Int,
+    val preview: String,
+    val time: String
+)
+
+data class Message(val text: String, val html: String, val time: String, val isOutgoing: Boolean)
+
+data class MessageBox(
+    val threads: List<MessageThread>,
+    /** "Yeni mesaj" form (To + Message + token) */
+    val sendForm: FormSpec?,
+    /** Bulk delete / archive form */
+    val threadForm: FormSpec?
+)
+
+data class ThreadDetail(
+    val nick: String,
+    val messages: List<Message>,
+    val sendForm: FormSpec?,
+    /** Archive / delete for this conversation */
+    val threadForm: FormSpec?
+)
+
+/** A channel (#spor, #ilişkiler, ...) and its topic list path. */
+data class Channel(val name: String, val description: String, val path: String)
 
 /** Returns a copy of the topic with one entry's favorite state (and count) changed. */
 fun Topic.withFavorite(entryId: String, favorited: Boolean): Topic = copy(

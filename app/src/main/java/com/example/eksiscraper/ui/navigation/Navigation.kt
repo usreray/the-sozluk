@@ -14,6 +14,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.eksiscraper.ui.screens.AuthorScreen
+import com.example.eksiscraper.ui.screens.ChannelsScreen
+import com.example.eksiscraper.ui.screens.MessageThreadScreen
+import com.example.eksiscraper.ui.screens.MessagesScreen
 import com.example.eksiscraper.ui.screens.HomeScreen
 import com.example.eksiscraper.ui.screens.LoginScreen
 import com.example.eksiscraper.ui.screens.ProfileScreen
@@ -35,6 +38,46 @@ fun Navigation(navController: NavHostController) {
         composable(Screen.Home.route) { HomeScreen(navController) }
         composable(Screen.Search.route) { SearchScreen(navController) }
         composable(Screen.Profile.route) { ProfileScreen(navController) }
+        composable(
+            route = Screen.Channels.pattern,
+            arguments = listOf(
+                navArgument("path") { type = NavType.StringType; defaultValue = "" },
+                navArgument("name") { type = NavType.StringType; defaultValue = "" }
+            ),
+            enterTransition = { slideIntoContainer(SlideDirection.Start, tween(320)) + fadeIn(tween(200)) },
+            popExitTransition = { slideOutOfContainer(SlideDirection.End, tween(280)) + fadeOut(tween(200)) }
+        ) { backStackEntry ->
+            ChannelsScreen(
+                path = backStackEntry.arguments?.getString("path").orEmpty(),
+                name = backStackEntry.arguments?.getString("name").orEmpty(),
+                navController = navController
+            )
+        }
+
+        composable(
+            Screen.Messages.pattern,
+            arguments = listOf(navArgument("to") { type = NavType.StringType; defaultValue = "" }),
+            enterTransition = { slideIntoContainer(SlideDirection.Start, tween(320)) + fadeIn(tween(200)) },
+            popExitTransition = { slideOutOfContainer(SlideDirection.End, tween(280)) + fadeOut(tween(200)) }
+        ) { backStackEntry ->
+            MessagesScreen(navController, composeTo = backStackEntry.arguments?.getString("to").orEmpty())
+        }
+
+        composable(
+            Screen.MessageThread.pattern,
+            arguments = listOf(
+                navArgument("id") { type = NavType.StringType; defaultValue = "" },
+                navArgument("nick") { type = NavType.StringType; defaultValue = "" }
+            ),
+            enterTransition = { slideIntoContainer(SlideDirection.Start, tween(320)) + fadeIn(tween(200)) },
+            popExitTransition = { slideOutOfContainer(SlideDirection.End, tween(280)) + fadeOut(tween(200)) }
+        ) { backStackEntry ->
+            MessageThreadScreen(
+                threadId = backStackEntry.arguments?.getString("id").orEmpty(),
+                nick = backStackEntry.arguments?.getString("nick").orEmpty(),
+                navController = navController
+            )
+        }
 
         composable(
             route = Screen.Author.pattern,

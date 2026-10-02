@@ -26,6 +26,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Mail
+import androidx.compose.material.icons.rounded.PersonAdd
 import androidx.compose.material.icons.rounded.Inbox
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.AlertDialog
@@ -179,7 +182,14 @@ fun AuthorScreen(
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    item(key = "header") { ProfileHeader(profile!!) }
+                    item(key = "header") {
+                        ProfileHeader(
+                            profile = profile!!,
+                            isOwn = nick.equals(EksiSession.nick.value, ignoreCase = true),
+                            onFollow = { requireLogin { viewModel.toggleFollow() } },
+                            onMessage = { requireLogin { navController.navigate(Screen.Messages.createRoute(nick)) } }
+                        )
+                    }
                     item(key = "tabs") {
                         TabButtons(selected = selectedTab, onSelect = { selectedTab = it })
                     }
@@ -216,7 +226,7 @@ fun AuthorScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ProfileHeader(profile: AuthorProfile) {
+private fun ProfileHeader(profile: AuthorProfile, isOwn: Boolean, onFollow: () -> Unit, onMessage: () -> Unit) {
     var openBadge by remember { mutableStateOf<Badge?>(null) }
     openBadge?.let { badge ->
         AlertDialog(
@@ -291,6 +301,31 @@ private fun ProfileHeader(profile: AuthorProfile) {
             StatTile("entry", profile.entryCount, Modifier.weight(1f))
             StatTile("takipçi", profile.followerCount, Modifier.weight(1f))
             StatTile("takip", profile.followingCount, Modifier.weight(1f))
+        }
+        if (!isOwn) {
+            // Follow / message, as on the site's profile buttons
+            Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+                ToggleButton(
+                    checked = profile.isFollowing,
+                    onCheckedChange = { onFollow() },
+                    shapes = ButtonGroupDefaults.connectedLeadingButtonShapes()
+                ) {
+                    Icon(
+                        if (profile.isFollowing) Icons.Rounded.Check else Icons.Rounded.PersonAdd,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp).size(18.dp)
+                    )
+                    Text(if (profile.isFollowing) "takip ediliyor" else "takip et")
+                }
+                ToggleButton(
+                    checked = false,
+                    onCheckedChange = { onMessage() },
+                    shapes = ButtonGroupDefaults.connectedTrailingButtonShapes()
+                ) {
+                    Icon(Icons.Rounded.Mail, contentDescription = null, modifier = Modifier.padding(end = 8.dp).size(18.dp))
+                    Text("mesaj")
+                }
+            }
         }
         if (profile.joinedDate.isNotBlank()) {
             Row(verticalAlignment = Alignment.CenterVertically) {

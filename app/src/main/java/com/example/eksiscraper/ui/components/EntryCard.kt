@@ -3,6 +3,7 @@ package com.example.eksiscraper.ui.components
 import android.content.ClipData
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -11,6 +12,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,10 +21,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material.icons.rounded.ChatBubble
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -32,6 +38,9 @@ import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.DropdownMenuGroup
@@ -60,9 +69,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import com.example.eksiscraper.model.Comment
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.network.EksiSession
 import kotlinx.coroutines.launch
@@ -77,7 +89,20 @@ data class EntryActions(
     val onAuthor: (String) -> Unit,
     val onLink: (EksiLink) -> Unit,
     val onDelete: ((Entry) -> Unit)? = null,
-    val onOpenTopic: ((Entry) -> Unit)? = null
+    val onOpenTopic: ((Entry) -> Unit)? = null,
+    // Comments ("yorum"); null hides the comment button (e.g. profile lists)
+    val comments: ((Entry) -> CommentsUi)? = null,
+    val onToggleComments: (Entry) -> Unit = {},
+    val onVoteComment: (Entry, Comment, Int) -> Unit = { _, _, _ -> },
+    val onWriteComment: ((Entry) -> Unit)? = null
+)
+
+/** What the card needs to show an entry's comments. */
+data class CommentsUi(
+    val isOpen: Boolean,
+    val isLoading: Boolean,
+    val comments: List<Comment>,
+    val error: String?
 )
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -156,6 +181,21 @@ fun EntryCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (entry.canVote) VoteButtons(entry, actions.onVote)
                 FavoriteButton(entry.isFavorited, entry.favoriteCount) { actions.onToggleFavorite(entry) }
+                val comments = actions.comments?.invoke(entry)
+                if (comments != null && (entry.commentCount > 0 || actions.onWriteComment != null)) {
+                    IconToggleButton(checked = comments.isOpen, onCheckedChange = { actions.onToggleComments(entry) }) {
+                        BadgedBox(badge = {
+                            if (entry.commentCount > 0) Badge { Text(entry.commentCount.toString()) }
+                        }) {
+                            Icon(
+                                if (comments.isOpen) Icons.Rounded.ChatBubble else Icons.Outlined.ChatBubbleOutline,
+                                contentDescription = "Yorumlar",
+                                tint = if (comments.isOpen) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 Column(
                     horizontalAlignment = Alignment.End,
@@ -179,12 +219,111 @@ fun EntryCard(
                     )
                 }
                 Spacer(Modifier.width(4.dp))
-                AuthorAvatar(entry.author, modifier = Modifier.clickable { actions.onAuthor(entry.author) })
+                AuthorAvatar(
+                    entry.author,
+                    avatarUrl = entry.avatarUrl,
+                    modifier = Modifier.clip(CircleShape).clickable { actions.onAuthor(entry.author) }
+                )
                 EntryMenu(
                     entry = entry,
                     onAuthor = { actions.onAuthor(entry.author) },
                     onDelete = if (entry.canDelete && actions.onDelete != null) ({ confirmDelete = true }) else null
                 )
+            }
+            val comments = actions.comments?.invoke(entry)
+            AnimatedVisibility(visible = comments?.isOpen == true) {
+                if (comments != null) {
+                    CommentsSection(
+                        comments = comments,
+                        onAuthor = actions.onAuthor,
+                        onLink = actions.onLink,
+                        onVote = { comment, rate -> actions.onVoteComment(entry, comment, rate) },
+                        onWrite = actions.onWriteComment?.let { write -> { write(entry) } }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CommentsSection(
+    comments: CommentsUi,
+    onAuthor: (String) -> Unit,
+    onLink: (EksiLink) -> Unit,
+    onVote: (Comment, Int) -> Unit,
+    onWrite: (() -> Unit)?
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(end = 12.dp, top = 4.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        when {
+            comments.isLoading -> Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) {
+                LoadingIndicator()
+            }
+            comments.error != null -> Text(
+                comments.error,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+            comments.comments.isEmpty() -> Text(
+                "henüz yorum yok",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        comments.comments.forEach { comment ->
+            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+                Column(modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 2.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AuthorAvatar(
+                            comment.author,
+                            avatarUrl = comment.avatarUrl,
+                            size = 24,
+                            modifier = Modifier.clip(CircleShape).clickable { onAuthor(comment.author) }
+                        )
+                        Text(
+                            comment.author,
+                            style = MaterialTheme.typography.labelLargeEmphasized,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 8.dp).clickable { onAuthor(comment.author) }
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            comment.date,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 10.dp)
+                        )
+                    }
+                    Text(
+                        rememberEntryText(comment.contentHtml, comment.content, onLink),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 6.dp, end = 10.dp)
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconToggleButton(
+                            checked = comment.isLiked,
+                            onCheckedChange = { onVote(comment, if (comment.isLiked) 0 else 1) },
+                            modifier = Modifier.size(36.dp)
+                        ) { Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "beğen", modifier = Modifier.size(20.dp)) }
+                        Text("${comment.upVotes}", style = MaterialTheme.typography.labelMedium)
+                        IconToggleButton(
+                            checked = comment.isDisliked,
+                            onCheckedChange = { onVote(comment, if (comment.isDisliked) 0 else -1) },
+                            modifier = Modifier.size(36.dp)
+                        ) { Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "beğenme", modifier = Modifier.size(20.dp)) }
+                        Text("${comment.downVotes}", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+        if (onWrite != null) {
+            TextButton(onClick = onWrite) {
+                Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Text("yorum yaz", modifier = Modifier.padding(start = 8.dp))
             }
         }
     }
@@ -311,7 +450,16 @@ private fun EntryMenu(entry: Entry, onAuthor: () -> Unit, onDelete: (() -> Unit)
 /** First letter of the nick in a cookie shape; the color is stable per author. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun AuthorAvatar(author: String, modifier: Modifier = Modifier, size: Int = 36) {
+fun AuthorAvatar(author: String, modifier: Modifier = Modifier, size: Int = 36, avatarUrl: String? = null) {
+    if (avatarUrl != null) {
+        AsyncImage(
+            model = avatarUrl,
+            contentDescription = author,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.size(size.dp).clip(MaterialShapes.Cookie6Sided.toShape())
+        )
+        return
+    }
     val colors = MaterialTheme.colorScheme
     val (container, content) = when (Math.floorMod(author.hashCode(), 3)) {
         0 -> colors.primaryContainer to colors.onPrimaryContainer

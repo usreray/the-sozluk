@@ -2,8 +2,14 @@ package com.example.eksiscraper.network
 
 import com.example.eksiscraper.model.AuthorProfile
 import com.example.eksiscraper.model.Badge
+import com.example.eksiscraper.model.Channel
+import com.example.eksiscraper.model.Comment
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.FormSpec
+import com.example.eksiscraper.model.Message
+import com.example.eksiscraper.model.MessageBox
+import com.example.eksiscraper.model.MessageThread
+import com.example.eksiscraper.model.ThreadDetail
 import com.example.eksiscraper.model.Topic
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -157,7 +163,8 @@ object HtmlParser {
                         currentPage = returnedPage,
                         olderEntriesCount = olderCount,
                         entryForm = findEntryForm(document),
-                        deleteForm = findDeleteForm(document)
+                        deleteForm = findDeleteForm(document),
+                        commentForm = document.selectFirst("form#comment-entry-form")?.let(::formSpec)
                 )
         }
 
@@ -178,9 +185,76 @@ object HtmlParser {
                         isLiked = li.attr("data-isliked").equals("true", ignoreCase = true),
                         isDisliked = li.attr("data-isdisliked").equals("true", ignoreCase = true),
                         flags = li.attr("data-flags").split(' ').filter { it.isNotBlank() }.toSet(),
-                        commentCount = li.attr("data-comment-count").toIntOrNull() ?: 0
+                        commentCount = li.attr("data-comment-count").toIntOrNull() ?: 0,
+                        avatarUrl = avatarUrl(li)
                 )
         }
+
+        /** The real profile picture inside an entry/comment footer, if the author set one. */
+        private fun avatarUrl(element: Element): String? {
+                val src = element.selectFirst("img.avatar")?.attr("src").orEmpty()
+                if (src.isBlank() || src.contains("default-profile")) return null
+                return if (src.startsWith("//")) "https:$src" else src
+        }
+
+        fun parseComments(document: Document): List<Comment> =
+                document.select("li[data-comment-id]").mapNotNull { li ->
+                        val content = li.selectFirst(".comment-content") ?: return@mapNotNull null
+                        Comment(
+                                id = li.attr("data-comment-id"),
+                                author = li.attr("data-author"),
+                                authorId = li.attr("data-author-id"),
+                                content = toPlainText(content),
+                                contentHtml = content.html(),
+                                date = li.selectFirst("a.entry-date")?.text().orEmpty(),
+                                avatarUrl = avatarUrl(li),
+                                upVotes = li.attr("data-up-vote-count").toIntOrNull() ?: 0,
+                                downVotes = li.attr("data-down-vote-count").toIntOrNull() ?: 0,
+                                isLiked = li.attr("data-isliked").equals("true", ignoreCase = true),
+                                isDisliked = li.attr("data-isdisliked").equals("true", ignoreCase = true)
+                        )
+                }
+
+        fun parseMessageBox(document: Document): MessageBox = MessageBox(
+                threads = document.select("ul#threads > li article").mapNotNull { article ->
+                        val link = article.selectFirst("a[href^=/mesaj/]") ?: return@mapNotNull null
+                        val heading = link.selectFirst("h2")
+                        val count = heading?.selectFirst("small")?.text()?.filter(Char::isDigit)?.toIntOrNull() ?: 0
+                        heading?.select("small")?.remove()
+                        MessageThread(
+                                id = link.attr("href").removePrefix("/mesaj/"),
+                                nick = heading?.text().orEmpty(),
+                                messageCount = count,
+                                preview = link.selectFirst("p")?.text().orEmpty(),
+                                time = article.selectFirst("time")?.text().orEmpty()
+                        )
+                },
+                sendForm = document.selectFirst("form#message-send-form")?.let(::formSpec),
+                threadForm = document.selectFirst("form#message-thread-list-form")?.let(::formSpec)
+        )
+
+        fun parseThread(document: Document): ThreadDetail = ThreadDetail(
+                nick = document.selectFirst("#message-thread-title a[href^=/biri/]")?.text().orEmpty(),
+                messages = document.select("#message-thread > article").map { article ->
+                        val paragraph = article.selectFirst("p")
+                        Message(
+                                text = paragraph?.let(::toPlainText).orEmpty(),
+                                html = paragraph?.html().orEmpty(),
+                                time = article.selectFirst("footer time")?.text().orEmpty(),
+                                // Received messages are marked "incoming"; the rest are ours
+                                isOutgoing = !article.hasClass("incoming")
+                        )
+                },
+                sendForm = document.selectFirst("form#message-send-form")?.let(::formSpec),
+                threadForm = document.selectFirst("form#message-thread-form")?.let(::formSpec)
+        )
+
+        /** Channels linked from the site navigation (/basliklar/kanal/...). */
+        fun parseChannels(document: Document): List<Channel> =
+                document.select("a[href^=/basliklar/kanal/]")
+                        .map { Channel(it.text().removePrefix("#").trim(), it.attr("title"), it.attr("href")) }
+                        .filter { it.name.isNotBlank() }
+                        .distinctBy { it.path }
 
         /** Text with line breaks kept: <br> and paragraphs become newlines. */
         private fun toPlainText(element: Element): String {
@@ -206,6 +280,7 @@ object HtmlParser {
                 val form = document.select("form").firstOrNull { form ->
                         form.selectFirst("textarea") != null &&
                                 form.id() != "comment-entry-form" &&
+                                !form.id().contains("comment") &&
                                 !form.attr("action").contains("mesaj") &&
                                 !form.attr("action").contains("yorum")
                 } ?: return null
@@ -252,6 +327,9 @@ object HtmlParser {
                         followerCount = count("user-follower-count"),
                         followingCount = count("user-following-count"),
                         joinedDate = document.selectFirst(".recorddate")?.text().orEmpty(),
+                        followAddUrl = document.selectFirst("#buddy-link")?.attr("data-add-url")?.ifBlank { null },
+                        followRemoveUrl = document.selectFirst("#buddy-link")?.attr("data-remove-url")?.ifBlank { null },
+                        isFollowing = document.selectFirst("#buddy-link")?.attr("data-added") == "true",
                         badges = document.select("a.user-profile-badge-item").map {
                                 Badge(
                                         name = it.attr("data-name"),
