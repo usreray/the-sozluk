@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ElevatedCard
@@ -19,6 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.R
 import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.network.EksiSession
 import com.example.eksiscraper.ui.components.SavedTopicsListSkeleton
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.viewmodel.EksiViewModelFactory
@@ -50,33 +53,63 @@ fun ProfileScreen(
     )
 ) {
     val savedTopics by viewModel.savedTopics
+    val isLoggedIn by EksiSession.isLoggedIn
     
     Scaffold(
         // No top app bar to match Home and Search screens
     ) { paddingValues ->
-        // Show saved topics list or loading skeleton
-        // Since savedTopics is a State<List<Topic>>, we can check if it's empty.
-        // Note: We don't have an explicit isLoading state in ProfileViewModel yet, 
-        // but Room flow collection is usually fast. 
-        // If we wanted to show a skeleton initially, we could add an isLoading state to VM.
-        // For now, we'll assume if it's empty, it might be loading or just empty.
-        // But better to show empty message if truly empty.
-        
-        if (savedTopics.isEmpty()) {
-             // We can't easily distinguish between "loading" and "empty" without a state.
-             // But since it's local DB, it's fast. Let's assume empty means empty.
-             EmptySavedTopicsMessage(paddingValues)
-        } else {
-            SavedTopicsList(
-                savedTopics = savedTopics,
-                onTopicSelected = { topic ->
-                    val encodedTitle = URLEncoder.encode(topic.title, StandardCharsets.UTF_8.toString())
-                    val encodedUrl = URLEncoder.encode(topic.url, StandardCharsets.UTF_8.toString())
-                    navController.navigate("${Screen.TopicDetail.route}/$encodedTitle/$encodedUrl")
-                },
-                viewModel = viewModel,
-                paddingValues = paddingValues
+        Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+            AccountCard(
+                isLoggedIn = isLoggedIn,
+                onLogin = { navController.navigate(Screen.Login.route) },
+                onLogout = { EksiSession.logout() }
             )
+
+            Box(modifier = Modifier.weight(1f)) {
+                if (savedTopics.isEmpty()) {
+                    // Room reads are fast, so empty here means there are no saved topics
+                    EmptySavedTopicsMessage(PaddingValues(0.dp))
+                } else {
+                    SavedTopicsList(
+                        savedTopics = savedTopics,
+                        onTopicSelected = { topic ->
+                            val encodedTitle = URLEncoder.encode(topic.title, StandardCharsets.UTF_8.toString())
+                            val encodedUrl = URLEncoder.encode(topic.url, StandardCharsets.UTF_8.toString())
+                            navController.navigate("${Screen.TopicDetail.route}/$encodedTitle/$encodedUrl")
+                        },
+                        viewModel = viewModel,
+                        paddingValues = PaddingValues(0.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountCard(isLoggedIn: Boolean, onLogin: () -> Unit, onLogout: () -> Unit) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (isLoggedIn) "Logged in to ekşi sözlük" else "Not logged in",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            if (isLoggedIn) {
+                OutlinedButton(onClick = onLogout) { Text("Log out") }
+            } else {
+                Button(onClick = onLogin) { Text("Log in") }
+            }
         }
     }
 }

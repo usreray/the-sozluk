@@ -37,11 +37,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.eksiscraper.ui.navigation.Navigation
 import com.example.eksiscraper.ui.navigation.Screen
+import com.example.eksiscraper.network.EksiSession
 import com.example.eksiscraper.ui.theme.EksiScraperTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        EksiSession.init(this)
         
         enableEdgeToEdge(
             statusBarStyle = androidx.activity.SystemBarStyle.auto(

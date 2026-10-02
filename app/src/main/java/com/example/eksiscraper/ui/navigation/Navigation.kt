@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.eksiscraper.ui.screens.HomeScreen
+import com.example.eksiscraper.ui.screens.LoginScreen
 import com.example.eksiscraper.ui.screens.ProfileScreen
 import com.example.eksiscraper.ui.screens.SearchScreen
 import com.example.eksiscraper.ui.screens.TopicDetailScreen
@@ -29,6 +30,10 @@ fun Navigation(
         
         composable(Screen.Profile.route) {
             ProfileScreen(navController)
+        }
+
+        composable(Screen.Login.route) {
+            LoginScreen(navController)
         }
         
         composable(

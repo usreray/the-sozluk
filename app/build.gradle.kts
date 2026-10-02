@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -19,14 +17,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // Session cookie for logged-in actions (favorites). Kept in local.properties, not in git.
-        val localProps = Properties().apply {
-            rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
-        }
-        val eksiCookie = localProps.getProperty("eksi.cookie", "")
-            .replace("\\", "\\\\").replace("\"", "\\\"")
-        buildConfigField("String", "EKSI_COOKIE", "\"$eksiCookie\"")
     }
 
     buildTypes {
@@ -47,7 +37,6 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true
     }
 }
 

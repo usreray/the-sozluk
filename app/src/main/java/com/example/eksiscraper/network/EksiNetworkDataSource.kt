@@ -1,6 +1,5 @@
 package com.example.eksiscraper.network
 
-import com.example.eksiscraper.BuildConfig
 import com.example.eksiscraper.model.Entry
 import com.example.eksiscraper.model.Topic
 import kotlinx.coroutines.Dispatchers
@@ -11,16 +10,16 @@ import org.jsoup.Jsoup
 import java.net.URLEncoder
 
 object EksiNetworkDataSource {
-    private const val BASE_URL = "https://eksisozluk.com"
+    private const val BASE_URL = EksiSession.BASE_URL
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"
     
-    // Set via eksi.cookie in local.properties; only needed for logged-in actions like favoriting
-    private val COOKIE_STRING = BuildConfig.EKSI_COOKIE
+    // Keeps cookies the site sets (iq, ASP.NET_SessionId, ...) across requests, like a browser
+    private val session = Jsoup.newSession()
 
     private fun applyCommonConnectionSettings(connection: org.jsoup.Connection): org.jsoup.Connection {
         // Accept-Encoding is left to Jsoup: it only decodes gzip/deflate, not br/zstd
         val configured = connection
-            .userAgent(USER_AGENT)
+            .userAgent(EksiSession.userAgent ?: USER_AGENT)
             .timeout(10000)
             .followRedirects(true)
             .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
@@ -36,7 +35,12 @@ object EksiNetworkDataSource {
             .header("Priority", "u=0, i")
             .header("TE", "trailers")
             .ignoreHttpErrors(true)
-        return if (COOKIE_STRING.isNotEmpty()) configured.header("Cookie", COOKIE_STRING) else configured
+        // Logged-in users: send the cookies captured from the WebView login
+        EksiSession.cookies.split(";").forEach { pair ->
+            val name = pair.substringBefore("=").trim()
+            if (name.isNotEmpty()) configured.cookie(name, pair.substringAfter("=", "").trim())
+        }
+        return configured
     }
 
     suspend fun fetchTopics(page: Int, category: String): List<Topic> = withContext(Dispatchers.IO) {
@@ -58,7 +62,7 @@ object EksiNetworkDataSource {
             "$BASE_URL/$urlPath$pageParam"
         }
 
-        val connection = applyCommonConnectionSettings(Jsoup.connect(url))
+        val connection = applyCommonConnectionSettings(session.newRequest(url))
         val response = connection.execute()
 
         if (response.statusCode() != 200) {
@@ -113,7 +117,7 @@ object EksiNetworkDataSource {
             "/?q=${URLEncoder.encode(query.trim(), "UTF-8")}"
         }
 
-        val connection = applyCommonConnectionSettings(Jsoup.connect("$BASE_URL$searchUrl"))
+        val connection = applyCommonConnectionSettings(session.newRequest("$BASE_URL$searchUrl"))
         val response = connection.execute()
 
         if (response.statusCode() != 200) {
@@ -151,7 +155,7 @@ object EksiNetworkDataSource {
     suspend fun favoriteEntry(entryId: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val favlaUrl = "$BASE_URL/entry/favla"
-            val connection = applyCommonConnectionSettings(Jsoup.connect(favlaUrl))
+            val connection = applyCommonConnectionSettings(session.newRequest(favlaUrl))
                 .method(org.jsoup.Connection.Method.POST)
                 .referrer("$BASE_URL/")
                 .header("Content-Type", "application/x-www-form-urlencoded")
@@ -169,7 +173,7 @@ object EksiNetworkDataSource {
     suspend fun unfavoriteEntry(entryId: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val favlamaUrl = "$BASE_URL/entry/favlama"
-            val connection = applyCommonConnectionSettings(Jsoup.connect(favlamaUrl))
+            val connection = applyCommonConnectionSettings(session.newRequest(favlamaUrl))
                 .method(org.jsoup.Connection.Method.POST)
                 .referrer("$BASE_URL/")
                 .header("Content-Type", "application/x-www-form-urlencoded")
