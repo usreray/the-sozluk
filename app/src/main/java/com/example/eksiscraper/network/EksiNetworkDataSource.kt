@@ -55,14 +55,18 @@ object EksiNetworkDataSource {
             delay(randomDelayMs)
         }
 
-        val url = if (urlPath == "basliklar/bugun" && page > 1) {
+        val url = if (urlPath == "basliklar/bugun") {
+            // /basliklar/bugun without a page number is 404 for logged-out users
             "$BASE_URL/$urlPath/$page"
         } else {
             val pageParam = if (page > 1) "?p=$page" else ""
             "$BASE_URL/$urlPath$pageParam"
         }
 
+        // Ask for the topic index the way the site's own script does: logged-in pages leave the
+        // list out of the HTML and load it with this XHR, which also works when logged out
         val connection = applyCommonConnectionSettings(session.newRequest(url))
+            .header("X-Requested-With", "XMLHttpRequest")
         val response = connection.execute()
 
         if (response.statusCode() != 200) {

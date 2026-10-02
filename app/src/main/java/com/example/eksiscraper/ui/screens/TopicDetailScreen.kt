@@ -122,7 +122,8 @@ fun TopicDetailScreen(
                             viewModel.toggleEntryExpansion(entryId)
                         },
                         onToggleEntryFavorite = { entryId -> viewModel.toggleEntryFavorite(entryId) },
-                        onLoginRequest = { navController.navigate(Screen.Login.route) }
+                        onLoginRequest = { navController.navigate(Screen.Login.route) },
+                        onShowOlderEntries = { viewModel.showOlderEntries() }
                 )
             }
         } else {

@@ -34,6 +34,9 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
 
     val scrollState = LazyListState()
 
+    // False: today's entries of a gündem topic (?a=popular); true: the whole topic
+    private var showAllEntries = false
+
     fun loadTopic(title: String, url: String, page: Int = 1) {
         val initialTopic =
                 Topic(
@@ -71,28 +74,55 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         fetchEntries(topic, page)
     }
 
+    /** Leaves today's entries for the full topic, at the page holding today's first entry. */
+    fun showOlderEntries() {
+        val topic = _selectedTopic.value ?: return
+        if (topic.olderEntriesUrl.isEmpty()) return
+        showAllEntries = true
+        clearExpandedEntries()
+        _isLoading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            try {
+                val result = repository.searchTopic(topic.title, 1, topic.olderEntriesUrl)
+                _selectedTopic.value = result.copy(url = topic.url, isSaved = topic.isSaved)
+                _totalPages.value = result.totalPages
+                _currentPage.value = result.currentPage
+                scrollState.scrollToItem(0)
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Could not load the topic"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     private fun fetchEntries(topic: Topic, page: Int) {
         _isLoading.value = true
         _error.value = null
         viewModelScope.launch {
             try {
-                // Open the topic itself from its first entry: drop query parameters such as
-                // ?a=popular (today's entries only) or an old ?p=; the data source adds the page
-                val path = try {
+                val uri = try {
                     if (topic.url.isEmpty()) null
-                    else URI(if (topic.url.startsWith("http")) topic.url else "https://eksisozluk.com" + (if (topic.url.startsWith("/")) "" else "/") + topic.url).path
+                    else URI(if (topic.url.startsWith("http")) topic.url else "https://eksisozluk.com" + (if (topic.url.startsWith("/")) "" else "/") + topic.url)
                 } catch (e: Exception) {
                     null
                 }
+                val path = uri?.path
+                // Gündem links (?a=popular) show today's entries, like the site and other
+                // clients; "N entry daha" switches to the full topic. Other params (an old
+                // ?p=, ?focusto=) are dropped: the data source adds the page itself.
+                val popular = !showAllEntries && uri?.query?.split("&")?.contains("a=popular") == true
                 val result =
                         if (path.isNullOrBlank() || path == "/") {
                             // No topic path (e.g. an old saved search URL): search by title
                             repository.searchTopic(topic.title, page)
                         } else {
-                            repository.searchTopic(topic.title, page, path)
+                            repository.searchTopic(topic.title, page, if (popular) "$path?a=popular" else path)
                         }
 
-                _selectedTopic.value = result
+                // Keep the link we were opened with so paging stays in the same (popular/full) mode
+                _selectedTopic.value = if (topic.url.isNotEmpty()) result.copy(url = topic.url) else result
                 _totalPages.value = result.totalPages
                 _currentPage.value = page
             } catch (e: Exception) {

@@ -25,18 +25,8 @@ object HtmlParser {
                         topicElements = document.select("#partial-index li a")
                 }
 
-                if (topicElements.isEmpty()) {
-                        // Use a different approach to get links that start with '/'
-                        val allLinks = document.select("a[href^='/']")
-                        // Create a new Elements collection for non-empty text links
-                        val filteredLinks = Elements()
-                        for (link in allLinks) {
-                                if (link.text().isNotEmpty()) {
-                                        filteredLinks.add(link)
-                                }
-                        }
-                        topicElements = filteredLinks
-                }
+                // No generic "every link" fallback: it turned the site menu (bugün, gündem,
+                // debe, ...) into fake topics when the list was missing
 
                 // Check if we found any topics at all
                 if (topicElements.isEmpty()) {
@@ -122,6 +112,23 @@ object HtmlParser {
                                 totalPages = maxLink
                         }
                 }
+
+                val returnedPage =
+                        document.selectFirst("[data-currentpage]")
+                                ?.attr("data-currentpage")
+                                ?.toIntOrNull()
+                                ?: page
+
+                // On ?a=popular pages a "N entry daha" link above the list leads to the
+                // full topic at today's first entry (/slug--id?focusto=<entry id>)
+                val firstEntry = entryListItems.firstOrNull()
+                val olderLink =
+                        document.select("a.showall").firstOrNull { link ->
+                                firstEntry != null &&
+                                        link.attr("href").contains("focusto=${firstEntry.attr("data-id")}")
+                        }
+                val olderCount =
+                        olderLink?.text()?.substringBefore(" ")?.toIntOrNull() ?: 0
 
                 // Process entries
                 val entries = mutableListOf<Entry>()
@@ -241,7 +248,10 @@ object HtmlParser {
                         entries = entries,
                         entriesLoaded = true,
                         redirectedUrl = redirectedPath,
-                        totalPages = totalPages
+                        totalPages = maxOf(totalPages, returnedPage),
+                        currentPage = returnedPage,
+                        olderEntriesCount = olderCount,
+                        olderEntriesUrl = if (olderCount > 0) olderLink?.attr("href").orEmpty() else ""
                 )
         }
 }

@@ -5,7 +5,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
@@ -28,7 +31,8 @@ fun EntriesDisplay(
         isEntryExpanded: (String) -> Boolean,
         onToggleEntryExpansion: (String) -> Unit,
         onToggleEntryFavorite: (String) -> Unit,
-        onLoginRequest: () -> Unit
+        onLoginRequest: () -> Unit,
+        onShowOlderEntries: (() -> Unit)? = null
 ) {
     val isLoggedIn by EksiSession.isLoggedIn
     var showLoginDialog by remember { mutableStateOf(false) }
@@ -69,6 +73,15 @@ fun EntriesDisplay(
                             bottom = 80.dp
                     ) // Space for FAB or bottom nav
     ) {
+        if (topic.olderEntriesCount > 0 && onShowOlderEntries != null) {
+            item {
+                OutlinedButton(
+                        onClick = onShowOlderEntries,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                ) { Text("${topic.olderEntriesCount} entry daha") }
+            }
+        }
+
         itemsIndexed(topic.entries) { index, entry ->
             EntryItem(
                     entry = entry,
