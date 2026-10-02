@@ -1,10 +1,12 @@
 package com.example.eksiscraper.ui.components
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -45,12 +47,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /**
- * The app's top bar, floating over the content instead of an edge-to-edge app bar.
+ * The app's top bar, floating over the content as separate surfaces in the M3 Expressive way:
+ * a round back button, a card with the title, and a pill with the actions, each on its own.
  *
- * Without a title (e.g. the top of a profile, where the page itself shows the big heading) it is
- * just round floating buttons, as in current Google apps; once a [title] is given it morphs into
- * a card holding it. It slides away while scrolling down and comes back on the way up
- * ([visible]).
+ * Without a title (e.g. the top of a profile, where the page itself shows the big heading) only
+ * the round buttons float; the title card appears once a [title] is given. The bar slides away
+ * while scrolling down and comes back on the way up ([visible]). [actions] null draws no pill.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -62,89 +64,91 @@ fun FloatingTopBar(
     visible: Boolean = true,
     isLoading: Boolean = false,
     leading: (@Composable () -> Unit)? = null,
-    actions: @Composable RowScope.() -> Unit = {}
+    actions: (@Composable RowScope.() -> Unit)? = null
 ) {
-    val compact = title == null && subtitle == null && leading == null && !isLoading
+    val showTitle = title != null || subtitle != null || leading != null
     AnimatedVisibility(
         visible = visible,
         enter = slideInVertically { -it } + fadeIn(),
         exit = slideOutVertically { -it } + fadeOut(),
         modifier = modifier.statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        AnimatedContent(
-            targetState = compact,
-            transitionSpec = {
-                (fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(120)))
-                    .using(SizeTransform(clip = false))
-            },
-            label = "topBarShape"
-        ) { isCompact ->
-            if (isCompact) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    if (onBack != null) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            shadowElevation = 6.dp
-                        ) {
-                            IconButton(onClick = onBack) {
-                                Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
-                            }
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shadowElevation = 6.dp
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) { actions() }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (onBack != null) {
+                FloatingSurface(shape = CircleShape) {
+                    IconButton(onClick = onBack, modifier = Modifier.size(52.dp)) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
                     }
                 }
-            } else {
-                Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 6.dp,
-                    modifier = Modifier.fillMaxWidth()
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showTitle,
+                    enter = fadeIn() + expandHorizontally(expandFrom = Alignment.Start),
+                    exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.Start)
                 ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(6.dp)) {
-                            if (onBack != null) {
-                                IconButton(onClick = onBack) {
-                                    Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Geri")
+                    FloatingSurface(shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth()) {
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 8.dp)
+                            ) {
+                                leading?.let {
+                                    it()
+                                    Spacer(Modifier.width(12.dp))
                                 }
-                            } else {
-                                Spacer(Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    if (title != null) {
+                                        Text(
+                                            title,
+                                            style = MaterialTheme.typography.titleMediumEmphasized,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    if (subtitle != null) {
+                                        Text(
+                                            subtitle,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
-                            leading?.invoke()
-                            Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp, vertical = 6.dp)) {
-                                if (title != null) {
-                                    Text(
-                                        title,
-                                        style = MaterialTheme.typography.titleMediumEmphasized,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                                if (subtitle != null) {
-                                    Text(
-                                        subtitle,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
+                            if (isLoading) {
+                                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
                             }
-                            actions()
-                        }
-                        if (isLoading) {
-                            LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp))
                         }
                     }
                 }
             }
+            if (actions != null) {
+                FloatingSurface(shape = CircleShape) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 2.dp)) { actions() }
+                }
+            }
         }
     }
+}
+
+/** One floating piece of the top bar. */
+@Composable
+private fun FloatingSurface(
+    shape: androidx.compose.ui.graphics.Shape,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 6.dp,
+        modifier = modifier,
+        content = content
+    )
 }
 
 /**
@@ -153,7 +157,7 @@ fun FloatingTopBar(
  */
 @Composable
 fun floatingTopBarInset(compact: Boolean = false): Dp =
-    WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + if (compact) 72.dp else 108.dp
+    WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + if (compact) 72.dp else 96.dp
 
 /** True while the user scrolls toward the top (or sits at the top): show the bars then. */
 @Composable

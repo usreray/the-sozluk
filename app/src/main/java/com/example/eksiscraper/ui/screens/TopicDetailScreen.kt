@@ -300,19 +300,14 @@ fun TopicDetailScreen(
 
         FloatingTopBar(
             title = displayTitle,
-            subtitle = when {
-                !loaded -> null
-                topic?.url?.contains("/entry/") == true -> "tek entry"
-                totalPages > 1 -> "$totalPages sayfa"
-                else -> null
-            },
+            // Pages are in the bottom toolbar; only say when this is a single entry
+            subtitle = if (loaded && topic?.url?.contains("/entry/") == true) "tek entry" else null,
             onBack = { navController.popBackStack() },
             visible = barsVisible || phase != TopicPhase.Content,
             isLoading = isLoading && loaded,
-            modifier = Modifier.align(Alignment.TopCenter)
-        ) {
+            modifier = Modifier.align(Alignment.TopCenter),
             // Nothing to save or share for a topic that doesn't exist
-            if (phase == TopicPhase.Content) {
+            actions = if (phase != TopicPhase.Content) null else ({
                 TopicShareButton(topic)
                 IconToggleButton(
                     checked = topic?.isSaved == true,
@@ -325,8 +320,8 @@ fun TopicDetailScreen(
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-        }
+            })
+        )
 
         BottomToolbar(
             visible = phase == TopicPhase.Content && (totalPages > 1 || canWrite) && barsVisible,

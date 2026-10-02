@@ -131,9 +131,8 @@ fun MessageThreadScreen(
                         size = 36,
                         modifier = Modifier.clickable { navController.navigate(Screen.Author.createRoute(otherNick)) }
                     )
-                }
-            ) {
-                    if (thread?.threadForm != null) {
+                },
+                actions = if (thread?.threadForm == null) null else ({
                         Box {
                             IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "Diğer") }
                             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -155,8 +154,8 @@ fun MessageThreadScreen(
                                 )
                             }
                         }
-                    }
-            }
+                })
+            )
         },
         bottomBar = {
             // Reply box: replies go through the "yeni mesaj" form to the same nick
