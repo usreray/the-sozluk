@@ -1,9 +1,13 @@
 package com.example.eksiscraper.network
 
+import com.example.eksiscraper.model.AuthorProfile
+import com.example.eksiscraper.model.Badge
 import com.example.eksiscraper.model.Entry
+import com.example.eksiscraper.model.FormSpec
 import com.example.eksiscraper.model.Topic
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
 
 object HtmlParser {
@@ -89,7 +93,7 @@ object HtmlParser {
                                         .ifBlank { query }
 
                 // Extract entry list items directly instead of just content divs
-                val entryListItems = document.select("li[data-id]")
+                val entryListItems = document.select("#entry-item-list > li[data-id]")
 
                 // Extract the total number of pages
                 var totalPages = page
@@ -130,97 +134,7 @@ object HtmlParser {
                 val olderCount =
                         olderLink?.text()?.substringBefore(" ")?.toIntOrNull() ?: 0
 
-                // Process entries
-                val entries = mutableListOf<Entry>()
-                for (entryLi in entryListItems.take(10)) {
-                        // Get the content div inside the li
-                        val entryElement =
-                                entryLi.select("div.content, div.entry-content, div.entry")
-                                        .firstOrNull()
-                        if (entryElement != null) {
-                                // Instead of just text(), preserve paragraph structure by replacing
-                                // <br> and <p>
-                                // tags with newlines
-                                val htmlContent = entryElement.html()
-
-                                // First, normalize all possible paragraph/line break tags to
-                                // consistent markers
-                                val contentWithMarkers =
-                                        htmlContent
-                                                .replace("<br>", "[SINGLE_BREAK]")
-                                                .replace("<br/>", "[SINGLE_BREAK]")
-                                                .replace("<br />", "[SINGLE_BREAK]")
-                                                .replace(
-                                                        "</p><p>",
-                                                        "[DOUBLE_BREAK]"
-                                                ) // Paragraphs should have double breaks
-                                                .replace("<p>", "")
-                                                .replace("</p>", "[SINGLE_BREAK]")
-
-                                // Convert to plain text - this will strip all remaining HTML tags
-                                val plainText = Jsoup.parse(contentWithMarkers).text()
-
-                                // Replace our markers with actual newlines
-                                val contentWithProperBreaks =
-                                        plainText
-                                                .replace("[SINGLE_BREAK]", "\n")
-                                                .replace(
-                                                        "[DOUBLE_BREAK]",
-                                                        "\n\n"
-                                                ) // Double newlines for paragraph breaks
-
-                                // Clean up any excessive consecutive newlines but preserve doubles
-                                val contentWithNormalizedBreaks =
-                                        contentWithProperBreaks.replace(
-                                                Regex("\n{3,}"),
-                                                "\n\n"
-                                        ) // Replace 3+ newlines with double newlines
-
-                                // Trim each line to remove leading/trailing spaces
-                                val lines = contentWithNormalizedBreaks.lines()
-                                val trimmedLines = lines.map { it.trim() }
-                                val content = trimmedLines.joinToString("\n").trim()
-
-                                if (content.isNotEmpty()) {
-                                        // Extract author, date, and favorite count
-                                        val author =
-                                                entryLi.select("a.entry-author, a.author")
-                                                        .firstOrNull()
-                                                        ?.text()
-                                                        ?: ""
-                                        val date =
-                                                entryLi.select("a.entry-date, span.date")
-                                                        .firstOrNull()
-                                                        ?.text()
-                                                        ?: ""
-
-                                        // Extract favorite count from data attribute of the li
-                                        // element
-                                        val favoriteCountStr =
-                                                entryLi.attr("data-favorite-count") ?: "0"
-                                        val favoriteCount = favoriteCountStr.toIntOrNull() ?: 0
-
-                                        // Extract entry ID from data-id attribute
-                                        val entryId = entryLi.attr("data-id") ?: ""
-
-                                        // Extract if the entry is already favorited
-                                        val isFavorited =
-                                                entryLi.attr("data-isfavorite")
-                                                        .equals("true", ignoreCase = true)
-
-                                        entries.add(
-                                                Entry(
-                                                        content = content,
-                                                        author = author,
-                                                        date = date,
-                                                        favoriteCount = favoriteCount,
-                                                        entryId = entryId,
-                                                        isFavorited = isFavorited
-                                                )
-                                        )
-                                }
-                        }
-                }
+                val entries = entryListItems.take(10).mapNotNull(::parseEntry)
 
                 // Determine redirected URL
                 val finalUrl = document.location()
@@ -241,7 +155,120 @@ object HtmlParser {
                         redirectedUrl = redirectedPath,
                         totalPages = maxOf(totalPages, returnedPage),
                         currentPage = returnedPage,
-                        olderEntriesCount = olderCount
+                        olderEntriesCount = olderCount,
+                        entryForm = findEntryForm(document),
+                        deleteForm = findDeleteForm(document)
                 )
         }
+
+        /** One entry `<li>` as rendered in topic pages and profile lists. */
+        fun parseEntry(li: Element): Entry? {
+                val contentElement = li.selectFirst("div.content") ?: return null
+                val content = toPlainText(contentElement)
+                if (content.isEmpty()) return null
+                return Entry(
+                        content = content,
+                        contentHtml = contentElement.html(),
+                        author = li.attr("data-author").ifEmpty { li.selectFirst("a.entry-author")?.text().orEmpty() },
+                        authorId = li.attr("data-author-id"),
+                        date = li.selectFirst("a.entry-date")?.text().orEmpty(),
+                        favoriteCount = li.attr("data-favorite-count").toIntOrNull() ?: 0,
+                        entryId = li.attr("data-id"),
+                        isFavorited = li.attr("data-isfavorite").equals("true", ignoreCase = true),
+                        isLiked = li.attr("data-isliked").equals("true", ignoreCase = true),
+                        isDisliked = li.attr("data-isdisliked").equals("true", ignoreCase = true),
+                        flags = li.attr("data-flags").split(' ').filter { it.isNotBlank() }.toSet(),
+                        commentCount = li.attr("data-comment-count").toIntOrNull() ?: 0
+                )
+        }
+
+        /** Text with line breaks kept: <br> and paragraphs become newlines. */
+        private fun toPlainText(element: Element): String {
+                val marked = element.html()
+                        .replace(Regex("<br\\s*/?>"), "[BR]")
+                        .replace("</p><p>", "[BR][BR]")
+                        .replace("<p>", "")
+                        .replace("</p>", "[BR]")
+                return Jsoup.parse(marked).text()
+                        .replace("[BR]", "\n")
+                        .replace(Regex("\n{3,}"), "\n\n")
+                        .lines()
+                        .joinToString("\n") { it.trim() }
+                        .trim()
+        }
+
+        /**
+         * The "write an entry" form logged-in users get under a topic. Found by shape (a form
+         * with a textarea that isn't the comment or message form) so small markup changes don't
+         * break it.
+         */
+        private fun findEntryForm(document: Document): FormSpec? {
+                val form = document.select("form").firstOrNull { form ->
+                        form.selectFirst("textarea") != null &&
+                                form.id() != "comment-entry-form" &&
+                                !form.attr("action").contains("mesaj") &&
+                                !form.attr("action").contains("yorum")
+                } ?: return null
+                return formSpec(form)
+        }
+
+        /** The form behind the "sil" item of the user's own entries. */
+        private fun findDeleteForm(document: Document): FormSpec? {
+                val candidates = document.select("form").filter { form ->
+                        val action = form.attr("action").lowercase()
+                        form.selectFirst("input[name=id], input[name=Id]") != null &&
+                                (action.contains("sil") || action.contains("delete"))
+                }
+                // Moderators also get a "delete other" form; prefer the one for own entries
+                val form = candidates.firstOrNull { !it.id().contains("other") } ?: return null
+                return formSpec(form)
+        }
+
+        private fun formSpec(form: Element): FormSpec {
+                val fields = form.select("input[name]")
+                        .filter { it.attr("type") !in setOf("submit", "button", "checkbox") }
+                        .associate { it.attr("name") to it.attr("value") }
+                return FormSpec(
+                        action = form.attr("action"),
+                        fields = fields,
+                        textFieldName = form.selectFirst("textarea[name]")?.attr("name")
+                )
+        }
+
+        fun parseProfile(document: Document, nick: String): AuthorProfile {
+                fun count(id: String) =
+                        document.selectFirst("#$id")?.text()?.filter(Char::isDigit)?.toIntOrNull() ?: 0
+                val avatar = document.selectFirst("img.avatar")?.attr("src").orEmpty()
+                return AuthorProfile(
+                        nick = document.selectFirst("#user-profile-title")?.attr("data-nick")
+                                ?.ifBlank { null } ?: nick,
+                        // The default picture is an SVG placeholder; the app shows initials instead
+                        avatarUrl = avatar.takeIf { it.isNotBlank() && !it.contains("default-profile") }
+                                ?.let { if (it.startsWith("//")) "https:$it" else it },
+                        isVerified = document.selectFirst("#verified-badge") != null,
+                        karma = document.selectFirst("#nick-container + p.muted, p.muted")?.text().orEmpty(),
+                        biography = document.selectFirst("#profile-biography .content")?.text().orEmpty(),
+                        entryCount = count("entry-count-total"),
+                        followerCount = count("user-follower-count"),
+                        followingCount = count("user-following-count"),
+                        joinedDate = document.selectFirst(".recorddate")?.text().orEmpty(),
+                        badges = document.select("a.user-profile-badge-item").map {
+                                Badge(
+                                        name = it.attr("data-name"),
+                                        description = it.attr("data-title"),
+                                        imageUrl = it.selectFirst("img")?.attr("src").orEmpty()
+                                )
+                        }
+                )
+        }
+
+        /** Profile tabs (son entryleri, en beğenilenleri, ...): entries with their topic. */
+        fun parseUserEntries(document: Document): List<Entry> =
+                document.select(".topic-item").flatMap { item ->
+                        val heading = item.selectFirst("h1")
+                        val title = heading?.attr("data-title")?.ifBlank { null } ?: heading?.text().orEmpty()
+                        val url = heading?.selectFirst("a")?.attr("href").orEmpty()
+                        item.select("li[data-id]").mapNotNull(::parseEntry)
+                                .map { it.copy(topicTitle = title, topicUrl = url) }
+                }
 }

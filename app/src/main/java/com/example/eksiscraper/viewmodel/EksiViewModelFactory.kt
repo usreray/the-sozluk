@@ -27,6 +27,9 @@ class EksiViewModelFactory(private val application: Application) : ViewModelProv
             modelClass.isAssignableFrom(TopicDetailViewModel::class.java) -> {
                 TopicDetailViewModel(repository) as T
             }
+            modelClass.isAssignableFrom(AuthorViewModel::class.java) -> {
+                AuthorViewModel(repository) as T
+            }
             modelClass.isAssignableFrom(ProfileViewModel::class.java) -> {
                 ProfileViewModel(repository) as T
             }

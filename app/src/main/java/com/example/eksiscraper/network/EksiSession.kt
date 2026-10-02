@@ -20,15 +20,26 @@ object EksiSession {
     private const val PREFS = "eksi_session"
     private const val KEY_COOKIES = "cookies"
     private const val KEY_USER_AGENT = "user_agent"
+    private const val KEY_NICK = "nick"
 
     private lateinit var prefs: SharedPreferences
 
     private val _isLoggedIn = mutableStateOf(false)
     val isLoggedIn: State<Boolean> = _isLoggedIn
 
+    // The logged-in user's nick, for "my profile"; read from the site after login
+    private val _nick = mutableStateOf<String?>(null)
+    val nick: State<String?> = _nick
+
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         _isLoggedIn.value = cookies.isNotEmpty()
+        _nick.value = prefs.getString(KEY_NICK, null)
+    }
+
+    fun saveNick(nick: String) {
+        prefs.edit().putString(KEY_NICK, nick).apply()
+        _nick.value = nick
     }
 
     val cookies: String
@@ -51,8 +62,10 @@ object EksiSession {
     }
 
     fun logout() {
-        prefs.edit().remove(KEY_COOKIES).remove(KEY_USER_AGENT).apply()
+        prefs.edit().remove(KEY_COOKIES).remove(KEY_USER_AGENT).remove(KEY_NICK).apply()
         CookieManager.getInstance().removeAllCookies(null)
+        EksiNetworkDataSource.resetSession()
         _isLoggedIn.value = false
+        _nick.value = null
     }
 }

@@ -42,6 +42,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.eksiscraper.ui.components.ErrorState
 import com.example.eksiscraper.ui.components.LoadingState
+import com.example.eksiscraper.ui.components.LocalBottomBarInset
 import com.example.eksiscraper.ui.components.TopicRow
 import com.example.eksiscraper.ui.components.segmentedShape
 import com.example.eksiscraper.ui.navigation.Screen
@@ -195,7 +196,7 @@ private fun CategoryPage(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp + LocalBottomBarInset.current),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         itemsIndexed(state.topics, key = { _, topic -> topic.url }) { index, topic ->

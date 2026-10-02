@@ -1,5 +1,8 @@
 package com.example.eksiscraper.network
 
+import com.example.eksiscraper.model.AuthorProfile
+import com.example.eksiscraper.model.Entry
+import com.example.eksiscraper.model.FormSpec
 import com.example.eksiscraper.model.Topic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -17,7 +20,12 @@ object EksiNetworkDataSource {
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"
     
     // Keeps cookies the site sets (iq, ASP.NET_SessionId, ...) across requests, like a browser
-    private val session = Jsoup.newSession()
+    private var session = Jsoup.newSession()
+
+    /** Drops cookies the site set during a login, e.g. after logging out. */
+    fun resetSession() {
+        session = Jsoup.newSession()
+    }
 
     private fun applyCommonConnectionSettings(connection: org.jsoup.Connection): org.jsoup.Connection {
         // Accept-Encoding is left to Jsoup: it only decodes gzip/deflate, not br/zstd
@@ -180,4 +188,89 @@ object EksiNetworkDataSource {
             return@withContext false
         }
     }
+
+    /**
+     * şükela (rate 1) or çok kötü (rate -1), as the site's own script sends it; [owner] is the
+     * author's id. [rate] 0 takes a vote back.
+     */
+    suspend fun vote(entryId: String, authorId: String, rate: Int, previous: Int): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                // Switching sides or taking a vote back first removes the old one
+                if (previous != 0) {
+                    val removed = ajaxPost("/entry/removevote", mapOf("id" to entryId, "rate" to "$previous", "owner" to authorId))
+                    if (!removed || rate == 0) return@withContext removed
+                }
+                ajaxPost("/entry/vote", mapOf("id" to entryId, "rate" to "$rate", "owner" to authorId))
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+    private fun ajaxPost(path: String, data: Map<String, String>): Boolean {
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))
+            .method(org.jsoup.Connection.Method.POST)
+            .referrer("$BASE_URL/")
+            .header("X-Requested-With", "XMLHttpRequest")
+            .data(data)
+            .execute()
+        return response.statusCode() == 200
+    }
+
+    /**
+     * Posts a form read from a page (entry form, delete form) with its hidden fields, including
+     * the CSRF token, plus [values]. Returns an error message, or null on success.
+     */
+    suspend fun submitForm(form: FormSpec, values: Map<String, String>): String? = withContext(Dispatchers.IO) {
+        try {
+            val action = if (form.action.startsWith("http")) form.action else BASE_URL + form.action
+            val response = applyCommonConnectionSettings(session.newRequest(action))
+                .method(org.jsoup.Connection.Method.POST)
+                .referrer("$BASE_URL/")
+                .data(form.fields + values)
+                .execute()
+            if (response.statusCode() !in 200..399) return@withContext "İşlem başarısız (HTTP ${response.statusCode()})"
+            // A rejected form comes back with the site's validation message
+            val error = runCatching { response.parse() }.getOrNull()
+                ?.select(".field-validation-error, .validation-summary-errors")
+                ?.text()?.trim()
+            error?.takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            e.message ?: "İşlem başarısız"
+        }
+    }
+
+    suspend fun fetchProfile(nick: String): AuthorProfile = withContext(Dispatchers.IO) {
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/biri/${encodePath(nick)}"))
+            .execute()
+        if (response.statusCode() == 404) throw IOException("Böyle bir yazar yok")
+        if (response.statusCode() != 200) throw IOException("Profil yüklenemedi (HTTP ${response.statusCode()})")
+        HtmlParser.parseProfile(response.parse(), nick)
+    }
+
+    /** One page of a profile tab such as "son-entryleri" or "en-begenilenleri". */
+    suspend fun fetchUserEntries(nick: String, tab: String, page: Int): List<Entry> = withContext(Dispatchers.IO) {
+        val url = "$BASE_URL/$tab?nick=${URLEncoder.encode(nick, "UTF-8")}&p=$page"
+        val response = applyCommonConnectionSettings(session.newRequest(url))
+            .header("X-Requested-With", "XMLHttpRequest")
+            .execute()
+        if (response.statusCode() != 200) throw IOException("Entry'ler yüklenemedi (HTTP ${response.statusCode()})")
+        HtmlParser.parseUserEntries(response.parse())
+    }
+
+    /** The logged-in user's nick, read from the "ben" link in the site header. */
+    suspend fun fetchOwnNick(): String? = withContext(Dispatchers.IO) {
+        try {
+            val document = applyCommonConnectionSettings(session.newRequest("$BASE_URL/")).execute().parse()
+            document.select("#top-navigation a[href^=/biri/], header a[href^=/biri/], nav a[href^=/biri/]")
+                .firstOrNull()?.attr("href")?.removePrefix("/biri/")?.substringBefore("/")?.substringBefore("?")
+                ?.let { java.net.URLDecoder.decode(it, "UTF-8") }
+                ?.ifBlank { null }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    // Nicks use dashes for spaces in profile URLs ("il leone" -> /biri/il-leone)
+    private fun encodePath(nick: String) = URLEncoder.encode(nick.trim().replace(' ', '-'), "UTF-8")
 }

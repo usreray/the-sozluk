@@ -1,6 +1,9 @@
 package com.example.eksiscraper.repository
 
 import com.example.eksiscraper.data.room.SavedTopicRepository
+import com.example.eksiscraper.model.AuthorProfile
+import com.example.eksiscraper.model.Entry
+import com.example.eksiscraper.model.FormSpec
 import com.example.eksiscraper.model.Topic
 import com.example.eksiscraper.network.EksiNetworkDataSource
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +31,20 @@ class EksiRepository(
         return if (favorited) EksiNetworkDataSource.favoriteEntry(entryId)
         else EksiNetworkDataSource.unfavoriteEntry(entryId)
     }
+
+    suspend fun vote(entryId: String, authorId: String, rate: Int, previous: Int): Boolean =
+        EksiNetworkDataSource.vote(entryId, authorId, rate, previous)
+
+    /** Returns an error message, or null on success. */
+    suspend fun submitForm(form: FormSpec, values: Map<String, String>): String? =
+        EksiNetworkDataSource.submitForm(form, values)
+
+    suspend fun getProfile(nick: String): AuthorProfile = EksiNetworkDataSource.fetchProfile(nick)
+
+    suspend fun getUserEntries(nick: String, tab: String, page: Int): List<Entry> =
+        EksiNetworkDataSource.fetchUserEntries(nick, tab, page)
+
+    suspend fun getOwnNick(): String? = EksiNetworkDataSource.fetchOwnNick()
 
     // Local operations (delegated to SavedTopicRepository)
     val allSavedTopics: Flow<List<Topic>> = savedTopicRepository.allSavedTopics

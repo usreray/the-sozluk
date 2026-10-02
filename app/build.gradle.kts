@@ -52,6 +52,9 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.jsoup)
+    // Avatars and badge images
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     
     // Replace Accompanist Pager with official Jetpack Compose Pager
     implementation("androidx.compose.foundation:foundation")

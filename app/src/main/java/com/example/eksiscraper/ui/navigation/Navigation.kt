@@ -13,10 +13,12 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.eksiscraper.ui.screens.AuthorScreen
 import com.example.eksiscraper.ui.screens.HomeScreen
 import com.example.eksiscraper.ui.screens.LoginScreen
 import com.example.eksiscraper.ui.screens.ProfileScreen
 import com.example.eksiscraper.ui.screens.SearchScreen
+import com.example.eksiscraper.ui.screens.SettingsScreen
 import com.example.eksiscraper.ui.screens.TopicDetailScreen
 
 @Composable
@@ -33,6 +35,21 @@ fun Navigation(navController: NavHostController) {
         composable(Screen.Home.route) { HomeScreen(navController) }
         composable(Screen.Search.route) { SearchScreen(navController) }
         composable(Screen.Profile.route) { ProfileScreen(navController) }
+
+        composable(
+            route = Screen.Author.pattern,
+            arguments = listOf(navArgument("nick") { type = NavType.StringType; defaultValue = "" }),
+            enterTransition = { slideIntoContainer(SlideDirection.Start, tween(320)) + fadeIn(tween(200)) },
+            popExitTransition = { slideOutOfContainer(SlideDirection.End, tween(280)) + fadeOut(tween(200)) }
+        ) { backStackEntry ->
+            AuthorScreen(nick = backStackEntry.arguments?.getString("nick").orEmpty(), navController = navController)
+        }
+
+        composable(
+            Screen.Settings.route,
+            enterTransition = { slideIntoContainer(SlideDirection.Start, tween(320)) + fadeIn(tween(200)) },
+            popExitTransition = { slideOutOfContainer(SlideDirection.End, tween(280)) + fadeOut(tween(200)) }
+        ) { SettingsScreen(navController) }
 
         // Login rises from the bottom like a sheet
         composable(

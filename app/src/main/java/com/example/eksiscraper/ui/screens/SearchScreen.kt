@@ -77,7 +77,11 @@ fun SearchScreen(
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
         scope.launch { searchBarState.animateToCollapsed() }
-        navController.navigate(Screen.TopicDetail.createRoute(trimmed, ""))
+        if (trimmed.startsWith("@") && trimmed.length > 1) {
+            navController.navigate(Screen.Author.createRoute(trimmed.removePrefix("@")))
+        } else {
+            navController.navigate(Screen.TopicDetail.createRoute(trimmed, ""))
+        }
     }
 
     val inputField = @Composable {

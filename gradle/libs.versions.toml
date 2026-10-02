@@ -22,9 +22,12 @@ navigationCompose = "2.10.2"
 navigationComposeVersion = "2.8.9"
 roomVersion = "2.8.5"
 ksp = "2.3.12"
+coil = "3.6.3"
 material3Expressive = "1.5.0-alpha27"
 
 [libraries]
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 accompanist-pager = { module = "com.google.accompanist:accompanist-pager", version.ref = "accompanistPager" }
 accompanist-pager-indicators = { module = "com.google.accompanist:accompanist-pager-indicators", version.ref = "accompanistPager" }
 accompanist-swiperefresh = { module = "com.google.accompanist:accompanist-swiperefresh", version.ref = "accompanistSwiperefresh" }

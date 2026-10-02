@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.BookmarkRemove
 import androidx.compose.material.icons.rounded.Bookmarks
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -36,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.network.EksiSession
+import com.example.eksiscraper.ui.components.LocalBottomBarInset
 import com.example.eksiscraper.ui.components.MessageState
 import com.example.eksiscraper.ui.components.TopicRow
 import com.example.eksiscraper.ui.components.segmentedShape
@@ -61,23 +64,38 @@ fun ProfileScreen(
 ) {
     val savedTopics by viewModel.savedTopics
     val isLoggedIn by EksiSession.isLoggedIn
+    val nick by EksiSession.nick
+
+    // The nick isn't part of the login itself; look it up once from the site header
+    LaunchedEffect(isLoggedIn, nick) {
+        if (isLoggedIn && nick == null) viewModel.refreshNick()
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("profil", style = MaterialTheme.typography.headlineMediumEmphasized) })
+            TopAppBar(
+                title = { Text("profil", style = MaterialTheme.typography.headlineMediumEmphasized) },
+                actions = {
+                    IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
+                        Icon(Icons.Rounded.Settings, contentDescription = "Ayarlar")
+                    }
+                }
+            )
         }
     ) { padding ->
         LazyColumn(
             state = viewModel.scrollState,
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp + LocalBottomBarInset.current),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             item(key = "account") {
                 AccountCard(
                     isLoggedIn = isLoggedIn,
+                    nick = nick,
                     onLogin = { navController.navigate(Screen.Login.route) },
-                    onLogout = { EksiSession.logout() }
+                    onLogout = { EksiSession.logout() },
+                    onOpenProfile = { nick?.let { navController.navigate(Screen.Author.createRoute(it)) } }
                 )
             }
             item(key = "savedHeader") {
@@ -121,7 +139,13 @@ fun ProfileScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun AccountCard(isLoggedIn: Boolean, onLogin: () -> Unit, onLogout: () -> Unit) {
+private fun AccountCard(
+    isLoggedIn: Boolean,
+    nick: String?,
+    onLogin: () -> Unit,
+    onLogout: () -> Unit,
+    onOpenProfile: () -> Unit
+) {
     val container = if (isLoggedIn) MaterialTheme.colorScheme.primaryContainer
     else MaterialTheme.colorScheme.surfaceContainerHigh
     val content = if (isLoggedIn) MaterialTheme.colorScheme.onPrimaryContainer
@@ -152,7 +176,7 @@ private fun AccountCard(isLoggedIn: Boolean, onLogin: () -> Unit, onLogout: () -
                     }
                     Column(modifier = Modifier.padding(start = 16.dp)) {
                         Text(
-                            text = if (loggedIn) "Giriş yapıldı" else "Misafir",
+                            text = if (loggedIn) nick ?: "Giriş yapıldı" else "Misafir",
                             style = MaterialTheme.typography.titleLargeEmphasized
                         )
                         Text(
@@ -163,13 +187,25 @@ private fun AccountCard(isLoggedIn: Boolean, onLogin: () -> Unit, onLogout: () -
                     }
                 }
                 if (loggedIn) {
-                    OutlinedButton(
-                        onClick = onLogout,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-                    ) {
-                        Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null)
-                        Text("Çıkış yap", modifier = Modifier.padding(start = 8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (nick != null) {
+                            Button(
+                                onClick = onOpenProfile,
+                                modifier = Modifier.weight(1f),
+                                contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                            ) {
+                                Icon(Icons.Rounded.Person, contentDescription = null)
+                                Text("Profilim", modifier = Modifier.padding(start = 8.dp))
+                            }
+                        }
+                        OutlinedButton(
+                            onClick = onLogout,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                        ) {
+                            Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null)
+                            Text("Çıkış yap", modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                 } else {
                     Button(

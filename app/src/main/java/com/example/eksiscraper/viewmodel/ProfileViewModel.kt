@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.network.EksiSession
 import com.example.eksiscraper.repository.EksiRepository
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -24,6 +25,12 @@ class ProfileViewModel(
             repository.allSavedTopics.collectLatest { topics ->
                 _savedTopics.value = topics
             }
+        }
+    }
+
+    fun refreshNick() {
+        viewModelScope.launch {
+            repository.getOwnNick()?.let(EksiSession::saveNick)
         }
     }
 
