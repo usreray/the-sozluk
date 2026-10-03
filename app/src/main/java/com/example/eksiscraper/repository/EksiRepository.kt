@@ -47,6 +47,9 @@ class EksiRepository(
 
     suspend fun getEditForm(entryId: String): FormSpec = EksiNetworkDataSource.fetchEditForm(entryId)
 
+    suspend fun saveSiteDraft(url: String, title: String, content: String): String? =
+        EksiNetworkDataSource.saveSiteDraft(url, title, content)
+
     /** Saves an entry's new text with its "düzelt" form; null on success, otherwise the reason. */
     suspend fun editEntry(form: FormSpec, text: String): String? {
         val field = form.textFieldName ?: return "düzeltme formu bulunamadı"
@@ -84,7 +87,8 @@ class EksiRepository(
 
     suspend fun getTopicCreator(topicId: String) = EksiNetworkDataSource.fetchTopicCreator(topicId)
 
-    suspend fun getFavoriters(entryId: String): List<String> = EksiNetworkDataSource.fetchFavoriters(entryId)
+    suspend fun getFavoriters(entryId: String, rookies: Boolean = false): List<String> =
+        EksiNetworkDataSource.fetchFavoriters(entryId, rookies)
 
     suspend fun getMessageBox(archive: Boolean, page: Int): MessageBox =
         EksiNetworkDataSource.fetchMessageBox(archive, page)

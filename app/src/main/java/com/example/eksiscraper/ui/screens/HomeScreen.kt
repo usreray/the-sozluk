@@ -1,5 +1,17 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import com.example.eksiscraper.ui.navigation.TabReselect
 import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import androidx.compose.animation.core.animate
@@ -148,79 +160,124 @@ fun HomeScreen(
         categories.getOrNull(pagerState.currentPage)?.let(viewModel::ensureLoaded)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .nestedScroll(headerConnection)
-    ) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 1
-        ) { page ->
-            CategoryPage(
-                category = categories[page],
-                viewModel = viewModel,
-                topPadding = headerPadding,
-                onTopicClick = { title, url ->
-                    navController.navigate(Screen.TopicDetail.createRoute(title, url))
-                }
-            )
+    // Tablets and landscape: the list on the left, the opened topic on the right
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 840.dp
+        var paneTitle by rememberSaveable { mutableStateOf<String?>(null) }
+        var paneUrl by rememberSaveable { mutableStateOf("") }
+        val openTopic: (String, String) -> Unit = { t, u ->
+            if (wide) {
+                paneTitle = t
+                paneUrl = u
+            } else {
+                navController.navigate(Screen.TopicDetail.createRoute(t, u))
+            }
         }
-            Column(
+        // Back closes the open pane first
+        androidx.activity.compose.BackHandler(enabled = wide && paneTitle != null) { paneTitle = null }
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(if (wide) 0.42f else 1f)) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { headerHeight = it.height }
-                    .graphicsLayer { translationY = headerOffset }
+                    .fillMaxSize()
                     .background(MaterialTheme.colorScheme.surface)
+                    .nestedScroll(headerConnection)
             ) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            "ekşi",
-                            style = MaterialTheme.typography.headlineMediumEmphasized,
-                            color = MaterialTheme.colorScheme.primary
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    beyondViewportPageCount = 1
+                ) { page ->
+                    CategoryPage(
+                        category = categories[page],
+                        viewModel = viewModel,
+                        topPadding = headerPadding,
+                        onTopicClick = openTopic
+                    )
+                }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onSizeChanged { headerHeight = it.height }
+                            .graphicsLayer { translationY = headerOffset }
+                            .background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    "ekşi",
+                                    style = MaterialTheme.typography.headlineMediumEmphasized,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            actions = {
+                                if (isLoggedIn) FloatingSurface(shape = CircleShape, modifier = Modifier.padding(end = 8.dp)) {
+                                  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 2.dp)) {
+                                    // The site's header lights: new entries in followed topics, unread messages
+                                    IconButton(onClick = {
+                                        val olay = categories.indexOf(HomeCategory.Olay)
+                                        if (olay >= 0) scope.launch { pagerState.animateScrollToPage(olay) }
+                                        else navController.navigate(Screen.Channels.createRoute(HomeCategory.Olay.key, "olay"))
+                                    }) {
+                                        BadgedBox(badge = { if (siteStatus.hasEvents) Badge() }) {
+                                            Icon(Icons.Rounded.NotificationsNone, contentDescription = "olay")
+                                        }
+                                    }
+                                    IconButton(onClick = { navController.navigate(Screen.Messages.createRoute()) }) {
+                                        BadgedBox(badge = { if (siteStatus.hasMessages) Badge() }) {
+                                            Icon(Icons.Rounded.MailOutline, contentDescription = "mesajlar")
+                                        }
+                                    }
+                                  }
+                                }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
                         )
-                    },
-                    actions = {
-                        if (isLoggedIn) FloatingSurface(shape = CircleShape, modifier = Modifier.padding(end = 8.dp)) {
-                          Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 2.dp)) {
-                            // The site's header lights: new entries in followed topics, unread messages
-                            IconButton(onClick = {
-                                val olay = categories.indexOf(HomeCategory.Olay)
-                                if (olay >= 0) scope.launch { pagerState.animateScrollToPage(olay) }
-                                else navController.navigate(Screen.Channels.createRoute(HomeCategory.Olay.key, "olay"))
-                            }) {
-                                BadgedBox(badge = { if (siteStatus.hasEvents) Badge() }) {
-                                    Icon(Icons.Rounded.NotificationsNone, contentDescription = "olay")
+                        CategoryButtons(
+                            categories = categories,
+                            selected = pagerState.currentPage,
+                            onSelect = { index ->
+                                scope.launch {
+                                    if (index == pagerState.currentPage) {
+                                        // Tapping the open tab again jumps back to the top
+                                        viewModel.listStates.getValue(categories[index]).animateScrollToItem(0)
+                                    } else {
+                                        pagerState.animateScrollToPage(index)
+                                    }
                                 }
                             }
-                            IconButton(onClick = { navController.navigate(Screen.Messages.createRoute()) }) {
-                                BadgedBox(badge = { if (siteStatus.hasMessages) Badge() }) {
-                                    Icon(Icons.Rounded.MailOutline, contentDescription = "mesajlar")
-                                }
-                            }
-                          }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
-                )
-                CategoryButtons(
-                    categories = categories,
-                    selected = pagerState.currentPage,
-                    onSelect = { index ->
-                        scope.launch {
-                            if (index == pagerState.currentPage) {
-                                // Tapping the open tab again jumps back to the top
-                                viewModel.listStates.getValue(categories[index]).animateScrollToItem(0)
-                            } else {
-                                pagerState.animateScrollToPage(index)
-                            }
+                        )
+                    }
+            }
+            }
+            if (wide) {
+                VerticalDivider()
+                Box(modifier = Modifier.weight(0.58f).fillMaxSize()) {
+                    val t = paneTitle
+                    if (t == null) {
+                        MessageState(
+                            icon = Icons.Rounded.Inbox,
+                            title = "bir başlık seç",
+                            message = "soldaki listeden açtığın başlık burada okunur."
+                        )
+                    } else {
+                        // One view model per opened topic, so switching topics starts fresh
+                        key(paneUrl) {
+                            TopicDetailScreen(
+                                title = t,
+                                url = paneUrl,
+                                navController = navController,
+                                onClose = { paneTitle = null },
+                                viewModel = viewModel(
+                                    key = "pane:$paneUrl",
+                                    factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+                                )
+                            )
                         }
                     }
-                )
+                }
             }
+        }
     }
 }
 
@@ -271,6 +328,38 @@ private fun CategoryButtons(categories: List<HomeCategory>, selected: Int, onSel
 }
 
 private enum class HomePhase { Loading, Error, Empty, Content }
+
+@Composable
+private fun YearPicker(year: Int?, onPick: (Int?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val thisYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    AssistChip(
+        onClick = { open = true },
+        label = { Text(if (year == null) "yıl seç" else "$year yılında bugün") },
+        leadingIcon = { Icon(Icons.Rounded.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        modifier = Modifier.padding(bottom = 6.dp)
+    )
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("hangi yıl?") },
+            text = {
+                // The sözlük started in 1999
+                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                    item {
+                        TextButton(onClick = { open = false; onPick(null) }, modifier = Modifier.fillMaxWidth()) { Text("sitenin seçtiği") }
+                    }
+                    items((thisYear - 1 downTo 1999).toList()) { y ->
+                        TextButton(onClick = { open = false; onPick(y) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("$y", color = if (y == year) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("kapat") } }
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -332,6 +421,10 @@ private fun CategoryPage(
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 4.dp, bottom = 24.dp + LocalBottomBarInset.current),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
+                        // tarihte bugün: which year's day to look at
+                        if (category == HomeCategory.TarihteBugun) {
+                            item(key = "year") { YearPicker(viewModel.historyYear.value, viewModel::setHistoryYear) }
+                        }
                         itemsIndexed(topics, key = { _, topic -> topic.url }) { index, topic ->
                             TopicRow(
                                 topic = topic,

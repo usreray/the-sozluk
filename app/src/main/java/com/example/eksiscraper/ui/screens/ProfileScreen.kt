@@ -1,5 +1,10 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.material.icons.rounded.CloudDone
+import androidx.compose.material.icons.rounded.History
+import com.example.eksiscraper.data.offline.OfflineStore
+import com.example.eksiscraper.settings.ReadingHistory
+import com.example.eksiscraper.settings.EntryBookmarks
 import com.example.eksiscraper.ui.navigation.TabReselect
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -132,6 +137,32 @@ fun ProfileScreen(
                     onOpenProfile = { nick?.let { navController.navigate(Screen.Author.createRoute(it)) } }
                 )
             }
+            // What is kept on this device: saved entries, history, offline topics
+            item(key = "library") {
+                val rows = listOf(
+                    Triple(LibraryKind.Bookmarks, Icons.Rounded.Bookmarks, "${EntryBookmarks.items.value.size} entry"),
+                    Triple(LibraryKind.History, Icons.Rounded.History, "${ReadingHistory.items.value.size} başlık"),
+                    Triple(LibraryKind.Offline, Icons.Rounded.CloudDone, OfflineStore.topics.value.size.let { n ->
+                        val running = OfflineStore.progress.values.count { !it.finished }
+                        "$n başlık" + if (running > 0) " · $running indiriliyor" else ""
+                    })
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 20.dp)) {
+                    rows.forEachIndexed { index, (kind, icon, count) ->
+                        Surface(
+                            onClick = { navController.navigate(Screen.Library.createRoute(kind)) },
+                            shape = segmentedShape(index, rows.size),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Text(kind.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 16.dp))
+                                Text(count, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
             // Unsent entries kept on the device; tapping one opens its topic to continue
             if (drafts.isNotEmpty()) {
                 item(key = "draftsHeader") {
@@ -198,7 +229,10 @@ fun ProfileScreen(
                     shape = segmentedShape(index, savedTopics.size),
                     onClick = { navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url, topic.currentPage)) },
                     modifier = Modifier.animateItem(),
-                    subtitle = if (topic.currentPage > 1) "${topic.currentPage}. sayfada kaldın" else null,
+                    subtitle = listOfNotNull(
+                        "çevrimdışı".takeIf { OfflineStore.get(topic.url) != null },
+                        "${topic.currentPage}. sayfada kaldın".takeIf { topic.currentPage > 1 }
+                    ).joinToString(" · ").ifBlank { null },
                     trailing = {
                         IconButton(onClick = { viewModel.unsaveTopic(topic) }) {
                             Icon(

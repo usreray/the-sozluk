@@ -208,7 +208,7 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
-    suspend fun favoriters(entryId: String): List<String> = repository.getFavoriters(entryId)
+    suspend fun favoriters(entryId: String, rookies: Boolean = false): List<String> = repository.getFavoriters(entryId, rookies)
 
     private val _isSubmitting = mutableStateOf(false)
     val isSubmitting: State<Boolean> = _isSubmitting

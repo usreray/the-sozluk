@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App icon shortcuts; MainActivity reads the "open" extra -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="search"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_search"
+        android:shortcutShortLabel="@string/shortcut_search">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.eksiscraper"
+            android:targetClass="com.example.eksiscraper.MainActivity">
+            <extra android:name="open" android:value="search" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="messages"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_messages"
+        android:shortcutShortLabel="@string/shortcut_messages">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.eksiscraper"
+            android:targetClass="com.example.eksiscraper.MainActivity">
+            <extra android:name="open" android:value="messages" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="events"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_events"
+        android:shortcutShortLabel="@string/shortcut_events">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.eksiscraper"
+            android:targetClass="com.example.eksiscraper.MainActivity">
+            <extra android:name="open" android:value="olay" />
+        </intent>
+    </shortcut>
+</shortcuts>

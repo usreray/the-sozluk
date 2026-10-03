@@ -1,5 +1,10 @@
 package com.example.eksiscraper.ui.components
 
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.BookmarkRemove
+import androidx.compose.material.icons.rounded.BookmarkAdd
+import com.example.eksiscraper.settings.EntryBookmarks
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.offset
 import android.content.ClipData
@@ -87,6 +92,16 @@ import kotlinx.coroutines.launch
 
 private const val COLLAPSED_LINES = 8
 
+/** Entry body text with the reading settings applied (typeface, line spacing). */
+@Composable
+fun entryBodyStyle(): TextStyle {
+    val base = MaterialTheme.typography.bodyLarge
+    return base.copy(
+        fontFamily = AppSettings.readingFont.value.family,
+        lineHeight = base.lineHeight * AppSettings.lineSpacing.value
+    )
+}
+
 /** What an entry card can do; screens wire these to their ViewModel and navigation. */
 data class EntryActions(
     val onToggleFavorite: (Entry) -> Unit,
@@ -106,7 +121,11 @@ data class EntryActions(
     /** "Bu başlıktaki entry'leri": the author's entries in the current topic */
     val onAuthorInTopic: ((Entry) -> Unit)? = null,
     /** "düzelt" on the user's own entries */
-    val onEdit: ((Entry) -> Unit)? = null
+    val onEdit: ((Entry) -> Unit)? = null,
+    /** "entry'yi kaydet": keep the entry (with a note) on the device */
+    val onBookmark: ((Entry) -> Unit)? = null,
+    /** Share the entry as a picture */
+    val onShareImage: ((Entry) -> Unit)? = null
 )
 
 /** What the card needs to show an entry's comments. */
@@ -162,7 +181,7 @@ fun EntryCard(
             .clip(RoundedCornerShape(28.dp))
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
-        Column(modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 8.dp)) {
+        Column(modifier = Modifier.padding(start = AppSettings.entryPadding.value.dp, end = 8.dp, top = 16.dp, bottom = 8.dp)) {
             if (entry.topicTitle.isNotBlank() && actions.onOpenTopic != null) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -190,7 +209,7 @@ fun EntryCard(
                 Text(
                     text = text,
                     inlineContent = rememberEntryInlineContent(),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = entryBodyStyle(),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = if (isExpanded) Int.MAX_VALUE else COLLAPSED_LINES,
                     overflow = TextOverflow.Ellipsis,
@@ -235,6 +254,8 @@ fun EntryCard(
                     entry = entry,
                     onAuthorInTopic = actions.onAuthorInTopic?.let { show -> { show(entry) } },
                     onEdit = if (("edit" in entry.flags || own) && actions.onEdit != null) ({ actions.onEdit(entry) }) else null,
+                    onBookmark = actions.onBookmark?.let { { it(entry) } },
+                    onShareImage = actions.onShareImage?.let { { it(entry) } },
                     onDelete = if ((entry.canDelete || own) && actions.onDelete != null) ({ confirmDelete = true }) else null
                 )
             }
@@ -447,7 +468,14 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun EntryMenu(entry: Entry, onAuthorInTopic: (() -> Unit)?, onEdit: (() -> Unit)?, onDelete: (() -> Unit)?) {
+private fun EntryMenu(
+    entry: Entry,
+    onAuthorInTopic: (() -> Unit)?,
+    onEdit: (() -> Unit)?,
+    onDelete: (() -> Unit)?,
+    onBookmark: (() -> Unit)? = null,
+    onShareImage: (() -> Unit)? = null
+) {
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -497,6 +525,27 @@ private fun EntryMenu(entry: Entry, onAuthorInTopic: (() -> Unit)?, onEdit: (() 
                         onClick = {
                             open = false
                             onAuthorInTopic()
+                        }
+                    )
+                }
+                if (onBookmark != null) {
+                    val saved = EntryBookmarks.isSaved(entry.entryId)
+                    DropdownMenuItem(
+                        text = { Text(if (saved) "kayıttan çıkar" else "entry'yi kaydet") },
+                        leadingIcon = { Icon(if (saved) Icons.Rounded.BookmarkRemove else Icons.Rounded.BookmarkAdd, contentDescription = null) },
+                        onClick = {
+                            open = false
+                            onBookmark()
+                        }
+                    )
+                }
+                if (onShareImage != null) {
+                    DropdownMenuItem(
+                        text = { Text("görsel olarak paylaş") },
+                        leadingIcon = { Icon(Icons.Rounded.Image, contentDescription = null) },
+                        onClick = {
+                            open = false
+                            onShareImage()
                         }
                     )
                 }

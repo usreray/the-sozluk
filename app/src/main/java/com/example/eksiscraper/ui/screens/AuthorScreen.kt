@@ -1,5 +1,7 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.ShareEntryImageSheet
+import com.example.eksiscraper.settings.EntryBookmarks
 import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -175,7 +177,7 @@ fun AuthorScreen(
     favoritersOf?.let { entry ->
         com.example.eksiscraper.ui.components.FavoritersSheet(
             entry = entry,
-            load = viewModel::favoriters,
+            load = { id, rookies -> viewModel.favoriters(id, rookies) },
             onAuthor = { nick -> navController.navigate(Screen.Author.createRoute(nick)) },
             onDismiss = { favoritersOf = null }
         )
@@ -183,6 +185,10 @@ fun AuthorScreen(
     val isOwnProfile = isLoggedIn && nick.equals(EksiSession.nick.value, ignoreCase = true)
     val isSubmitting by viewModel.isSubmitting
     val isRefreshing by viewModel.isRefreshing
+    var shareImageOf by remember { mutableStateOf<com.example.eksiscraper.model.Entry?>(null) }
+    shareImageOf?.let { entry ->
+        ShareEntryImageSheet(entry = entry, topicTitle = entry.topicTitle, onDismiss = { shareImageOf = null })
+    }
     var editTarget by remember { mutableStateOf<Pair<com.example.eksiscraper.model.Entry, com.example.eksiscraper.model.FormSpec>?>(null) }
     val scope = rememberCoroutineScope()
     val actions = EntryActions(
@@ -194,6 +200,12 @@ fun AuthorScreen(
         onOpenTopic = { entry ->
             navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle, entry.topicUrl.ifBlank { "/entry/${entry.entryId}" }))
         },
+        onBookmark = { entry ->
+            if (EntryBookmarks.isSaved(entry.entryId)) EntryBookmarks.remove(entry.entryId)
+            else EntryBookmarks.save(entry, entry.topicTitle, entry.topicUrl)
+            scope.launch { snackbar.showSnackbar(if (EntryBookmarks.isSaved(entry.entryId)) "entry kaydedildi" else "kayıttan çıkarıldı") }
+        },
+        onShareImage = { entry -> shareImageOf = entry },
         // Own profile: the user's entries can be edited and deleted from here too
         onDelete = if (isOwnProfile) viewModel::deleteEntry else null,
         onEdit = if (isOwnProfile) ({ entry ->

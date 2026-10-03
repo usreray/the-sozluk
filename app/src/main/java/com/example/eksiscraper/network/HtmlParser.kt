@@ -142,7 +142,7 @@ object HtmlParser {
                 val olderCount =
                         olderLink?.text()?.substringBefore(" ")?.toIntOrNull() ?: 0
 
-                val entries = entryListItems.take(10).mapNotNull(::parseEntry)
+                val entries = entryListItems.take(10).mapNotNull(::parseEntry).distinctBy { it.entryId }
                 val trackLink = document.selectFirst("#track-topic-link")
 
                 // Determine redirected URL
@@ -172,7 +172,8 @@ object HtmlParser {
                         // The site toggles data-tracked (0/1) and posts to data-trackurl / data-untrackurl
                         isTracked = trackLink?.attr("data-tracked") == "1",
                         trackUrl = trackLink?.attr("data-trackurl")?.ifBlank { null },
-                        untrackUrl = trackLink?.attr("data-untrackurl")?.ifBlank { null }
+                        untrackUrl = trackLink?.attr("data-untrackurl")?.ifBlank { null },
+                        draftSaveUrl = document.selectFirst("#save-draft-button")?.attr("data-href")?.ifBlank { null }
                 )
         }
 

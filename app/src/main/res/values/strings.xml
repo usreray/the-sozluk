@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">Eksi Scraper</string>
+    <string name="shortcut_search">ara</string>
+    <string name="shortcut_messages">mesajlar</string>
+    <string name="shortcut_events">olay</string>
+    <string name="widget_gundem">ekşi gündem</string>
+    <string name="widget_gundem_description">gündem başlıkları; dokununca uygulamada açılır</string>
 </resources>

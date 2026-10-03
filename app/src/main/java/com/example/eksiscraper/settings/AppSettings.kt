@@ -1,5 +1,6 @@
 package com.example.eksiscraper.settings
 
+import androidx.compose.ui.text.font.FontFamily
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.State
@@ -39,6 +40,14 @@ enum class PaletteChoice(val label: String) {
 
 enum class ContrastChoice(val label: String, val level: Double) {
     Standard("standart", 0.0), Medium("orta", 0.5), High("yüksek", 1.0)
+}
+
+/** Typeface for entry text. */
+enum class ReadingFont(val label: String, val family: FontFamily) {
+    Default("varsayılan", FontFamily.Default),
+    Serif("tırnaklı", FontFamily.Serif),
+    Sans("yalın", FontFamily.SansSerif),
+    Mono("daktilo", FontFamily.Monospace)
 }
 
 /** Appearance preferences, kept in SharedPreferences and exposed as Compose state. */
@@ -92,8 +101,44 @@ object AppSettings {
     private val _prefetchNextPage = mutableStateOf(true)
     val prefetchNextPage: State<Boolean> = _prefetchNextPage
 
+    /** Reading: entry typeface, line spacing (x the normal one) and side padding in dp */
+    private val _readingFont = mutableStateOf(ReadingFont.Default)
+    val readingFont: State<ReadingFont> = _readingFont
+    private val _lineSpacing = mutableFloatStateOf(1f)
+    val lineSpacing: State<Float> = _lineSpacing
+    private val _entryPadding = mutableFloatStateOf(20f)
+    val entryPadding: State<Float> = _entryPadding
+
+    /** Keep a list of recently opened topics */
+    private val _historyEnabled = mutableStateOf(true)
+    val historyEnabled: State<Boolean> = _historyEnabled
+
+    fun setReadingFont(font: ReadingFont) {
+        _readingFont.value = font
+        prefs.edit().putInt("readingFont", font.ordinal).apply()
+    }
+
+    fun setLineSpacing(value: Float) {
+        _lineSpacing.floatValue = value
+        prefs.edit().putFloat("lineSpacing", value).apply()
+    }
+
+    fun setEntryPadding(value: Float) {
+        _entryPadding.floatValue = value
+        prefs.edit().putFloat("entryPadding", value).apply()
+    }
+
+    fun setHistoryEnabled(enabled: Boolean) {
+        _historyEnabled.value = enabled
+        prefs.edit().putBoolean("historyEnabled", enabled).apply()
+    }
+
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        _readingFont.value = ReadingFont.entries.getOrElse(prefs.getInt("readingFont", 0)) { ReadingFont.Default }
+        _lineSpacing.floatValue = prefs.getFloat("lineSpacing", 1f)
+        _entryPadding.floatValue = prefs.getFloat("entryPadding", 20f)
+        _historyEnabled.value = prefs.getBoolean("historyEnabled", true)
         _blockedWords.value = prefs.getStringSet("blockedWords", emptySet()).orEmpty().toSet()
         _hiddenTabs.value = prefs.getStringSet("hiddenTabs", DEFAULT_HIDDEN_TABS).orEmpty().toSet()
         _showEntryNumbers.value = prefs.getBoolean("showEntryNumbers", false)

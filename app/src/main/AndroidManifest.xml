@@ -39,7 +39,45 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- eksisozluk.com links (and soz.lk uploads) open here once allowed under
+                 "open by default" in the system settings -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:scheme="http" />
+                <data android:host="eksisozluk.com" />
+                <data android:host="www.eksisozluk.com" />
+                <data android:host="soz.lk" />
+            </intent-filter>
+            <!-- Long press on the app icon: ara, mesajlar, olay -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+        <!-- Home screen widget: gündem -->
+        <receiver
+            android:name=".widget.GundemWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_gundem">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/gundem_widget" />
+        </receiver>
+        <!-- Shares entry pictures from the cache with other apps -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/shared_files" />
+        </provider>
     </application>
 
 </manifest>

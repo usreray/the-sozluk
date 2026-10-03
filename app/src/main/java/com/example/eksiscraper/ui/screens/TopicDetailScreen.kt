@@ -1,5 +1,9 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.ShareEntryImageSheet
+import com.example.eksiscraper.settings.ReadingHistory
+import com.example.eksiscraper.data.offline.OfflineStore
+import com.example.eksiscraper.settings.EntryBookmarks
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.pager.rememberPagerState
@@ -137,6 +141,8 @@ fun TopicDetailScreen(
     url: String,
     navController: NavController,
     startPage: Int = 1,
+    /** In the tablet layout's right pane: closing clears the pane instead of leaving the screen */
+    onClose: (() -> Unit)? = null,
     viewModel: TopicDetailViewModel = viewModel(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
@@ -162,6 +168,7 @@ fun TopicDetailScreen(
     var favoritersOf by remember { mutableStateOf<com.example.eksiscraper.model.Entry?>(null) }
     var showComposer by rememberSaveable { mutableStateOf(false) }
     var commentTarget by remember { mutableStateOf<Entry?>(null) }
+    var shareImageOf by remember { mutableStateOf<Entry?>(null) }
     // Entry opened full screen (swipe sideways for the others), null when closed
     var pagerEntryId by rememberSaveable { mutableStateOf<String?>(null) }
     // Entry being edited, with its "düzelt" form
@@ -180,6 +187,15 @@ fun TopicDetailScreen(
     }
 
     LaunchedEffect(title, url) { viewModel.loadTopic(title, url, startPage) }
+    // Offline copy of this topic: on the device, downloading, or none
+    val offlineKey = topic?.let { it.topicPath.ifBlank { it.url } } ?: url
+    val offlineProgress = OfflineStore.progress[OfflineStore.keyOf(offlineKey)]
+    val offlineState = when {
+        offlineProgress != null && !offlineProgress.finished ->
+            if (offlineProgress.total > 0) "indiriliyor ${offlineProgress.done} / ${offlineProgress.total} · durdur" else "indiriliyor · durdur"
+        OfflineStore.topics.value.any { it.path == OfflineStore.keyOf(offlineKey) } -> "kayıtlı"
+        else -> null
+    }
     LaunchedEffect(message) {
         message?.let {
             snackbar.showSnackbar(it)
@@ -212,7 +228,8 @@ fun TopicDetailScreen(
             if ((topic?.olderEntriesCount ?: 0) > 0 && firstPage == 1) add(TopicRow.Intro)
             var page = -1
             var indexInPage = 0
-            topic?.entries.orEmpty().forEach { entry ->
+            // An entry can come twice (e.g. pinned on the page and in the list); list keys must be unique
+            topic?.entries.orEmpty().distinctBy { it.entryId }.forEach { entry ->
                 if (entry.page != page) {
                     page = entry.page
                     indexInPage = 0
@@ -279,7 +296,7 @@ fun TopicDetailScreen(
     favoritersOf?.let { entry ->
         com.example.eksiscraper.ui.components.FavoritersSheet(
             entry = entry,
-            load = viewModel::favoriters,
+            load = { id, rookies -> viewModel.favoriters(id, rookies) },
             onAuthor = { nick -> navController.navigate(Screen.Author.createRoute(nick)) },
             onDismiss = { favoritersOf = null }
         )
@@ -299,6 +316,16 @@ fun TopicDetailScreen(
         onVoteComment = { entry, comment, rate -> requireLogin { viewModel.voteComment(entry.entryId, comment, rate) } },
         onWriteComment = if (canComment) ({ entry -> commentTarget = entry }) else null,
         onAuthorInTopic = { entry -> viewModel.applyFilter(TopicFilter.Author(entry.author)) },
+        onBookmark = { entry ->
+            if (EntryBookmarks.isSaved(entry.entryId)) {
+                EntryBookmarks.remove(entry.entryId)
+                scope.launch { snackbar.showSnackbar("kayıttan çıkarıldı") }
+            } else {
+                EntryBookmarks.save(entry, displayTitle, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty())
+                scope.launch { snackbar.showSnackbar("entry kaydedildi; profilde \"kaydedilen entry'ler\"de") }
+            }
+        },
+        onShareImage = { entry -> shareImageOf = entry },
         onEdit = { entry ->
             scope.launch {
                 try {
@@ -326,6 +353,17 @@ fun TopicDetailScreen(
             is TopicMenuAction.Filter -> viewModel.applyFilter(action.filter)
             TopicMenuAction.Creator -> showCreator = true
             TopicMenuAction.Share -> topic?.let { shareTopic(context, it) }
+            TopicMenuAction.SaveOffline -> topic?.let {
+                val path = it.topicPath.ifBlank { it.url }
+                OfflineStore.download(it.title, path)
+                // An offline copy also goes to the saved topics
+                if (!it.isSaved) viewModel.saveTopic(visiblePage)
+                scope.launch { snackbar.showSnackbar("indirme başladı; ilerlemesi ⋮ menüsünde ve profilde") }
+            }
+            TopicMenuAction.DeleteOffline -> topic?.let {
+                OfflineStore.delete(it.topicPath.ifBlank { it.url })
+                scope.launch { snackbar.showSnackbar("çevrimdışı kopya silindi") }
+            }
             else -> prompt = action
         }
     }
@@ -389,8 +427,17 @@ fun TopicDetailScreen(
             onSubmit = { text -> viewModel.submitEntry(text) { showComposer = false } },
             onDismiss = { if (!isSubmitting) showComposer = false },
             initialText = remember { Drafts.get(draftKey)?.text ?: topic?.entryForm?.textValue.orEmpty() },
-            onTextChange = { text -> Drafts.save(draftKey, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty(), text) }
+            onTextChange = { text -> Drafts.save(draftKey, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty(), text) },
+            onSaveToSite = if (topic?.draftSaveUrl != null) viewModel::saveSiteDraft else null
         )
+    }
+    shareImageOf?.let { entry ->
+        ShareEntryImageSheet(entry = entry, topicTitle = displayTitle, onDismiss = { shareImageOf = null })
+    }
+    // Recently opened topics (settings: içerik ve gizlilik)
+    LaunchedEffect(loaded, topic?.title) {
+        val t = topic ?: return@LaunchedEffect
+        if (loaded && t.title.isNotBlank()) ReadingHistory.record(t.title, t.topicPath.ifBlank { t.url })
     }
     commentTarget?.let { entry ->
         EntryComposerSheet(
@@ -490,7 +537,7 @@ fun TopicDetailScreen(
             // Pages are in the bottom toolbar; only say when this is a single entry
             // The title opens the whole topic from its first page
             onTitleClick = if (loaded) viewModel::showOlderEntries else null,
-            onBack = { navController.popBackStack() },
+            onBack = { onClose?.invoke() ?: navController.popBackStack() },
             visible = barsVisible || phase != TopicPhase.Content,
             // The pull-down gap already shows a refresh; the bar shows only page jumps
             // Page jumps and an earlier page loading above show as the bar's thin line
@@ -520,7 +567,7 @@ fun TopicDetailScreen(
                         else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                TopicMenu(current = filter, isLoggedIn = isLoggedIn, onAction = onMenu)
+                TopicMenu(current = filter, isLoggedIn = isLoggedIn, onAction = onMenu, offlineState = offlineState)
             })
         )
 
@@ -538,7 +585,7 @@ fun TopicDetailScreen(
 
         EntryPager(
             openEntryId = pagerEntryId,
-            entries = topic?.entries.orEmpty(),
+            entries = topic?.entries.orEmpty().distinctBy { it.entryId },
             numbers = rows.mapNotNull { (it as? TopicRow.EntryItem)?.let { row -> row.entry.entryId to row.number } }.toMap(),
             title = displayTitle,
             actions = actions,

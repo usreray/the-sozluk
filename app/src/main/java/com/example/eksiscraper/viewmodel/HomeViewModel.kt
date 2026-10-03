@@ -63,6 +63,16 @@ class HomeViewModel(private val repository: EksiRepository) : ViewModel() {
 
     fun refresh(category: HomeCategory) = load(category, page = 1, refreshing = true)
 
+    /** "tarihte bugün" for another year (null: the site's default) */
+    private val _historyYear = androidx.compose.runtime.mutableStateOf<Int?>(null)
+    val historyYear: androidx.compose.runtime.State<Int?> = _historyYear
+
+    fun setHistoryYear(year: Int?) {
+        _historyYear.value = year
+        states[HomeCategory.TarihteBugun] = CategoryState()
+        load(HomeCategory.TarihteBugun, page = 1)
+    }
+
     fun retry(category: HomeCategory) = load(category, page = 1)
 
     fun loadMore(category: HomeCategory) {
@@ -84,7 +94,9 @@ class HomeViewModel(private val repository: EksiRepository) : ViewModel() {
         }
         jobs[category] = viewModelScope.launch {
             try {
-                val result = repository.getPopularTopics(page, category.key)
+                val key = _historyYear.value?.takeIf { category == HomeCategory.TarihteBugun }
+                    ?.let { "${category.key}?year=$it" } ?: category.key
+                val result = repository.getPopularTopics(page, key)
                 update(category) {
                     it.copy(
                         // Lazy list keys are topic URLs, so never keep the same topic twice

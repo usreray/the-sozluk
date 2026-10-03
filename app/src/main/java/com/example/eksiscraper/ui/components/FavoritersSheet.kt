@@ -1,5 +1,7 @@
 package com.example.eksiscraper.ui.components
 
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,15 +42,18 @@ import kotlinx.coroutines.CancellationException
 @Composable
 fun FavoritersSheet(
     entry: Entry,
-    load: suspend (String) -> List<String>,
+    /** (entry id, çaylaklar) -> nicks */
+    load: suspend (String, Boolean) -> List<String>,
     onAuthor: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var nicks by remember(entry.entryId) { mutableStateOf<List<String>?>(null) }
-    var error by remember(entry.entryId) { mutableStateOf<String?>(null) }
-    LaunchedEffect(entry.entryId) {
+    // The authors' favorites, or the çaylaklar's, which the site counts apart
+    var rookies by remember(entry.entryId) { mutableStateOf(false) }
+    var nicks by remember(entry.entryId, rookies) { mutableStateOf<List<String>?>(null) }
+    var error by remember(entry.entryId, rookies) { mutableStateOf<String?>(null) }
+    LaunchedEffect(entry.entryId, rookies) {
         try {
-            nicks = load(entry.entryId)
+            nicks = load(entry.entryId, rookies)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -71,12 +76,29 @@ fun FavoritersSheet(
                 modifier = Modifier.padding(start = 10.dp)
             )
         }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 8.dp)
+        ) {
+            ToggleButton(
+                checked = !rookies,
+                onCheckedChange = { rookies = false },
+                modifier = Modifier.weight(1f),
+                shapes = ButtonGroupDefaults.connectedLeadingButtonShapes()
+            ) { Text("yazarlar") }
+            ToggleButton(
+                checked = rookies,
+                onCheckedChange = { rookies = true },
+                modifier = Modifier.weight(1f),
+                shapes = ButtonGroupDefaults.connectedTrailingButtonShapes()
+            ) { Text("çaylaklar") }
+        }
         Box(modifier = Modifier.fillMaxWidth().height(420.dp), contentAlignment = Alignment.Center) {
             val list = nicks
             when {
                 error != null -> Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))
                 list == null -> LoadingIndicator()
-                list.isEmpty() -> Text("henüz favorileyen yok", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                list.isEmpty() -> Text(if (rookies) "çaylak favorisi yok" else "henüz favorileyen yok", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),

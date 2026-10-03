@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.navigation
 
+import com.example.eksiscraper.ui.screens.LibraryScreen
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.EnterTransition
@@ -119,8 +120,23 @@ fun Navigation(navController: NavHostController) {
         }
 
         composable(
-            Screen.Settings.route,
-        ) { SettingsScreen(navController) }
+            Screen.Settings.pattern,
+            arguments = listOf(navArgument("section") { type = NavType.StringType; nullable = true; defaultValue = null })
+        ) { backStackEntry ->
+            SettingsScreen(navController, backStackEntry.arguments?.getString("section"))
+        }
+
+        composable(
+            Screen.Library.pattern,
+            arguments = listOf(navArgument("kind") { type = NavType.StringType; defaultValue = "History" })
+        ) { backStackEntry ->
+            LibraryScreen(
+                kind = com.example.eksiscraper.ui.screens.LibraryKind.entries
+                    .firstOrNull { it.name == backStackEntry.arguments?.getString("kind") }
+                    ?: com.example.eksiscraper.ui.screens.LibraryKind.History,
+                navController = navController
+            )
+        }
 
         // Login rises from the bottom like a sheet
         composable(

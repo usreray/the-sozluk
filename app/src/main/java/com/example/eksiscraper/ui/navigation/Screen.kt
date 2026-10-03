@@ -7,7 +7,15 @@ sealed class Screen(val route: String) {
     object Search : Screen("search")
     object Profile : Screen("profile")
     object Login : Screen("login")
-    object Settings : Screen("settings")
+    object Settings : Screen("settings") {
+        const val pattern = "settings?section={section}"
+        fun createRoute(section: String? = null): String = if (section == null) "settings" else "settings?section=$section"
+    }
+    /** History, saved entries and offline topics */
+    object Library : Screen("library") {
+        const val pattern = "library?kind={kind}"
+        fun createRoute(kind: com.example.eksiscraper.ui.screens.LibraryKind): String = "library?kind=${kind.name}"
+    }
     object Channels : Screen("channels") {
         const val pattern = "channels?path={path}&name={name}"
         fun createRoute(path: String, name: String): String =

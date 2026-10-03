@@ -22,6 +22,7 @@ navigationCompose = "2.10.2"
 navigationComposeVersion = "2.8.9"
 roomVersion = "2.8.5"
 workVersion = "2.12.0"
+glanceVersion = "1.2.0"
 ksp = "2.3.12"
 coil = "3.6.3"
 materialKolor = "5.0.1"
@@ -47,6 +48,8 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomVersion" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomVersion" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workVersion" }
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glanceVersion" }
+androidx-glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glanceVersion" }
 jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 jsoup-v1153 = { module = "org.jsoup:jsoup", version.ref = "jsoupVersion" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

@@ -1,5 +1,11 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.foundation.layout.Row
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material.icons.rounded.Tune
+import com.example.eksiscraper.ui.components.AdvancedSearchSheet
 import com.example.eksiscraper.ui.navigation.TabReselect
 import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
@@ -76,6 +82,18 @@ fun SearchScreen(
     val suggestions by viewModel.suggestions
     val isLoading by viewModel.isLoadingSuggestions
     val searchBarState = rememberSearchBarState()
+    // Detailed search sheet, opened with the words typed so far
+    var advancedFor by remember { mutableStateOf<String?>(null) }
+    advancedFor?.let { initial ->
+        AdvancedSearchSheet(
+            initialKeywords = initial,
+            onSearch = { path, name ->
+                advancedFor = null
+                navController.navigate(Screen.Channels.createRoute(path, name))
+            },
+            onDismiss = { advancedFor = null }
+        )
+    }
     // Tapping "ara" again in the bottom bar opens the search field
     LaunchedEffect(Unit) {
         TabReselect.events.collect { route ->
@@ -144,6 +162,10 @@ fun SearchScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            androidx.compose.material3.OutlinedButton(onClick = { advancedFor = "" }) {
+                Icon(Icons.Rounded.Tune, contentDescription = null)
+                Text("gelişmiş arama", modifier = Modifier.padding(start = 8.dp))
+            }
             Text(
                 "kanallar",
                 style = MaterialTheme.typography.titleMediumEmphasized,
@@ -186,6 +208,10 @@ fun SearchScreen(
                     query = query,
                     suggestions = suggestions,
                     onSelect = ::open,
+                    onAdvanced = { text ->
+                        scope.launch { searchBarState.animateToCollapsed() }
+                        advancedFor = text
+                    },
                     onSearchTitles = { text ->
                         scope.launch { searchBarState.animateToCollapsed() }
                         // The site's detailed search: every topic whose title contains the words
@@ -203,7 +229,8 @@ private fun SuggestionList(
     query: String,
     suggestions: List<String>,
     onSelect: (String) -> Unit,
-    onSearchTitles: (String) -> Unit
+    onSearchTitles: (String) -> Unit,
+    onAdvanced: (String) -> Unit
 ) {
     // The typed text itself always comes first, so a search is one tap away
     val rows = listOf(query.trim()) + suggestions.filterNot { it.equals(query.trim(), ignoreCase = true) }
@@ -214,12 +241,19 @@ private fun SuggestionList(
     ) {
         if (!query.trim().startsWith("@") && !query.trim().startsWith("#")) {
             item(key = "searchTitles") {
-                androidx.compose.material3.FilledTonalButton(
-                    onClick = { onSearchTitles(query) },
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
-                ) {
-                    Icon(Icons.Rounded.Search, contentDescription = null)
-                    Text("başlıklarda ara", modifier = Modifier.padding(start = 8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                    androidx.compose.material3.FilledTonalButton(
+                        onClick = { onSearchTitles(query) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Rounded.Search, contentDescription = null)
+                        Text("başlıklarda ara", modifier = Modifier.padding(start = 8.dp))
+                    }
+                    // Words plus author, dates, şükela only, sort order
+                    androidx.compose.material3.OutlinedButton(onClick = { onAdvanced(query) }) {
+                        Icon(Icons.Rounded.Tune, contentDescription = null)
+                        Text("gelişmiş", modifier = Modifier.padding(start = 8.dp))
+                    }
                 }
             }
         }

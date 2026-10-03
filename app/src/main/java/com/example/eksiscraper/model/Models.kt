@@ -23,7 +23,9 @@ data class Topic(
     // "takip et" on the topic (logged in only): current state and the urls it posts to
     val isTracked: Boolean = false,
     val trackUrl: String? = null,
-    val untrackUrl: String? = null
+    val untrackUrl: String? = null,
+    /** "kenara kaydet": the site's own draft for this topic (logged in only) */
+    val draftSaveUrl: String? = null
 )
 
 data class Entry(

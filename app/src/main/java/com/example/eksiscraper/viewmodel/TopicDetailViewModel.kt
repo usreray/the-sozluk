@@ -28,6 +28,8 @@ sealed class TopicFilter(val label: String, val query: String?) {
     data object All : TopicFilter("tümü", null)
     /** "bugün" links: today's entries only */
     data class Day(val param: String) : TopicFilter("bugün", param)
+    /** A filter that came with the link: olay's new entries (a=tracked), detailed search results */
+    data class Linked(val params: String, val name: String) : TopicFilter(name, params)
     data object Nice : TopicFilter("şükela", "a=nice")
     data object DailyNice : TopicFilter("bugünün şükelaları", "a=dailynice")
     data object Buddies : TopicFilter("takip ettiklerim", "a=buddyrecent")
@@ -109,8 +111,18 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
     fun loadTopic(title: String, url: String, startPage: Int = 1) {
         if (_selectedTopic.value != null) return
         // "bugün" links (?day=) open on today's entries like the site; everything else at page 1
-        val day = url.substringAfter("?", "").split("&").firstOrNull { it.startsWith("day=") }
-        _filter.value = if (day != null) TopicFilter.Day(day) else TopicFilter.All
+        val params = url.substringAfter("?", "").replace("&amp;", "&").split("&")
+            .filter { it.isNotBlank() && !it.startsWith("p=") && !it.startsWith("focusto=") }
+        val day = params.firstOrNull { it.startsWith("day=") }
+        _filter.value = when {
+            day != null -> TopicFilter.Day(day)
+            // From olay: only the entries written since the topic was last read
+            params.any { it == "a=tracked" } -> TopicFilter.Linked(params.joinToString("&"), "yeni entry'ler")
+            // From the detailed search: entries in its date range / şükela only
+            params.any { it.startsWith("searchform.", ignoreCase = true) } ->
+                TopicFilter.Linked(params.joinToString("&"), "arama sonucu")
+            else -> TopicFilter.All
+        }
         _selectedTopic.value = Topic(title = title, url = url)
         viewModelScope.launch {
             val isSaved = repository.isTopicSaved(title)
@@ -260,9 +272,22 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             // No topic path (e.g. a search or an old saved search URL): search by title
             repository.searchTopic(topic.title, page)
         } else {
-            repository.searchTopic(topic.title, page, if (filter != null) "$path?$filter" else path)
+            try {
+                repository.searchTopic(topic.title, page, if (filter != null) "$path?$filter" else path)
+            } catch (e: java.io.IOException) {
+                if (e is TopicNotFoundException || filter != null) throw e
+                // No connection: the copy saved for offline reading, if there is one
+                val offline = com.example.eksiscraper.data.offline.OfflineStore.loadPage(path, page) ?: throw e
+                if (!shownOfflineNotice) {
+                    shownOfflineNotice = true
+                    _message.value = "bağlantı yok; çevrimdışı kopya gösteriliyor"
+                }
+                offline.copy(isSaved = topic.isSaved)
+            }
         }
     }
+
+    private var shownOfflineNotice = false
 
     /** Takes the fresh page's metadata but keeps the link we were opened with and the saved flag. */
     private fun merge(current: Topic, result: Topic): Topic = result.copy(
@@ -335,6 +360,16 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             } else {
                 _message.value = error
             }
+        }
+    }
+
+    /** "kenara kaydet": the text becomes the site's draft for this topic. */
+    fun saveSiteDraft(text: String) {
+        val topic = _selectedTopic.value ?: return
+        val url = topic.draftSaveUrl ?: return
+        viewModelScope.launch {
+            val error = repository.saveSiteDraft(url, topic.title, text)
+            _message.value = error ?: "kenara kaydedildi; sitede de bu başlıkta duruyor"
         }
     }
 
@@ -433,7 +468,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
-    suspend fun favoriters(entryId: String): List<String> = repository.getFavoriters(entryId)
+    suspend fun favoriters(entryId: String, rookies: Boolean = false): List<String> = repository.getFavoriters(entryId, rookies)
 
     /** "Başlığı açan": who opened the topic and when. */
     suspend fun topicCreator(): com.example.eksiscraper.model.TopicCreator {

@@ -1,5 +1,9 @@
 package com.example.eksiscraper
 
+import com.example.eksiscraper.ui.navigation.openEksiLink
+import com.example.eksiscraper.ui.components.EksiLink
+import com.example.eksiscraper.ui.components.eksiLinkFor
+import androidx.compose.ui.platform.LocalUriHandler
 import com.example.eksiscraper.ui.navigation.TabReselect
 import com.example.eksiscraper.viewmodel.HomeTabRequest
 import com.example.eksiscraper.viewmodel.HomeCategory
@@ -64,6 +68,9 @@ class MainActivity : ComponentActivity() {
         EksiSession.init(this)
         AppSettings.init(this)
         com.example.eksiscraper.settings.Drafts.init(this)
+        com.example.eksiscraper.settings.ReadingHistory.init(this)
+        com.example.eksiscraper.settings.EntryBookmarks.init(this)
+        com.example.eksiscraper.data.offline.OfflineStore.init(this)
         Notifier.schedule(this, AppSettings.notifications.value && EksiSession.isLoggedIn.value)
         // Logged in on Android 13+: ask once for the permission the message / olay alerts need
         if (EksiSession.isLoggedIn.value && AppSettings.notifications.value && !Notifier.canNotify(this) &&
@@ -71,7 +78,7 @@ class MainActivity : ComponentActivity() {
         ) {
             notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
-        pendingOpen.value = intent?.getStringExtra(Notifier.EXTRA_OPEN)
+        pendingOpen.value = openTarget(intent)
         enableEdgeToEdge()
         setContent {
             // Status / navigation bar icons follow the app theme, not only the system one
@@ -92,7 +99,7 @@ class MainActivity : ComponentActivity() {
     // A notification tapped while the app is open
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.getStringExtra(Notifier.EXTRA_OPEN)?.let { pendingOpen.value = it }
+        openTarget(intent)?.let { pendingOpen.value = it }
     }
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -104,6 +111,15 @@ class MainActivity : ComponentActivity() {
 
     /** Where a tapped notification wants to go ("messages" / "olay"), until handled */
     private val pendingOpen = mutableStateOf<String?>(null)
+
+    /** What an intent asks for: a notification / shortcut target, or "link:<url>" for an ekşi link. */
+    private fun openTarget(intent: Intent?): String? {
+        intent ?: return null
+        intent.getStringExtra(Notifier.EXTRA_OPEN)?.let { return it }
+        val data = intent.data
+        if (intent.action == Intent.ACTION_VIEW && data != null && data.scheme?.startsWith("http") == true) return "link:$data"
+        return null
+    }
 }
 
 private val topLevelDestinations = listOf(
@@ -115,8 +131,28 @@ private val topLevelDestinations = listOf(
 @Composable
 fun MainScreen(pendingOpen: MutableState<String?>) {
     val navController = rememberNavController()
+    val uriHandler = LocalUriHandler.current
     LaunchedEffect(pendingOpen.value) {
-        when (pendingOpen.value) {
+        val target = pendingOpen.value
+        when {
+            // A link from another app: open it like a link inside an entry
+            target?.startsWith("link:") == true -> {
+                val url = target.removePrefix("link:")
+                val link = eksiLinkFor(url, "")
+                if (link != null && link !is EksiLink.External) navController.openEksiLink(link, uriHandler)
+            }
+            // App icon shortcut "ara": the search tab with its field open
+            target == "search" -> {
+                navController.navigate(Screen.Search.route) {
+                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+                kotlinx.coroutines.delay(350)
+                TabReselect.reselect(Screen.Search.route)
+            }
+        }
+        when (target) {
             Notifier.OPEN_MESSAGES -> navController.navigate(Screen.Messages.createRoute())
             // The olay tab on the home screen (or the olay list if that tab is turned off)
             Notifier.OPEN_EVENTS -> {

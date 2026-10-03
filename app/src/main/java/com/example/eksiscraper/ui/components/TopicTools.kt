@@ -1,5 +1,9 @@
 package com.example.eksiscraper.ui.components
 
+import androidx.compose.material.icons.rounded.Downloading
+import androidx.compose.material.icons.rounded.CloudOff
+import androidx.compose.material.icons.rounded.CloudSync
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -57,12 +61,20 @@ sealed interface TopicMenuAction {
     data object SearchAuthor : TopicMenuAction
     data object Creator : TopicMenuAction
     data object Share : TopicMenuAction
+    data object SaveOffline : TopicMenuAction
+    data object DeleteOffline : TopicMenuAction
 }
 
 /** Topic filters (as on the site's topic menu) plus "başlığı açan". */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun TopicMenu(current: TopicFilter, isLoggedIn: Boolean, onAction: (TopicMenuAction) -> Unit) {
+fun TopicMenu(
+    current: TopicFilter,
+    isLoggedIn: Boolean,
+    onAction: (TopicMenuAction) -> Unit,
+    /** null: not saved; "indiriliyor 3 / 20"...; "kayıtlı" when a copy is on the device */
+    offlineState: String? = null
+) {
     var open by remember { mutableStateOf(false) }
     fun pick(action: TopicMenuAction) {
         open = false
@@ -94,6 +106,15 @@ fun TopicMenu(current: TopicFilter, isLoggedIn: Boolean, onAction: (TopicMenuAct
                 FilterItem("yazara göre", Icons.Rounded.AlternateEmail, current is TopicFilter.Author) { pick(TopicMenuAction.SearchAuthor) }
                 FilterItem("başlığı açan", Icons.Rounded.Info, false) { pick(TopicMenuAction.Creator) }
                 FilterItem("paylaş", Icons.Rounded.Share, false) { pick(TopicMenuAction.Share) }
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                when (offlineState) {
+                    null -> FilterItem("çevrimdışı kaydet", Icons.Rounded.CloudDownload, false) { pick(TopicMenuAction.SaveOffline) }
+                    "kayıtlı" -> {
+                        FilterItem("çevrimdışı kopyayı güncelle", Icons.Rounded.CloudSync, false) { pick(TopicMenuAction.SaveOffline) }
+                        FilterItem("çevrimdışı kopyayı sil", Icons.Rounded.CloudOff, false) { pick(TopicMenuAction.DeleteOffline) }
+                    }
+                    else -> FilterItem(offlineState, Icons.Rounded.Downloading, true) { pick(TopicMenuAction.DeleteOffline) }
+                }
             }
         }
     }
