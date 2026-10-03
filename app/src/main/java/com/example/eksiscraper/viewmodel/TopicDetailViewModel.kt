@@ -138,9 +138,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 _firstPage.value = loadedPage
                 _lastPage.value = loadedPage
                 _totalPages.value = result.totalPages
-                // From the top: on a jumped-to page the "previous page" row shows in full below the
-                // bar (starting one row down left it half hidden under the bar). The previous page
-                // still loads only when the reader scrolls up.
+                // A jumped-to page opens at its own start (its page marker)
                 scrollState.scrollToItem(0)
                 prefetchAfter(loadedPage)
             } catch (e: CancellationException) {

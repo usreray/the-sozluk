@@ -1,5 +1,8 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.RevealPullToRefresh
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.interaction.DragInteraction
 import com.example.eksiscraper.ui.components.EntryListSkeleton
 import android.app.Application
@@ -111,13 +114,13 @@ import kotlinx.coroutines.launch
 
 private enum class TopicPhase { Loading, Error, Empty, Content }
 
+
 /** Rows of the endless list: entries plus page markers and loading slots. */
 private sealed interface TopicRow {
     val key: String
     data object Intro : TopicRow { override val key = "intro" }
     data object Header : TopicRow { override val key = "header" }
     data object FilterBanner : TopicRow { override val key = "filter" }
-    data object Previous : TopicRow { override val key = "previous" }
     data class PageMarker(val page: Int) : TopicRow { override val key = "page:$page" }
     data class EntryItem(val entry: Entry, val number: Int?) : TopicRow { override val key = "entry:${entry.entryId}" }
     data object Footer : TopicRow { override val key = "footer" }
@@ -194,9 +197,11 @@ fun TopicDetailScreen(
             // The full title, however long, above page 1; the bar shows a short copy once this
             // scrolls away, and on a page jumped to in the middle (no header there)
             if (firstPage == 1) add(TopicRow.Header)
-            if (filter !is TopicFilter.All && filter !is TopicFilter.Day) add(TopicRow.FilterBanner)
+            // Above a page in the middle only its page marker sits on top. Earlier pages are
+            // added above it while reading, and the list keeps the row on screen by its key; a
+            // fixed row at the very top (as the old "previous page" slot was) would break that
+            if (firstPage == 1 && filter !is TopicFilter.All && filter !is TopicFilter.Day) add(TopicRow.FilterBanner)
             if ((topic?.olderEntriesCount ?: 0) > 0 && firstPage == 1) add(TopicRow.Intro)
-            if (firstPage > 1) add(TopicRow.Previous)
             var page = -1
             var indexInPage = 0
             topic?.entries.orEmpty().forEach { entry ->
@@ -212,38 +217,33 @@ fun TopicDetailScreen(
             add(TopicRow.Footer)
         }
     }
-    // The page counter follows the entry at the top of the screen
+    // The page counter follows the entry being read: the one across the upper quarter of the
+    // screen, not whatever sliver is at the very top (often the end of the page before)
     val visiblePage by remember(rows) {
         derivedStateOf {
-            val index = listState.firstVisibleItemIndex
-            rows.drop(index).firstNotNullOfOrNull { (it as? TopicRow.EntryItem)?.entry?.page }
-                ?: rows.take(index + 1).lastOrNull { it is TopicRow.EntryItem }?.let { (it as TopicRow.EntryItem).entry.page }
-                ?: firstPage
+            val info = listState.layoutInfo
+            val line = (info.viewportEndOffset - info.viewportStartOffset) / 4
+            val rowsByKey = rows.associateBy { it.key }
+            val reading = info.visibleItemsInfo.firstOrNull { it.offset + it.size > line }
+            val index = reading?.let { item -> rows.indexOfFirst { it.key == item.key } } ?: listState.firstVisibleItemIndex
+            when (val row = reading?.key?.let(rowsByKey::get)) {
+                is TopicRow.EntryItem -> row.entry.page
+                is TopicRow.PageMarker -> row.page
+                else -> rows.drop(index.coerceAtLeast(0)).firstNotNullOfOrNull { (it as? TopicRow.EntryItem)?.entry?.page }
+            } ?: firstPage
         }
     }
-    // Endless scroll: next page near the end, previous page when reaching the top
+    // Endless scroll both ways, like long threads in forum apps: the next page comes in near the
+    // end, the previous one whenever the top of the loaded pages is close. The previous page is
+    // added above the rows on screen; the list keeps the row being read in place by its key, so
+    // nothing moves and the top is then far away again (no run back through the pages).
     val nearEnd by remember(rows) {
         derivedStateOf { (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) >= rows.size - 4 }
     }
     LaunchedEffect(nearEnd, lastPage, phase) { if (nearEnd && phase == TopicPhase.Content) viewModel.loadNext() }
-    val atTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
-    // The page before the first loaded one comes in only when the reader scrolls up to it, and the
-    // list then stays on the entry that was on top. Without this, a page jump sat at the top,
-    // pulled the previous page, was still at the top, and so on back to page 1.
-    var anchorKey by remember { mutableStateOf<String?>(null) }
-    fun loadPrevious() {
-        anchorKey = rows.firstOrNull { it is TopicRow.EntryItem }?.key
-        viewModel.loadPrevious()
-    }
-    LaunchedEffect(atTop, firstPage, phase) {
-        if (atTop && firstPage > 1 && phase == TopicPhase.Content && listState.lastScrolledBackward) loadPrevious()
-    }
-    LaunchedEffect(firstPage) {
-        val key = anchorKey ?: return@LaunchedEffect
-        anchorKey = null
-        val index = rows.indexOfFirst { it.key == key }
-        // One row above the old top entry: its page marker stays in view
-        if (index > 0) listState.scrollToItem(index - 1)
+    val nearTop by remember { derivedStateOf { listState.firstVisibleItemIndex <= 2 } }
+    LaunchedEffect(nearTop, firstPage, phase, isLoading) {
+        if (nearTop && !isLoading && firstPage > 1 && phase == TopicPhase.Content) viewModel.loadPrevious()
     }
 
     // Saved topics keep the reading position, written once the reader settles on a page
@@ -374,6 +374,9 @@ fun TopicDetailScreen(
     }
 
     val barsVisible = listState.isScrollingUp() || pinBars
+    // Only a pull opens the refresh gap; page jumps load the same way but show in the bar
+    var pullRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(isLoading) { if (!isLoading) pullRefreshing = false }
     val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 || firstPage > 1 } }
     // Room under the floating header so the first row starts below it
     val topInset = floatingTopBarInset()
@@ -397,9 +400,23 @@ fun TopicDetailScreen(
                         FilledTonalButton(onClick = viewModel::showOlderEntries) { Text("tüm entry'leri göster") }
                     })
                 )
-                TopicPhase.Content -> LazyColumn(
+                // Pulling down at the top reloads the pages on screen (new entries, votes). The
+                // list itself moves down with the finger and the loading animation sits in the gap
+                // that opens above it, which stays open until the refresh is done
+                TopicPhase.Content -> RevealPullToRefresh(
+                    isRefreshing = pullRefreshing,
+                    onRefresh = {
+                        pullRefreshing = true
+                        viewModel.retry()
+                    },
+                    top = topInset,
+                    // Only at the top of the topic; above a page in the middle, pulling down
+                    // would cover its page marker with the animation
+                    enabled = firstPage == 1
+                ) { pullOffset ->
+                LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().then(pullOffset),
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = topInset, bottom = 128.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -409,10 +426,6 @@ fun TopicDetailScreen(
                             TopicRow.Header -> TopicHeader(displayTitle, onClick = viewModel::showOlderEntries)
                             TopicRow.Intro -> OlderEntriesCard(topic!!.olderEntriesCount, viewModel::showOlderEntries)
                             TopicRow.FilterBanner -> FilterBanner(filter.label, onClear = viewModel::showOlderEntries)
-                            TopicRow.Previous -> Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
-                                if (isLoadingPrevious) LoadingIndicator()
-                                else TextButton(onClick = ::loadPrevious) { Text("önceki sayfayı yükle") }
-                            }
                             is TopicRow.PageMarker -> PageMarker(row.page, totalPages)
                             is TopicRow.EntryItem -> EntryCard(
                                 entry = row.entry,
@@ -435,6 +448,7 @@ fun TopicDetailScreen(
                         }
                     }
                 }
+                }
             }
         }
 
@@ -448,7 +462,9 @@ fun TopicDetailScreen(
             onTitleClick = if (loaded) viewModel::showOlderEntries else null,
             onBack = { navController.popBackStack() },
             visible = barsVisible || phase != TopicPhase.Content,
-            isLoading = isLoading && loaded,
+            // The pull-down gap already shows a refresh; the bar shows only page jumps
+            // Page jumps and an earlier page loading above show as the bar's thin line
+            isLoading = (isLoading && loaded && !pullRefreshing) || isLoadingPrevious,
             modifier = Modifier.align(Alignment.TopCenter),
             // Nothing to save or share for a topic that doesn't exist
             actions = if (phase != TopicPhase.Content) null else ({
