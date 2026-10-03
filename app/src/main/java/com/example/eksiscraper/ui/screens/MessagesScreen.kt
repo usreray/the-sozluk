@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.graphicsLayer
@@ -11,8 +12,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.foundation.shape.CircleShape
 import com.example.eksiscraper.ui.components.FloatingSurface
 import com.example.eksiscraper.ui.components.rememberAvatarUrl
@@ -58,7 +57,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -171,19 +169,11 @@ fun MessagesScreen(
                 box == null -> TopicListSkeleton(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 4.dp))
                 else -> {
                     // Pull to refresh with the same expressive indicator as the home lists
-                    val refreshState = rememberPullToRefreshState()
-                    PullToRefreshBox(
+                    RevealPullToRefresh(
                         isRefreshing = isLoading,
                         onRefresh = { viewModel.loadBox() },
-                        state = refreshState,
-                        indicator = {
-                            PullToRefreshDefaults.LoadingIndicator(
-                                state = refreshState,
-                                isRefreshing = isLoading,
-                                modifier = Modifier.align(Alignment.TopCenter).padding(top = top)
-                            )
-                        }
-                    ) {
+                        top = top
+                    ) { pullOffset ->
                     val threads = box!!.threads
                     if (threads.isEmpty() && !isLoading) {
                         MessageState(
@@ -194,7 +184,7 @@ fun MessagesScreen(
                     }
                     LazyColumn(
                         state = threadListState,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().then(pullOffset),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 4.dp, bottom = 96.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {

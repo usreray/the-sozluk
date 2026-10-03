@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.shape.CircleShape
 import com.example.eksiscraper.ui.components.FloatingSurface
@@ -39,9 +40,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -312,22 +310,14 @@ private fun CategoryPage(
                 message = "bu listede şu an gösterilecek bir şey yok."
             )
             HomePhase.Content -> {
-                val refreshState = rememberPullToRefreshState()
-                PullToRefreshBox(
+                RevealPullToRefresh(
                     isRefreshing = state.isRefreshing,
                     onRefresh = { viewModel.refresh(category) },
-                    state = refreshState,
-                    indicator = {
-                        PullToRefreshDefaults.LoadingIndicator(
-                            state = refreshState,
-                            isRefreshing = state.isRefreshing,
-                            modifier = Modifier.align(Alignment.TopCenter).padding(top = topPadding)
-                        )
-                    }
-                ) {
+                    top = topPadding
+                ) { pullOffset ->
                     LazyColumn(
                         state = listState,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().then(pullOffset),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 4.dp, bottom = 24.dp + LocalBottomBarInset.current),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {

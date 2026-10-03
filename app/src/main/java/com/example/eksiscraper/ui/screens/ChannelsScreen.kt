@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import com.example.eksiscraper.ui.components.TopicListSkeleton
 import android.app.Application
 import androidx.compose.animation.Crossfade
@@ -26,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -118,10 +118,10 @@ fun ChannelsScreen(
                         title = "hiç başlık yok",
                         message = "burada şu an gösterilecek bir şey yok."
                     )
-                    else -> PullToRefreshBox(isRefreshing = state.isLoading, onRefresh = viewModel::retry) {
+                    else -> RevealPullToRefresh(isRefreshing = state.isLoading, onRefresh = viewModel::retry, top = 0.dp) { pullOffset ->
                         LazyColumn(
                             state = listState,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().then(pullOffset),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
