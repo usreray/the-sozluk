@@ -92,6 +92,7 @@ fun SettingsScreen(navController: NavController) {
     val showAvatars by AppSettings.showAvatars
     val keepScreenOn by AppSettings.keepScreenOn
     val prefetchNextPage by AppSettings.prefetchNextPage
+    val marqueeTitles by AppSettings.marqueeTitles
     val hiddenTabs by AppSettings.hiddenTabs
     val blockedWords by AppSettings.blockedWords
     var addingWord by remember { mutableStateOf(false) }
@@ -142,6 +143,8 @@ fun SettingsScreen(navController: NavController) {
                                     checked = themeMode == mode,
                                     onCheckedChange = { AppSettings.setThemeMode(mode) },
                                     modifier = Modifier.weight(1f),
+                                    // Icon and label fit a third of the width without wrapping
+                                    contentPadding = PaddingValues(horizontal = 8.dp),
                                     shapes = when (index) {
                                         0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
                                         ThemeMode.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
@@ -157,7 +160,7 @@ fun SettingsScreen(navController: NavController) {
                                         contentDescription = null,
                                         modifier = Modifier.padding(end = ToggleButtonDefaults.IconSpacing)
                                     )
-                                    Text(mode.label)
+                                    Text(mode.label, maxLines = 1, softWrap = false)
                                 }
                             }
                         }
@@ -245,7 +248,7 @@ fun SettingsScreen(navController: NavController) {
 
             item { SectionTitle("okuma") }
             item {
-                Surface(shape = segmentedShape(0, 5), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Surface(shape = segmentedShape(0, 6), color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "yazı boyutu · %${(textScale * 100).roundToInt()}",
@@ -271,7 +274,7 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "her entry'nin başlıktaki sırası (#12)",
                     checked = showEntryNumbers,
                     enabled = true,
-                    shape = segmentedShape(1, 5),
+                    shape = segmentedShape(1, 6),
                     onCheckedChange = AppSettings::setShowEntryNumbers
                 )
             }
@@ -281,7 +284,7 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "entry'lerde yazarın resmini göster",
                     checked = showAvatars,
                     enabled = true,
-                    shape = segmentedShape(2, 5),
+                    shape = segmentedShape(2, 6),
                     onCheckedChange = AppSettings::setShowAvatars
                 )
             }
@@ -291,7 +294,7 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "başlık okurken ekran kararmasın",
                     checked = keepScreenOn,
                     enabled = true,
-                    shape = segmentedShape(3, 5),
+                    shape = segmentedShape(3, 6),
                     onCheckedChange = AppSettings::setKeepScreenOn
                 )
             }
@@ -301,8 +304,18 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "kaydırırken beklememek için",
                     checked = prefetchNextPage,
                     enabled = true,
-                    shape = segmentedShape(4, 5),
+                    shape = segmentedShape(4, 6),
                     onCheckedChange = AppSettings::setPrefetchNextPage
+                )
+            }
+            item {
+                SwitchRow(
+                    title = "uzun başlıkları kaydır",
+                    subtitle = "üst bara sığmayan başlık sağdan sola aksın; basılı tutunca tamamı görünür",
+                    checked = marqueeTitles,
+                    enabled = true,
+                    shape = segmentedShape(5, 6),
+                    onCheckedChange = AppSettings::setMarqueeTitles
                 )
             }
 

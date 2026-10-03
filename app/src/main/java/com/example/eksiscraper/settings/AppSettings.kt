@@ -101,6 +101,7 @@ object AppSettings {
         _keepScreenOn.value = prefs.getBoolean("keepScreenOn", false)
         _prefetchNextPage.value = prefs.getBoolean("prefetchNextPage", true)
         _notifications.value = prefs.getBoolean("notifications", true)
+        _marqueeTitles.value = prefs.getBoolean("marqueeTitles", true)
         _themeMode.value = ThemeMode.entries.getOrElse(prefs.getInt("themeMode", 0)) { ThemeMode.System }
         _dynamicColor.value = prefs.getBoolean("dynamicColor", true)
         _pureBlack.value = prefs.getBoolean("pureBlack", false)
@@ -151,6 +152,15 @@ object AppSettings {
     fun setKeepScreenOn(enabled: Boolean) {
         _keepScreenOn.value = enabled
         prefs.edit().putBoolean("keepScreenOn", enabled).apply()
+    }
+
+    /** Bar titles too long for the bar scroll right to left */
+    private val _marqueeTitles = mutableStateOf(true)
+    val marqueeTitles: State<Boolean> = _marqueeTitles
+
+    fun setMarqueeTitles(enabled: Boolean) {
+        _marqueeTitles.value = enabled
+        prefs.edit().putBoolean("marqueeTitles", enabled).apply()
     }
 
     /** Background check for new messages / followed-topic entries */

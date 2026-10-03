@@ -1,5 +1,12 @@
 package com.example.eksiscraper.ui.components
 
+import com.example.eksiscraper.settings.AppSettings
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipBox
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.animation.AnimatedVisibility
@@ -59,7 +66,7 @@ import androidx.compose.ui.unit.dp
  * the round buttons float; the title card appears once a [title] is given. The bar slides away
  * while scrolling down and comes back on the way up ([visible]). [actions] null draws no pill.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun FloatingTopBar(
     title: String?,
@@ -100,6 +107,13 @@ fun FloatingTopBar(
                     enter = fadeIn() + scaleIn(initialScale = 0.9f),
                     exit = fadeOut() + scaleOut(targetScale = 0.9f)
                 ) {
+                    // Long press shows the whole title in a tooltip
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+                        tooltip = { if (title != null) PlainTooltip { Text(title) } },
+                        state = rememberTooltipState(),
+                        enableUserInput = title != null
+                    ) {
                     FloatingSurface(
                         shape = RoundedCornerShape(26.dp),
                         onClick = onTitleClick
@@ -120,12 +134,22 @@ fun FloatingTopBar(
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     if (title != null) {
+                                        // A title too long for the bar scrolls right to left (unless
+                                        // turned off in settings, then it ends with "…")
+                                        val marquee = AppSettings.marqueeTitles.value
                                         Text(
                                             title,
                                             style = MaterialTheme.typography.titleMediumEmphasized,
                                             textAlign = TextAlign.Center,
                                             maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
+                                            overflow = if (marquee) TextOverflow.Clip else TextOverflow.Ellipsis,
+                                            modifier = if (marquee) {
+                                                Modifier.basicMarquee(
+                                                    iterations = Int.MAX_VALUE,
+                                                    initialDelayMillis = 1500,
+                                                    repeatDelayMillis = 2500
+                                                )
+                                            } else Modifier
                                         )
                                     }
                                     if (subtitle != null) {
@@ -148,6 +172,7 @@ fun FloatingTopBar(
                                 )
                             }
                         }
+                    }
                     }
                 }
             }
