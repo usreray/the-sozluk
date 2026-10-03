@@ -149,7 +149,9 @@ fun EntryCard(
     /** Tapping the card (outside its buttons and links) */
     onClick: (() -> Unit)? = null,
     /** False where the entry is always shown in full */
-    showExpandToggle: Boolean = true
+    showExpandToggle: Boolean = true,
+    /** The full-screen reader allows selecting text; list cards do not. */
+    textSelectable: Boolean = false
 ) {
     var overflows by remember(entry.entryId) { mutableStateOf(false) }
     val showAvatars by AppSettings.showAvatars
@@ -204,8 +206,18 @@ fun EntryCard(
                     )
                 }
             }
-            // Long-press selects text to copy part of an entry; links stay tappable
-            SelectionContainer {
+            if (textSelectable) SelectionContainer {
+                Text(
+                    text = text,
+                    inlineContent = rememberEntryInlineContent(),
+                    style = entryBodyStyle(),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = if (isExpanded) Int.MAX_VALUE else COLLAPSED_LINES,
+                    overflow = TextOverflow.Ellipsis,
+                    onTextLayout = { if (!isExpanded) overflows = it.hasVisualOverflow },
+                    modifier = Modifier.padding(end = 12.dp).animateContentSize()
+                )
+            } else {
                 Text(
                     text = text,
                     inlineContent = rememberEntryInlineContent(),
@@ -306,7 +318,8 @@ fun EntryCard(
                         onAuthor = actions.onAuthor,
                         onLink = actions.onLink,
                         onVote = { comment, rate -> actions.onVoteComment(entry, comment, rate) },
-                        onWrite = actions.onWriteComment?.let { write -> { write(entry) } }
+                        onWrite = actions.onWriteComment?.let { write -> { write(entry) } },
+                        textSelectable = textSelectable
                     )
                 }
             }
@@ -321,7 +334,8 @@ private fun CommentsSection(
     onAuthor: (String) -> Unit,
     onLink: (EksiLink) -> Unit,
     onVote: (Comment, Int) -> Unit,
-    onWrite: (() -> Unit)?
+    onWrite: (() -> Unit)?,
+    textSelectable: Boolean
 ) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(end = 12.dp, top = 4.dp, bottom = 8.dp),
@@ -366,7 +380,14 @@ private fun CommentsSection(
                             modifier = Modifier.padding(end = 10.dp)
                         )
                     }
-                    SelectionContainer {
+                    if (textSelectable) SelectionContainer {
+                        Text(
+                            rememberEntryText(comment.contentHtml, comment.content, onLink),
+                            inlineContent = rememberEntryInlineContent(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(top = 6.dp, end = 10.dp)
+                        )
+                    } else {
                         Text(
                             rememberEntryText(comment.contentHtml, comment.content, onLink),
                             inlineContent = rememberEntryInlineContent(),

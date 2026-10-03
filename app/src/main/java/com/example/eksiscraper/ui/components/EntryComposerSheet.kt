@@ -1,7 +1,5 @@
 package com.example.eksiscraper.ui.components
 
-import androidx.compose.material.icons.rounded.CloudUpload
-import androidx.compose.material3.TextButton
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -59,9 +57,7 @@ fun EntryComposerSheet(
     /** A saved draft (or the site's "kenar" text) to continue from */
     initialText: String = "",
     /** Called on every edit so the text survives closing the sheet */
-    onTextChange: ((String) -> Unit)? = null,
-    /** "kenara kaydet" (the site's draft); null hides the button */
-    onSaveToSite: ((String) -> Unit)? = null
+    onTextChange: ((String) -> Unit)? = null
 ) {
     var value by remember { mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length))) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -107,30 +103,15 @@ fun EntryComposerSheet(
                     )
                 }
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.align(Alignment.End)
-            ) {
-            if (onSaveToSite != null) {
-                // Saved on the site too, so it can be finished from another device
-                TextButton(
-                    onClick = { onSaveToSite(value.text.trim()) },
-                    enabled = value.text.isNotBlank() && !isSubmitting
-                ) {
-                    Icon(Icons.Rounded.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text("kenara kaydet", modifier = Modifier.padding(start = 6.dp))
-                }
-            }
             Button(
                 onClick = { onSubmit(value.text.trim()) },
                 enabled = value.text.isNotBlank() && !isSubmitting,
-                modifier = Modifier.padding(start = 8.dp),
+                modifier = Modifier.align(Alignment.End),
                 contentPadding = ButtonDefaults.ButtonWithIconContentPadding
             ) {
                 if (isSubmitting) LoadingIndicator(modifier = Modifier.size(20.dp))
                 else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                 Text("gönder", modifier = Modifier.padding(start = 8.dp))
-            }
             }
         }
     }

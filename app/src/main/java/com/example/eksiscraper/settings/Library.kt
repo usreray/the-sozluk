@@ -8,6 +8,38 @@ import com.example.eksiscraper.model.Entry
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Recent search terms, newest first, kept on this device. */
+object SearchHistory {
+    private const val PREFS = "search_history"
+    private const val KEY = "items"
+    private const val LIMIT = 20
+    private lateinit var prefs: SharedPreferences
+
+    private val _items = mutableStateOf<List<String>>(emptyList())
+    val items: State<List<String>> = _items
+
+    fun init(context: Context) {
+        prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val array = runCatching { JSONArray(prefs.getString(KEY, "[]")) }.getOrDefault(JSONArray())
+        _items.value = List(array.length()) { array.optString(it) }.filter(String::isNotBlank).take(LIMIT)
+    }
+
+    fun add(query: String) {
+        val term = query.trim().takeIf(String::isNotEmpty) ?: return
+        _items.value = (listOf(term) + _items.value.filterNot { it.equals(term, ignoreCase = true) }).take(LIMIT)
+        persist()
+    }
+
+    fun remove(query: String) {
+        _items.value = _items.value.filterNot { it == query }
+        persist()
+    }
+
+    private fun persist() {
+        prefs.edit().putString(KEY, JSONArray(_items.value).toString()).apply()
+    }
+}
+
 /** A topic opened recently. */
 data class HistoryItem(val title: String, val url: String, val openedAt: Long)
 

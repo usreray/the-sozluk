@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
         com.example.eksiscraper.settings.Drafts.init(this)
         com.example.eksiscraper.settings.ReadingHistory.init(this)
         com.example.eksiscraper.settings.EntryBookmarks.init(this)
+        com.example.eksiscraper.settings.SearchHistory.init(this)
         com.example.eksiscraper.data.offline.OfflineStore.init(this)
         Notifier.schedule(this, AppSettings.notifications.value && EksiSession.isLoggedIn.value)
         // Logged in on Android 13+: ask once for the permission the message / olay alerts need

@@ -438,29 +438,6 @@ object EksiNetworkDataSource {
             }.filter { it.nick.isNotBlank() }
         }
 
-    /**
-     * "kenara kaydet": keeps the text as the site's draft for the topic, readable from any device
-     * (POST title + content, like the site's own button). Null on success, otherwise the reason.
-     */
-    suspend fun saveSiteDraft(url: String, title: String, content: String): String? = withContext(Dispatchers.IO) {
-        try {
-            val path = if (url.startsWith("http")) url.removePrefix(BASE_URL) else url
-            val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))
-                .method(org.jsoup.Connection.Method.POST)
-                .referrer("$BASE_URL/")
-                .header("Origin", BASE_URL)
-                .header("X-Requested-With", "XMLHttpRequest")
-                .data("title", title)
-                .data("content", content)
-                .execute()
-            if (response.statusCode() !in 200..299) return@withContext "kenara kaydedilemedi (HTTP ${response.statusCode()})"
-            val json = runCatching { JSONObject(response.body()) }.getOrNull() ?: return@withContext null
-            if (json.optBoolean("Success", true)) null else json.optString("Message").ifBlank { "kenara kaydedilemedi" }
-        } catch (e: Exception) {
-            e.message ?: "kenara kaydedilemedi"
-        }
-    }
-
     /** The form of an entry's "düzelt" page (/entry/duzelt/<id>), holding its current text. */
     suspend fun fetchEditForm(entryId: String): FormSpec = withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/entry/duzelt/$entryId"))

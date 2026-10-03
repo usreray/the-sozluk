@@ -35,6 +35,7 @@ import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.ExpandedFullScreenSearchBar
+import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberSearchBarState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.eksiscraper.model.Topic
+import com.example.eksiscraper.settings.SearchHistory
 import com.example.eksiscraper.ui.components.MessageState
 import com.example.eksiscraper.ui.components.TopicRow
 import com.example.eksiscraper.ui.components.segmentedShape
@@ -89,6 +91,7 @@ fun SearchScreen(
             initialKeywords = initial,
             onSearch = { path, name ->
                 advancedFor = null
+                SearchHistory.add(name.removeSurrounding("“", "”"))
                 navController.navigate(Screen.Channels.createRoute(path, name))
             },
             onDismiss = { advancedFor = null }
@@ -113,6 +116,7 @@ fun SearchScreen(
     fun open(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
+        SearchHistory.add(trimmed)
         scope.launch { searchBarState.animateToCollapsed() }
         if (trimmed.startsWith("@") && trimmed.length > 1) {
             navController.navigate(Screen.Author.createRoute(trimmed.removePrefix("@")))
@@ -198,11 +202,7 @@ fun SearchScreen(
         }
         Crossfade(targetState = query.isBlank(), label = "searchBody") { blank ->
             if (blank) {
-                MessageState(
-                    icon = Icons.Rounded.Search,
-                    title = "yazmaya başla",
-                    message = "öneriler burada belirecek."
-                )
+                SearchHistoryList(SearchHistory.items.value, ::open, SearchHistory::remove)
             } else {
                 SuggestionList(
                     query = query,
@@ -214,11 +214,50 @@ fun SearchScreen(
                     },
                     onSearchTitles = { text ->
                         scope.launch { searchBarState.animateToCollapsed() }
+                        SearchHistory.add(text)
                         // The site's detailed search: every topic whose title contains the words
                         val path = "basliklar/ara?SearchForm.Keywords=" + java.net.URLEncoder.encode(text.trim(), "UTF-8")
                         navController.navigate(Screen.Channels.createRoute(path, "“${text.trim()}”"))
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchHistoryList(history: List<String>, onSelect: (String) -> Unit, onRemove: (String) -> Unit) {
+    if (history.isEmpty()) {
+        MessageState(Icons.Rounded.Search, "yazmaya başla", "öneriler burada belirecek.")
+        return
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(
+            "son aramalar",
+            style = MaterialTheme.typography.titleMediumEmphasized,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+        )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            itemsIndexed(history, key = { _, item -> item }) { index, item ->
+                Surface(
+                    onClick = { onSelect(item) },
+                    shape = segmentedShape(index, history.size),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, end = 8.dp)) {
+                        Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(item, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 16.dp))
+                        IconButton(onClick = { onRemove(item) }) {
+                            Icon(Icons.Rounded.Close, contentDescription = "arama geçmişinden kaldır", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
             }
         }
     }

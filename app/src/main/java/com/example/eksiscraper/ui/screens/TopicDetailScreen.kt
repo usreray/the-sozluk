@@ -427,8 +427,7 @@ fun TopicDetailScreen(
             onSubmit = { text -> viewModel.submitEntry(text) { showComposer = false } },
             onDismiss = { if (!isSubmitting) showComposer = false },
             initialText = remember { Drafts.get(draftKey)?.text ?: topic?.entryForm?.textValue.orEmpty() },
-            onTextChange = { text -> Drafts.save(draftKey, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty(), text) },
-            onSaveToSite = if (topic?.draftSaveUrl != null) viewModel::saveSiteDraft else null
+            onTextChange = { text -> Drafts.save(draftKey, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty(), text) }
         )
     }
     shareImageOf?.let { entry ->
@@ -500,7 +499,7 @@ fun TopicDetailScreen(
                         when (row) {
                             // Like the bar title: the whole topic from its first page
                             TopicRow.Header -> TopicHeader(displayTitle, onClick = viewModel::showOlderEntries)
-                            TopicRow.Intro -> OlderEntriesCard(topic!!.olderEntriesCount, viewModel::showOlderEntries)
+                            TopicRow.Intro -> OlderEntriesCard(viewModel::showOlderEntries)
                             TopicRow.FilterBanner -> FilterBanner(filter.label, onClear = viewModel::showOlderEntries)
                             is TopicRow.PageMarker -> PageMarker(row.page, totalPages)
                             is TopicRow.EntryItem -> EntryCard(
@@ -649,7 +648,8 @@ private fun EntryPager(
                             onToggleExpand = {},
                             actions = actions,
                             number = numbers[entry.entryId],
-                            showExpandToggle = false
+                            showExpandToggle = false,
+                            textSelectable = true
                         )
                         if (page == entries.lastIndex && isLoadingNext) {
                             Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { LoadingIndicator() }
@@ -706,14 +706,14 @@ private fun FilterBanner(label: String, onClear: () -> Unit) {
 }
 
 @Composable
-private fun OlderEntriesCard(count: Int, onShow: () -> Unit) {
+private fun OlderEntriesCard(onShow: () -> Unit) {
     FilledTonalButton(
         onClick = onShow,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = ButtonDefaults.ButtonWithIconContentPadding
     ) {
         Icon(Icons.Rounded.History, contentDescription = null)
-        Text("başlığın tamamını oku · $count entry daha", modifier = Modifier.padding(start = 8.dp))
+        Text("başlığın tamamını oku", modifier = Modifier.padding(start = 8.dp))
     }
 }
 

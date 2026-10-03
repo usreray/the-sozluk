@@ -429,7 +429,12 @@ private fun CategoryPage(
                             TopicRow(
                                 topic = topic,
                                 shape = segmentedShape(index, topics.size),
-                                onClick = { onTopicClick(topic.title, topic.url) },
+                                onClick = {
+                                    val url = if (category == HomeCategory.Caylaklar) {
+                                        topic.url + if ('?' in topic.url) "&a=caylaklar" else "?a=caylaklar"
+                                    } else topic.url
+                                    onTopicClick(topic.title, url)
+                                },
                                 modifier = Modifier.animateItem()
                             )
                         }

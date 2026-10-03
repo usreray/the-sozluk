@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import android.app.Application
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,11 +41,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.eksiscraper.data.offline.OfflineStore
+import com.example.eksiscraper.settings.Drafts
 import com.example.eksiscraper.settings.EntryBookmarks
 import com.example.eksiscraper.settings.ReadingHistory
 import com.example.eksiscraper.settings.SavedEntry
@@ -55,25 +60,38 @@ import com.example.eksiscraper.ui.components.entryBodyStyle
 import com.example.eksiscraper.ui.components.rememberEntryInlineContent
 import com.example.eksiscraper.ui.components.rememberEntryText
 import com.example.eksiscraper.ui.components.segmentedShape
+import com.example.eksiscraper.ui.components.TopicRow
 import com.example.eksiscraper.ui.navigation.Screen
 import com.example.eksiscraper.ui.navigation.openEksiLink
+import com.example.eksiscraper.viewmodel.EksiViewModelFactory
+import com.example.eksiscraper.viewmodel.ProfileViewModel
 import kotlinx.coroutines.launch
 
 /** The device-side collections reachable from the profile and settings. */
 enum class LibraryKind(val title: String) {
     History("okuma geçmişi"),
     Bookmarks("kaydedilen entry'ler"),
-    Offline("çevrimdışı başlıklar")
+    Offline("çevrimdışı başlıklar"),
+    Drafts("taslaklar"),
+    SavedTopics("kaydedilen başlıklar")
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun LibraryScreen(kind: LibraryKind, navController: NavController) {
+fun LibraryScreen(
+    kind: LibraryKind,
+    navController: NavController,
+    profileViewModel: ProfileViewModel = viewModel(
+        factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
+) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val scrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     var confirmClear by remember { mutableStateOf(false) }
     val history by ReadingHistory.items
+    val drafts by Drafts.all
+    val savedTopics by profileViewModel.savedTopics
 
     Scaffold(
         topBar = {
@@ -159,6 +177,49 @@ fun LibraryScreen(kind: LibraryKind, navController: NavController) {
                                 }
                             )
                         }
+                    }
+                }
+                LibraryKind.Drafts -> {
+                    if (drafts.isEmpty()) item { Empty(Icons.Rounded.Description, "taslak yok", "göndermediğin entry'ler burada listelenir.") }
+                    itemsIndexed(drafts, key = { _, draft -> "d:${draft.title}" }) { index, draft ->
+                        Surface(
+                            onClick = { navController.navigate(Screen.TopicDetail.createRoute(draft.title, draft.url)) },
+                            shape = segmentedShape(index, drafts.size),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(draft.title, style = MaterialTheme.typography.bodyLarge)
+                                    Text(draft.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                }
+                                IconButton(onClick = { Drafts.delete(draft.title) }) {
+                                    Icon(Icons.Rounded.DeleteOutline, contentDescription = "taslağı sil", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
+                }
+                LibraryKind.SavedTopics -> {
+                    if (savedTopics.isEmpty()) item {
+                        Empty(Icons.Rounded.Bookmarks, "henüz kayıt yok", "bir başlıktaki yer imi simgesine dokun, buraya eklensin.")
+                    }
+                    itemsIndexed(savedTopics, key = { _, topic -> "s:${topic.title}" }) { index, topic ->
+                        TopicRow(
+                            topic = topic,
+                            shape = segmentedShape(index, savedTopics.size),
+                            onClick = { navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url, topic.currentPage)) },
+                            modifier = Modifier,
+                            subtitle = listOfNotNull(
+                                "çevrimdışı".takeIf { OfflineStore.get(topic.url) != null },
+                                "${topic.currentPage}. sayfada kaldın".takeIf { topic.currentPage > 1 }
+                            ).joinToString(" · ").ifBlank { null },
+                            trailing = {
+                                IconButton(onClick = { profileViewModel.unsaveTopic(topic) }) {
+                                    Icon(Icons.Rounded.BookmarkRemove, contentDescription = "kayıttan çıkar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        )
                     }
                 }
             }

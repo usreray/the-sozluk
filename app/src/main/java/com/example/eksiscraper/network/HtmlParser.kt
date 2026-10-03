@@ -172,8 +172,7 @@ object HtmlParser {
                         // The site toggles data-tracked (0/1) and posts to data-trackurl / data-untrackurl
                         isTracked = trackLink?.attr("data-tracked") == "1",
                         trackUrl = trackLink?.attr("data-trackurl")?.ifBlank { null },
-                        untrackUrl = trackLink?.attr("data-untrackurl")?.ifBlank { null },
-                        draftSaveUrl = document.selectFirst("#save-draft-button")?.attr("data-href")?.ifBlank { null }
+                        untrackUrl = trackLink?.attr("data-untrackurl")?.ifBlank { null }
                 )
         }
 
@@ -357,6 +356,19 @@ object HtmlParser {
         fun parseProfile(document: Document, nick: String): AuthorProfile {
                 fun count(id: String) =
                         document.selectFirst("#$id")?.text()?.filter(Char::isDigit)?.toIntOrNull() ?: 0
+                val rank = document.selectFirst("#nick-container + p.muted")?.text()?.trim().orEmpty()
+                val profileTitle = document.selectFirst("#user-profile-title")
+                val nickContainer = document.selectFirst("#nick-container")
+                val headerNodes = buildList<Element?> {
+                        addAll(generateSequence(profileTitle) { it.parent() }.take(3).toList())
+                        add(nickContainer)
+                        add(nickContainer?.nextElementSibling())
+                        add(nickContainer?.parent()?.nextElementSibling())
+                }.filterNotNull()
+                val isRookie = rank.equals("çaylak", ignoreCase = true) || headerNodes.any { node ->
+                        node.ownText().trim().equals("çaylak", ignoreCase = true) ||
+                                node.select("*").any { it.ownText().trim().equals("çaylak", ignoreCase = true) }
+                }
                 // The profile's own picture box; a bare img.avatar can be the logged-in user's
                 // own picture in the site header
                 val avatar = (document.selectFirst("#profile-logo img") ?: document.selectFirst("#user-profile-title img.avatar, img.logo.avatar"))
@@ -368,7 +380,8 @@ object HtmlParser {
                         avatarUrl = avatar.takeIf { it.isNotBlank() && !it.contains("default-profile") }
                                 ?.let { if (it.startsWith("//")) "https:$it" else it },
                         isVerified = document.selectFirst("#verified-badge") != null,
-                        karma = document.selectFirst("#nick-container + p.muted, p.muted")?.text().orEmpty(),
+                        karma = rank.takeUnless { isRookie }
+                                ?: document.select("p.muted").firstOrNull { it.text().matches(Regex(".*\\(\\d+\\).*")) }?.text().orEmpty(),
                         biography = document.selectFirst("#profile-biography .content")?.text().orEmpty(),
                         entryCount = count("entry-count-total"),
                         followerCount = count("user-follower-count"),
@@ -391,6 +404,7 @@ object HtmlParser {
                                         )
                                 }
                                 .distinctBy { it.addUrl },
+                        isRookie = isRookie,
                         badges = document.select("a.user-profile-badge-item").map {
                                 Badge(
                                         name = it.attr("data-name"),

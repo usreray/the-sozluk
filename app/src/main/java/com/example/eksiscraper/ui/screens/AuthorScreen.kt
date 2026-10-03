@@ -301,6 +301,9 @@ fun AuthorScreen(
                         EntryCard(
                             entry = entry,
                             isExpanded = false,
+                            onClick = {
+                                navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle, "/entry/${entry.entryId}"))
+                            },
                             onToggleExpand = {
                                 navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle, "/entry/${entry.entryId}"))
                             },
@@ -416,6 +419,20 @@ private fun ProfileHeader(
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(profile.nick, style = MaterialTheme.typography.headlineMediumEmphasized, textAlign = TextAlign.Center)
+            if (profile.isRookie) {
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text(
+                        "çaylak",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
             if (profile.isVerified) {
                 Icon(
                     Icons.Rounded.Verified,

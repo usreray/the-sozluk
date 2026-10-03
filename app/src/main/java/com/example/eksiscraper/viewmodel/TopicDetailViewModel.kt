@@ -116,6 +116,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         val day = params.firstOrNull { it.startsWith("day=") }
         _filter.value = when {
             day != null -> TopicFilter.Day(day)
+            params.any { it == "a=caylaklar" } -> TopicFilter.Rookies
             // From olay: only the entries written since the topic was last read
             params.any { it == "a=tracked" } -> TopicFilter.Linked(params.joinToString("&"), "yeni entry'ler")
             // From the detailed search: entries in its date range / şükela only
@@ -360,16 +361,6 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             } else {
                 _message.value = error
             }
-        }
-    }
-
-    /** "kenara kaydet": the text becomes the site's draft for this topic. */
-    fun saveSiteDraft(text: String) {
-        val topic = _selectedTopic.value ?: return
-        val url = topic.draftSaveUrl ?: return
-        viewModelScope.launch {
-            val error = repository.saveSiteDraft(url, topic.title, text)
-            _message.value = error ?: "kenara kaydedildi; sitede de bu başlıkta duruyor"
         }
     }
 

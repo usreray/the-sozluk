@@ -23,9 +23,7 @@ data class Topic(
     // "takip et" on the topic (logged in only): current state and the urls it posts to
     val isTracked: Boolean = false,
     val trackUrl: String? = null,
-    val untrackUrl: String? = null,
-    /** "kenara kaydet": the site's own draft for this topic (logged in only) */
-    val draftSaveUrl: String? = null
+    val untrackUrl: String? = null
 )
 
 data class Entry(
@@ -92,7 +90,8 @@ data class AuthorProfile(
     val followRemoveUrl: String? = null,
     val isFollowing: Boolean = false,
     /** Other relation buttons besides "takip et"; empty when logged out */
-    val relations: List<RelationAction> = emptyList()
+    val relations: List<RelationAction> = emptyList(),
+    val isRookie: Boolean = false
 )
 
 /** "Başlığı açan": the author's nick plus the plain facts (date, counts) from the site's box. */

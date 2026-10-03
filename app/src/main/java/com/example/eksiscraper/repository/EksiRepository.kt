@@ -47,9 +47,6 @@ class EksiRepository(
 
     suspend fun getEditForm(entryId: String): FormSpec = EksiNetworkDataSource.fetchEditForm(entryId)
 
-    suspend fun saveSiteDraft(url: String, title: String, content: String): String? =
-        EksiNetworkDataSource.saveSiteDraft(url, title, content)
-
     /** Saves an entry's new text with its "düzelt" form; null on success, otherwise the reason. */
     suspend fun editEntry(form: FormSpec, text: String): String? {
         val field = form.textFieldName ?: return "düzeltme formu bulunamadı"

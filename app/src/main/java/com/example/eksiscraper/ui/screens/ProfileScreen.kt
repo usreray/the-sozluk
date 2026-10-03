@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.rounded.Login
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.BookmarkRemove
 import androidx.compose.material.icons.rounded.Bookmarks
+import androidx.compose.material.icons.rounded.BookmarkAdd
+import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.Settings
@@ -137,7 +139,7 @@ fun ProfileScreen(
                     onOpenProfile = { nick?.let { navController.navigate(Screen.Author.createRoute(it)) } }
                 )
             }
-            // What is kept on this device: saved entries, history, offline topics
+            // Device-side library sections
             item(key = "library") {
                 val rows = listOf(
                     Triple(LibraryKind.Bookmarks, Icons.Rounded.Bookmarks, "${EntryBookmarks.items.value.size} entry"),
@@ -145,7 +147,9 @@ fun ProfileScreen(
                     Triple(LibraryKind.Offline, Icons.Rounded.CloudDone, OfflineStore.topics.value.size.let { n ->
                         val running = OfflineStore.progress.values.count { !it.finished }
                         "$n başlık" + if (running > 0) " · $running indiriliyor" else ""
-                    })
+                    }),
+                    Triple(LibraryKind.Drafts, Icons.Rounded.Description, "${drafts.size} taslak"),
+                    Triple(LibraryKind.SavedTopics, Icons.Rounded.BookmarkAdd, "${savedTopics.size} başlık")
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.padding(top = 20.dp)) {
                     rows.forEachIndexed { index, (kind, icon, count) ->
@@ -162,87 +166,6 @@ fun ProfileScreen(
                         }
                     }
                 }
-            }
-            // Unsent entries kept on the device; tapping one opens its topic to continue
-            if (drafts.isNotEmpty()) {
-                item(key = "draftsHeader") {
-                    Text(
-                        text = "taslaklar",
-                        style = MaterialTheme.typography.titleMediumEmphasized,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 8.dp, top = 28.dp, bottom = 10.dp)
-                    )
-                }
-                itemsIndexed(drafts, key = { _, draft -> "draft:${draft.title}" }) { index, draft ->
-                    Surface(
-                        onClick = { navController.navigate(Screen.TopicDetail.createRoute(draft.title, draft.url)) },
-                        shape = segmentedShape(index, drafts.size),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        modifier = Modifier.fillMaxWidth().animateItem()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(draft.title, style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    draft.text,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            IconButton(onClick = { Drafts.delete(draft.title) }) {
-                                Icon(
-                                    Icons.Rounded.DeleteOutline,
-                                    contentDescription = "taslağı sil",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            item(key = "savedHeader") {
-                Text(
-                    text = "kaydedilen başlıklar",
-                    style = MaterialTheme.typography.titleMediumEmphasized,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(start = 8.dp, top = 28.dp, bottom = 10.dp)
-                )
-            }
-            if (savedTopics.isEmpty()) {
-                item(key = "empty") {
-                    MessageState(
-                        icon = Icons.Rounded.Bookmarks,
-                        title = "henüz kayıt yok",
-                        message = "bir başlıktaki yer imi simgesine dokun, buraya eklensin.",
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-            }
-            itemsIndexed(savedTopics, key = { _, topic -> "saved:${topic.title}" }) { index, topic ->
-                TopicRow(
-                    topic = topic,
-                    shape = segmentedShape(index, savedTopics.size),
-                    onClick = { navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url, topic.currentPage)) },
-                    modifier = Modifier.animateItem(),
-                    subtitle = listOfNotNull(
-                        "çevrimdışı".takeIf { OfflineStore.get(topic.url) != null },
-                        "${topic.currentPage}. sayfada kaldın".takeIf { topic.currentPage > 1 }
-                    ).joinToString(" · ").ifBlank { null },
-                    trailing = {
-                        IconButton(onClick = { viewModel.unsaveTopic(topic) }) {
-                            Icon(
-                                Icons.Rounded.BookmarkRemove,
-                                contentDescription = "kayıttan çıkar",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                )
             }
         }
     }
