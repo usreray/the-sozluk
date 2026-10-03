@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.components
 
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.foundation.layout.offset
 import android.content.ClipData
 import android.content.Intent
@@ -218,12 +219,25 @@ fun EntryCard(
                         }
                     }
                 }
-                // The nick takes whatever room is left and ellipsizes, so a long one never pushes
-                // the avatar and the menu off the card
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                Spacer(Modifier.weight(1f))
+                EntryMenu(
+                    entry = entry,
+                    onAuthor = { actions.onAuthor(entry.author) },
+                    onAuthorInTopic = actions.onAuthorInTopic?.let { show -> { show(entry) } },
+                    onDelete = if (entry.canDelete && actions.onDelete != null) ({ confirmDelete = true }) else null
+                )
+            }
+            // Author on a line of its own below the actions, so a long nick and the full date
+            // (with an edit time) have the card's whole width
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.End,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp, end = 12.dp)
+            ) {
                 Column(
                     horizontalAlignment = Alignment.End,
                     modifier = Modifier
+                        .weight(1f, fill = false)
                         .clip(RoundedCornerShape(12.dp))
                         .clickable { actions.onAuthor(entry.author) }
                         .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -236,29 +250,21 @@ fun EntryCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = (if (showNumbers && number != null) "#$number · ${entry.date}" else entry.date)
-                            .replace(" ~ ", "\n~ "),
+                        text = if (showNumbers && number != null) "#$number · ${entry.date}" else entry.date,
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.End,
                         maxLines = 2
                     )
                 }
-                }
                 if (showAvatars) {
-                    Spacer(Modifier.width(4.dp))
+                    Spacer(Modifier.width(6.dp))
                     AuthorAvatar(
                         entry.author,
                         avatarUrl = entry.avatarUrl,
                         modifier = Modifier.clip(CircleShape).clickable { actions.onAuthor(entry.author) }
                     )
                 }
-                EntryMenu(
-                    entry = entry,
-                    onAuthor = { actions.onAuthor(entry.author) },
-                    onAuthorInTopic = actions.onAuthorInTopic?.let { show -> { show(entry) } },
-                    onDelete = if (entry.canDelete && actions.onDelete != null) ({ confirmDelete = true }) else null
-                )
             }
             val comments = actions.comments?.invoke(entry)
             AnimatedVisibility(visible = comments?.isOpen == true) {
