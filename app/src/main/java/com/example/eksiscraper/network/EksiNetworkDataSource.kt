@@ -436,6 +436,16 @@ object EksiNetworkDataSource {
             }.filter { it.nick.isNotBlank() }
         }
 
+    /** The form of an entry's "düzelt" page (/entry/duzelt/<id>), holding its current text. */
+    suspend fun fetchEditForm(entryId: String): FormSpec = withContext(Dispatchers.IO) {
+        val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/entry/duzelt/$entryId"))
+            .timeout(20000)
+            .execute()
+        if (response.statusCode() == 403 || response.statusCode() == 401) throw IOException("bu entry'yi düzeltemezsin")
+        if (response.statusCode() != 200) throw IOException("düzeltme sayfası açılamadı (HTTP ${response.statusCode()})")
+        HtmlParser.parseEditForm(response.parse()) ?: throw IOException("düzeltme formu bulunamadı")
+    }
+
     /** The header lights the site polls (GET /top/led); null when it can't be read. */
     suspend fun fetchSiteStatus(): com.example.eksiscraper.notify.SiteStatus? = withContext(Dispatchers.IO) {
         try {

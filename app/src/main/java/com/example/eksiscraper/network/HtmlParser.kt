@@ -326,6 +326,9 @@ object HtmlParser {
                 return formSpec(form)
         }
 
+        /** "düzelt" page of an entry: its form, with the entry's current text in the field. */
+        fun parseEditForm(document: Document): FormSpec? = findEntryForm(document)
+
         /** The form behind the "sil" item of the user's own entries. */
         private fun findDeleteForm(document: Document): FormSpec? {
                 val candidates = document.select("form").filter { form ->

@@ -338,6 +338,28 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
+    /** The "düzelt" form of an entry, with its current text. */
+    suspend fun editForm(entry: Entry): com.example.eksiscraper.model.FormSpec = repository.getEditForm(entry.entryId)
+
+    /** Saves an edited entry, then reloads the pages on screen to show it. */
+    fun submitEdit(form: com.example.eksiscraper.model.FormSpec, text: String, onSuccess: () -> Unit) {
+        _isSubmitting.value = true
+        viewModelScope.launch {
+            try {
+                val error = repository.editEntry(form, text)
+                if (error != null) {
+                    _message.value = error
+                } else {
+                    onSuccess()
+                    _message.value = "entry düzeltildi"
+                    jumpTo(_firstPage.value)
+                }
+            } finally {
+                _isSubmitting.value = false
+            }
+        }
+    }
+
     // --- comments ---
 
     fun comments(entryId: String): CommentsState = _comments[entryId] ?: CommentsState()

@@ -1,5 +1,10 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.components.RevealPullToRefresh
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import com.example.eksiscraper.ui.components.EntryComposerSheet
+import com.example.eksiscraper.settings.AppSettings
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -175,6 +180,11 @@ fun AuthorScreen(
             onDismiss = { favoritersOf = null }
         )
     }
+    val isOwnProfile = isLoggedIn && nick.equals(EksiSession.nick.value, ignoreCase = true)
+    val isSubmitting by viewModel.isSubmitting
+    val isRefreshing by viewModel.isRefreshing
+    var editTarget by remember { mutableStateOf<Pair<com.example.eksiscraper.model.Entry, com.example.eksiscraper.model.FormSpec>?>(null) }
+    val scope = rememberCoroutineScope()
     val actions = EntryActions(
         onShowFavoriters = { entry -> requireLogin { favoritersOf = entry } },
         onToggleFavorite = { entry -> requireLogin { viewModel.toggleFavorite(entry) } },
@@ -183,8 +193,31 @@ fun AuthorScreen(
         onLink = { link -> navController.openEksiLink(link, uriHandler) },
         onOpenTopic = { entry ->
             navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle, entry.topicUrl.ifBlank { "/entry/${entry.entryId}" }))
-        }
+        },
+        // Own profile: the user's entries can be edited and deleted from here too
+        onDelete = if (isOwnProfile) viewModel::deleteEntry else null,
+        onEdit = if (isOwnProfile) ({ entry ->
+            scope.launch {
+                try {
+                    editTarget = entry to viewModel.editForm(entry)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    snackbar.showSnackbar(e.message ?: "düzeltme sayfası açılamadı")
+                }
+            }
+        }) else null
     )
+    editTarget?.let { (entry, form) ->
+        EntryComposerSheet(
+            topicTitle = entry.topicTitle,
+            heading = "entry'yi düzelt",
+            isSubmitting = isSubmitting,
+            initialText = form.textValue.ifBlank { entry.content },
+            onSubmit = { text -> viewModel.submitEdit(form, text) { editTarget = null } },
+            onDismiss = { if (!isSubmitting) editTarget = null }
+        )
+    }
 
     // The nick moves into the floating bar once the big header has scrolled away
     val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
@@ -202,9 +235,14 @@ fun AuthorScreen(
             when (phase) {
                 0 -> LoadingState(messages = listOf("profil açılıyor", "rozetler parlatılıyor"))
                 2 -> ErrorState(message = profileError.orEmpty(), onRetry = viewModel::retry)
-                else -> LazyColumn(
+                else -> RevealPullToRefresh(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { viewModel.refresh(selectedTab) },
+                    top = floatingTopBarInset(compact = true)
+                ) { pullOffset ->
+                LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().then(pullOffset),
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = floatingTopBarInset(compact = true), bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -215,7 +253,10 @@ fun AuthorScreen(
                             onFollow = { requireLogin { viewModel.toggleFollow() } },
                             onMessage = { requireLogin { navController.navigate(Screen.Messages.createRoute(nick)) } },
                             onShowFollows = { following -> followSheet = following },
-                            onAvatarClick = { url -> navController.navigate(Screen.Image.createRoute(url)) }
+                            onAvatarClick = { url ->
+                                ImageGallery.refs = emptyList()
+                                navController.navigate(Screen.Image.createRoute(url))
+                            }
                         )
                     }
                     item(key = "tabs") {
@@ -234,7 +275,11 @@ fun AuthorScreen(
                                         .aspectRatio(1f)
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                        .clickable { navController.navigate(Screen.Image.createRoute(image.ref)) }
+                                        .clickable {
+                                            // The viewer pages through all of the author's images
+                                            ImageGallery.refs = tabState.images.map { it.ref }
+                                            navController.navigate(Screen.Image.createRoute(image.ref))
+                                        }
                                 )
                             }
                             repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
@@ -269,6 +314,7 @@ fun AuthorScreen(
                         }
                     }
                 }
+                }
             }
         }
 
@@ -276,7 +322,9 @@ fun AuthorScreen(
         FloatingTopBar(
             title = if (headerGone) nick else null,
             onBack = { navController.popBackStack() },
-            visible = listState.isScrollingUp(),
+            // The nick in the bar takes the page back to its top
+            onTitleClick = { scope.launch { listState.animateScrollToItem(0) } },
+            visible = !AppSettings.hideBarsOnScroll.value || listState.isScrollingUp(),
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
             IconButton(onClick = {

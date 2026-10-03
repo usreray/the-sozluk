@@ -45,6 +45,24 @@ class EksiRepository(
 
     suspend fun getProfile(nick: String): AuthorProfile = EksiNetworkDataSource.fetchProfile(nick)
 
+    suspend fun getEditForm(entryId: String): FormSpec = EksiNetworkDataSource.fetchEditForm(entryId)
+
+    /** Saves an entry's new text with its "düzelt" form; null on success, otherwise the reason. */
+    suspend fun editEntry(form: FormSpec, text: String): String? {
+        val field = form.textFieldName ?: return "düzeltme formu bulunamadı"
+        return submitForm(form, mapOf(field to text))
+    }
+
+    /**
+     * Deletes one of the user's own entries from anywhere (e.g. a profile list): the delete form
+     * comes from the entry's own page. Null on success, otherwise the reason.
+     */
+    suspend fun deleteEntry(entryId: String): String? {
+        val form = searchTopic("", 1, "/entry/$entryId").deleteForm ?: return "silme formu bulunamadı"
+        val idField = form.fields.keys.firstOrNull { it.equals("id", ignoreCase = true) } ?: "id"
+        return submitForm(form, mapOf(idField to entryId))
+    }
+
     suspend fun getUserEntries(nick: String, tab: String, page: Int): List<Entry> =
         EksiNetworkDataSource.fetchUserEntries(nick, tab, page)
 

@@ -1,5 +1,9 @@
 package com.example.eksiscraper.ui.screens
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.HorizontalPager
 import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.graphics.graphicsLayer
@@ -158,6 +162,10 @@ fun TopicDetailScreen(
     var favoritersOf by remember { mutableStateOf<com.example.eksiscraper.model.Entry?>(null) }
     var showComposer by rememberSaveable { mutableStateOf(false) }
     var commentTarget by remember { mutableStateOf<Entry?>(null) }
+    // Entry opened full screen (swipe sideways for the others), null when closed
+    var pagerEntryId by rememberSaveable { mutableStateOf<String?>(null) }
+    // Entry being edited, with its "düzelt" form
+    var editTarget by remember { mutableStateOf<Pair<Entry, com.example.eksiscraper.model.FormSpec>?>(null) }
     var prompt by remember { mutableStateOf<TopicMenuAction?>(null) }
     val context = LocalContext.current
     var showCreator by remember { mutableStateOf(false) }
@@ -290,8 +298,29 @@ fun TopicDetailScreen(
         onToggleComments = viewModel::toggleComments,
         onVoteComment = { entry, comment, rate -> requireLogin { viewModel.voteComment(entry.entryId, comment, rate) } },
         onWriteComment = if (canComment) ({ entry -> commentTarget = entry }) else null,
-        onAuthorInTopic = { entry -> viewModel.applyFilter(TopicFilter.Author(entry.author)) }
+        onAuthorInTopic = { entry -> viewModel.applyFilter(TopicFilter.Author(entry.author)) },
+        onEdit = { entry ->
+            scope.launch {
+                try {
+                    editTarget = entry to viewModel.editForm(entry)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    snackbar.showSnackbar(e.message ?: "düzeltme sayfası açılamadı")
+                }
+            }
+        }
     )
+    editTarget?.let { (entry, form) ->
+        EntryComposerSheet(
+            topicTitle = displayTitle,
+            heading = "entry'yi düzelt",
+            isSubmitting = isSubmitting,
+            initialText = form.textValue.ifBlank { entry.content },
+            onSubmit = { text -> viewModel.submitEdit(form, text) { editTarget = null } },
+            onDismiss = { if (!isSubmitting) editTarget = null }
+        )
+    }
     val onMenu: (TopicMenuAction) -> Unit = { action ->
         when (action) {
             is TopicMenuAction.Filter -> viewModel.applyFilter(action.filter)
@@ -373,7 +402,7 @@ fun TopicDetailScreen(
         )
     }
 
-    val barsVisible = listState.isScrollingUp() || pinBars
+    val barsVisible = !AppSettings.hideBarsOnScroll.value || listState.isScrollingUp() || pinBars
     // Only a pull opens the refresh gap; page jumps load the same way but show in the bar
     var pullRefreshing by remember { mutableStateOf(false) }
     LaunchedEffect(isLoading) { if (!isLoading) pullRefreshing = false }
@@ -430,6 +459,7 @@ fun TopicDetailScreen(
                             is TopicRow.EntryItem -> EntryCard(
                                 entry = row.entry,
                                 number = row.number,
+                                onClick = { pagerEntryId = row.entry.entryId },
                                 isExpanded = viewModel.isEntryExpanded(row.entry.entryId),
                                 onToggleExpand = { viewModel.toggleEntryExpansion(row.entry.entryId) },
                                 actions = actions,
@@ -506,8 +536,87 @@ fun TopicDetailScreen(
             modifier = Modifier.align(Alignment.BottomCenter)
         )
 
+        EntryPager(
+            openEntryId = pagerEntryId,
+            entries = topic?.entries.orEmpty(),
+            numbers = rows.mapNotNull { (it as? TopicRow.EntryItem)?.let { row -> row.entry.entryId to row.number } }.toMap(),
+            title = displayTitle,
+            actions = actions,
+            isLoadingNext = isLoadingNext,
+            onNearEnd = viewModel::loadNext,
+            onClose = { lastId ->
+                pagerEntryId = null
+                // Back in the list at the entry the reader swiped to
+                val index = rows.indexOfFirst { it is TopicRow.EntryItem && it.entry.entryId == lastId }
+                if (index >= 0) scope.launch { listState.scrollToItem(index) }
+            }
+        )
+
         SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 88.dp))
     }
+    }
+}
+
+/**
+ * One entry at a time, full screen and in full; swiping sideways goes to the next or previous
+ * entry of the topic, and the next page loads when the end comes close.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun EntryPager(
+    openEntryId: String?,
+    entries: List<Entry>,
+    numbers: Map<String, Int?>,
+    title: String,
+    actions: EntryActions,
+    isLoadingNext: Boolean,
+    onNearEnd: () -> Unit,
+    onClose: (lastEntryId: String?) -> Unit
+) {
+    AnimatedVisibility(
+        visible = openEntryId != null,
+        enter = fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.96f),
+        exit = fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.96f)
+    ) {
+        val startIndex = remember { entries.indexOfFirst { it.entryId == openEntryId }.coerceAtLeast(0) }
+        val pager = rememberPagerState(initialPage = startIndex) { entries.size }
+        val currentId = entries.getOrNull(pager.currentPage)?.entryId
+        androidx.activity.compose.BackHandler { onClose(currentId) }
+        LaunchedEffect(pager.currentPage, entries.size) {
+            if (pager.currentPage >= entries.size - 3) onNearEnd()
+        }
+        val topInset = floatingTopBarInset()
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { entries[it].entryId }) { page ->
+                    val entry = entries[page]
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(start = 12.dp, end = 12.dp, top = topInset, bottom = 32.dp)
+                    ) {
+                        EntryCard(
+                            entry = entry,
+                            isExpanded = true,
+                            onToggleExpand = {},
+                            actions = actions,
+                            number = numbers[entry.entryId],
+                            showExpandToggle = false
+                        )
+                        if (page == entries.lastIndex && isLoadingNext) {
+                            Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { LoadingIndicator() }
+                        }
+                    }
+                }
+                FloatingTopBar(
+                    title = title,
+                    subtitle = numbers[currentId]?.let { "#$it" } ?: "${pager.currentPage + 1} / ${entries.size}",
+                    onBack = { onClose(currentId) },
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
+            }
+        }
     }
 }
 

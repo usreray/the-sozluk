@@ -1,5 +1,7 @@
 package com.example.eksiscraper.ui.screens
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import com.example.eksiscraper.ui.components.TopicListSkeleton
 import android.app.Application
@@ -63,6 +65,7 @@ fun ChannelsScreen(
     val selected by viewModel.selected
     val state by viewModel.topics
     val listState = viewModel.listState
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(path) { viewModel.open(path, name) }
 
@@ -80,7 +83,9 @@ fun ChannelsScreen(
                 FloatingTopBar(
                     title = "#${selected?.name ?: name}",
                     subtitle = "kanal",
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    // The title takes the list back to its top
+                    onTitleClick = { scope.launch { listState.animateScrollToItem(0) } }
                 )
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),

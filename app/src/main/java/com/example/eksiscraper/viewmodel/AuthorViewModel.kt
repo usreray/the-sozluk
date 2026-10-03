@@ -68,6 +68,27 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
+    private val _isRefreshing = mutableStateOf(false)
+    val isRefreshing: State<Boolean> = _isRefreshing
+
+    /** Pull to refresh: the profile and the open tab from its first page. */
+    fun refresh(tab: AuthorTab) {
+        if (nick.isEmpty() || _isRefreshing.value) return
+        _isRefreshing.value = true
+        viewModelScope.launch {
+            try {
+                _profile.value = repository.getProfile(nick)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = e.message ?: "profil yenilenemedi"
+            }
+            loadTab(tab, 1)
+            tabJobs[tab]?.join()
+            _isRefreshing.value = false
+        }
+    }
+
     fun retry() {
         val current = nick
         nick = ""
@@ -188,6 +209,49 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
     }
 
     suspend fun favoriters(entryId: String): List<String> = repository.getFavoriters(entryId)
+
+    private val _isSubmitting = mutableStateOf(false)
+    val isSubmitting: State<Boolean> = _isSubmitting
+
+    suspend fun editForm(entry: Entry): com.example.eksiscraper.model.FormSpec = repository.getEditForm(entry.entryId)
+
+    /** Saves an edited entry and reloads the open lists so they show it. */
+    fun submitEdit(form: com.example.eksiscraper.model.FormSpec, text: String, onSuccess: () -> Unit) {
+        _isSubmitting.value = true
+        viewModelScope.launch {
+            try {
+                val error = repository.editEntry(form, text)
+                if (error != null) {
+                    _message.value = error
+                } else {
+                    onSuccess()
+                    _message.value = "entry düzeltildi"
+                    tabs.keys.toList().forEach { loadTab(it, 1) }
+                }
+            } finally {
+                _isSubmitting.value = false
+            }
+        }
+    }
+
+    /** Deletes one of the user's own entries and takes it out of every list. */
+    fun deleteEntry(entry: Entry) {
+        viewModelScope.launch {
+            val error = try {
+                repository.deleteEntry(entry.entryId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e.message ?: "entry silinemedi"
+            }
+            if (error == null) {
+                tabs.keys.toList().forEach { tab -> update(tab) { s -> s.copy(entries = s.entries.filterNot { it.entryId == entry.entryId }) } }
+                _message.value = "entry silindi"
+            } else {
+                _message.value = error
+            }
+        }
+    }
 
     suspend fun followList(following: Boolean) = repository.getFollowList(nick, following)
 

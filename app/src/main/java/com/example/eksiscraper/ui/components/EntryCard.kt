@@ -104,7 +104,9 @@ data class EntryActions(
     /** Tapping the favorite count shows who favorited */
     val onShowFavoriters: ((Entry) -> Unit)? = null,
     /** "Bu başlıktaki entry'leri": the author's entries in the current topic */
-    val onAuthorInTopic: ((Entry) -> Unit)? = null
+    val onAuthorInTopic: ((Entry) -> Unit)? = null,
+    /** "düzelt" on the user's own entries */
+    val onEdit: ((Entry) -> Unit)? = null
 )
 
 /** What the card needs to show an entry's comments. */
@@ -124,7 +126,11 @@ fun EntryCard(
     actions: EntryActions,
     modifier: Modifier = Modifier,
     /** Position in the topic, shown when enabled in settings */
-    number: Int? = null
+    number: Int? = null,
+    /** Tapping the card (outside its buttons and links) */
+    onClick: (() -> Unit)? = null,
+    /** False where the entry is always shown in full */
+    showExpandToggle: Boolean = true
 ) {
     var overflows by remember(entry.entryId) { mutableStateOf(false) }
     val showAvatars by AppSettings.showAvatars
@@ -151,7 +157,10 @@ fun EntryCard(
     Surface(
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
     ) {
         Column(modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 8.dp)) {
             if (entry.topicTitle.isNotBlank() && actions.onOpenTopic != null) {
@@ -189,7 +198,7 @@ fun EntryCard(
                     modifier = Modifier.padding(end = 12.dp).animateContentSize()
                 )
             }
-            if (overflows || isExpanded) {
+            if (showExpandToggle && (overflows || isExpanded)) {
                 TextButton(onClick = onToggleExpand) {
                     Text(if (isExpanded) "daha az göster" else "devamını oku")
                 }
@@ -220,11 +229,13 @@ fun EntryCard(
                     }
                 }
                 Spacer(Modifier.weight(1f))
+                // The user's own entries: the site's flags say so, or the nick matches
+                val own = entry.author.isNotBlank() && entry.author.equals(EksiSession.nick.value, ignoreCase = true)
                 EntryMenu(
                     entry = entry,
-                    onAuthor = { actions.onAuthor(entry.author) },
                     onAuthorInTopic = actions.onAuthorInTopic?.let { show -> { show(entry) } },
-                    onDelete = if (entry.canDelete && actions.onDelete != null) ({ confirmDelete = true }) else null
+                    onEdit = if (("edit" in entry.flags || own) && actions.onEdit != null) ({ actions.onEdit(entry) }) else null,
+                    onDelete = if ((entry.canDelete || own) && actions.onDelete != null) ({ confirmDelete = true }) else null
                 )
             }
             // Author on a line of its own below the actions, so a long nick and the full date
@@ -436,7 +447,7 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun EntryMenu(entry: Entry, onAuthor: () -> Unit, onAuthorInTopic: (() -> Unit)?, onDelete: (() -> Unit)?) {
+private fun EntryMenu(entry: Entry, onAuthorInTopic: (() -> Unit)?, onEdit: (() -> Unit)?, onDelete: (() -> Unit)?) {
     var open by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
@@ -489,14 +500,16 @@ private fun EntryMenu(entry: Entry, onAuthor: () -> Unit, onAuthorInTopic: (() -
                         }
                     )
                 }
-                DropdownMenuItem(
-                    text = { Text("${entry.author} profili") },
-                    leadingIcon = { Icon(Icons.Rounded.Person, contentDescription = null) },
-                    onClick = {
-                        open = false
-                        onAuthor()
-                    }
-                )
+                if (onEdit != null) {
+                    DropdownMenuItem(
+                        text = { Text("düzelt") },
+                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                        onClick = {
+                            open = false
+                            onEdit()
+                        }
+                    )
+                }
                 if (onDelete != null) {
                     DropdownMenuItem(
                         text = { Text("sil", color = MaterialTheme.colorScheme.error) },
