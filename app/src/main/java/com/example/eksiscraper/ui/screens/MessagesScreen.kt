@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.settings.AppSettings
 import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
@@ -129,7 +130,9 @@ fun MessagesScreen(
     val headerConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                headerOffset = (headerOffset + available.y).coerceIn(-headerHeight.toFloat(), 0f)
+                // Turned off in settings: the header always stays
+                headerOffset = if (!AppSettings.hideBarsOnScroll.value) 0f
+                else (headerOffset + available.y).coerceIn(-headerHeight.toFloat(), 0f)
                 return Offset.Zero
             }
         }

@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.navigation.TabReselect
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import android.app.Application
@@ -89,6 +90,12 @@ fun ProfileScreen(
     }
 
     val scrolled by remember { derivedStateOf { viewModel.scrollState.firstVisibleItemIndex > 0 } }
+    // Tapping "profil" again in the bottom bar: back to the top
+    LaunchedEffect(Unit) {
+        TabReselect.events.collect { route ->
+            if (route == Screen.Profile.route) viewModel.scrollState.animateScrollToItem(0)
+        }
+    }
     val scope = rememberCoroutineScope()
     Scaffold(
         topBar = {

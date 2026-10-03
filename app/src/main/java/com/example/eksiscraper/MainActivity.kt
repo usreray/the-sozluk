@@ -1,5 +1,6 @@
 package com.example.eksiscraper
 
+import com.example.eksiscraper.ui.navigation.TabReselect
 import com.example.eksiscraper.viewmodel.HomeTabRequest
 import com.example.eksiscraper.viewmodel.HomeCategory
 import androidx.activity.result.contract.ActivityResultContracts
@@ -158,7 +159,9 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
                 destinations = topLevelDestinations,
                 selectedRoute = currentRoute,
                 onSelect = { destination ->
-                    if (destination.route != currentRoute) {
+                    if (destination.route == currentRoute) {
+                        TabReselect.reselect(destination.route)
+                    } else {
                         navController.navigate(destination.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                             launchSingleTop = true

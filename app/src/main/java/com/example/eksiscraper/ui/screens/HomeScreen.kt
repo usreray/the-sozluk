@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.navigation.TabReselect
 import com.example.eksiscraper.ui.components.RevealPullToRefresh
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.shape.CircleShape
@@ -120,12 +121,22 @@ fun HomeScreen(
     val headerConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                headerOffset = (headerOffset + available.y).coerceIn(-headerHeight.toFloat(), 0f)
+                // Turned off in settings: the header always stays
+                headerOffset = if (!AppSettings.hideBarsOnScroll.value) 0f
+                else (headerOffset + available.y).coerceIn(-headerHeight.toFloat(), 0f)
                 return Offset.Zero
             }
         }
     }
     val headerPadding = with(density) { headerHeight.toDp() }
+    // Tapping "akış" again in the bottom bar: back to the top of the open list
+    LaunchedEffect(Unit) {
+        TabReselect.events.collect { route ->
+            if (route != Screen.Home.route) return@collect
+            categories.getOrNull(pagerState.currentPage)?.let { viewModel.listStates.getValue(it).animateScrollToItem(0) }
+            animate(headerOffset, 0f) { value, _ -> headerOffset = value }
+        }
+    }
     // Another tab's list starts at its own position, so bring the header back with it;
     // otherwise its space stays empty above that list
     LaunchedEffect(pagerState.currentPage) {

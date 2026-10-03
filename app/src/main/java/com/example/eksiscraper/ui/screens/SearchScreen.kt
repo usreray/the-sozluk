@@ -1,5 +1,6 @@
 package com.example.eksiscraper.ui.screens
 
+import com.example.eksiscraper.ui.navigation.TabReselect
 import android.app.Application
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -75,6 +76,12 @@ fun SearchScreen(
     val suggestions by viewModel.suggestions
     val isLoading by viewModel.isLoadingSuggestions
     val searchBarState = rememberSearchBarState()
+    // Tapping "ara" again in the bottom bar opens the search field
+    LaunchedEffect(Unit) {
+        TabReselect.events.collect { route ->
+            if (route == Screen.Search.route) searchBarState.animateToExpanded()
+        }
+    }
     val textFieldState = rememberTextFieldState()
     val scope = rememberCoroutineScope()
     val query = textFieldState.text.toString()

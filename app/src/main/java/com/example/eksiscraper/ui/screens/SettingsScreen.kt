@@ -93,6 +93,7 @@ fun SettingsScreen(navController: NavController) {
     val keepScreenOn by AppSettings.keepScreenOn
     val prefetchNextPage by AppSettings.prefetchNextPage
     val marqueeTitles by AppSettings.marqueeTitles
+    val hideBarsOnScroll by AppSettings.hideBarsOnScroll
     val hiddenTabs by AppSettings.hiddenTabs
     val blockedWords by AppSettings.blockedWords
     var addingWord by remember { mutableStateOf(false) }
@@ -248,7 +249,7 @@ fun SettingsScreen(navController: NavController) {
 
             item { SectionTitle("okuma") }
             item {
-                Surface(shape = segmentedShape(0, 6), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+                Surface(shape = segmentedShape(0, 7), color = MaterialTheme.colorScheme.surfaceContainerLow) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "yazı boyutu · %${(textScale * 100).roundToInt()}",
@@ -274,7 +275,7 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "her entry'nin başlıktaki sırası (#12)",
                     checked = showEntryNumbers,
                     enabled = true,
-                    shape = segmentedShape(1, 6),
+                    shape = segmentedShape(1, 7),
                     onCheckedChange = AppSettings::setShowEntryNumbers
                 )
             }
@@ -284,7 +285,7 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "entry'lerde yazarın resmini göster",
                     checked = showAvatars,
                     enabled = true,
-                    shape = segmentedShape(2, 6),
+                    shape = segmentedShape(2, 7),
                     onCheckedChange = AppSettings::setShowAvatars
                 )
             }
@@ -294,7 +295,7 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "başlık okurken ekran kararmasın",
                     checked = keepScreenOn,
                     enabled = true,
-                    shape = segmentedShape(3, 6),
+                    shape = segmentedShape(3, 7),
                     onCheckedChange = AppSettings::setKeepScreenOn
                 )
             }
@@ -304,7 +305,7 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "kaydırırken beklememek için",
                     checked = prefetchNextPage,
                     enabled = true,
-                    shape = segmentedShape(4, 6),
+                    shape = segmentedShape(4, 7),
                     onCheckedChange = AppSettings::setPrefetchNextPage
                 )
             }
@@ -314,8 +315,18 @@ fun SettingsScreen(navController: NavController) {
                     subtitle = "üst bara sığmayan başlık sağdan sola aksın; basılı tutunca tamamı görünür",
                     checked = marqueeTitles,
                     enabled = true,
-                    shape = segmentedShape(5, 6),
+                    shape = segmentedShape(5, 7),
                     onCheckedChange = AppSettings::setMarqueeTitles
+                )
+            }
+            item {
+                SwitchRow(
+                    title = "kaydırınca barları gizle",
+                    subtitle = "aşağı kaydırırken üst bar, sayfa düğmeleri ve başlık alanları kaybolsun",
+                    checked = hideBarsOnScroll,
+                    enabled = true,
+                    shape = segmentedShape(6, 7),
+                    onCheckedChange = AppSettings::setHideBarsOnScroll
                 )
             }
 

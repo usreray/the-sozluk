@@ -102,6 +102,7 @@ object AppSettings {
         _prefetchNextPage.value = prefs.getBoolean("prefetchNextPage", true)
         _notifications.value = prefs.getBoolean("notifications", true)
         _marqueeTitles.value = prefs.getBoolean("marqueeTitles", true)
+        _hideBarsOnScroll.value = prefs.getBoolean("hideBarsOnScroll", true)
         _themeMode.value = ThemeMode.entries.getOrElse(prefs.getInt("themeMode", 0)) { ThemeMode.System }
         _dynamicColor.value = prefs.getBoolean("dynamicColor", true)
         _pureBlack.value = prefs.getBoolean("pureBlack", false)
@@ -152,6 +153,15 @@ object AppSettings {
     fun setKeepScreenOn(enabled: Boolean) {
         _keepScreenOn.value = enabled
         prefs.edit().putBoolean("keepScreenOn", enabled).apply()
+    }
+
+    /** Bars and headers slide away while scrolling down (off: they always stay) */
+    private val _hideBarsOnScroll = mutableStateOf(true)
+    val hideBarsOnScroll: State<Boolean> = _hideBarsOnScroll
+
+    fun setHideBarsOnScroll(enabled: Boolean) {
+        _hideBarsOnScroll.value = enabled
+        prefs.edit().putBoolean("hideBarsOnScroll", enabled).apply()
     }
 
     /** Bar titles too long for the bar scroll right to left */
