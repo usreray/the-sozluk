@@ -23,3 +23,5 @@ build_*.txt
 *.keystore
 /app/release
 keystore.properties
+
+keystore-legacy.properties

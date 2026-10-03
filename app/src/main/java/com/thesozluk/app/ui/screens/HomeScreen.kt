@@ -1,0 +1,459 @@
+package com.thesozluk.app.ui.screens
+
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import com.thesozluk.app.ui.navigation.TabReselect
+import com.thesozluk.app.ui.components.RevealPullToRefresh
+import androidx.compose.animation.core.animate
+import androidx.compose.foundation.shape.CircleShape
+import com.thesozluk.app.ui.components.FloatingSurface
+import com.thesozluk.app.viewmodel.HomeTabRequest
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalDensity
+import com.thesozluk.app.ui.components.TopicListSkeleton
+import android.app.Application
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Inbox
+import androidx.compose.material.icons.rounded.MailOutline
+import androidx.compose.material.icons.rounded.NotificationsNone
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import com.thesozluk.app.notify.SiteStatusStore
+import com.thesozluk.app.network.EksiSession
+import com.thesozluk.app.settings.AppSettings
+import com.thesozluk.app.ui.components.MessageState
+import com.thesozluk.app.ui.components.ErrorState
+import com.thesozluk.app.ui.components.LoadingState
+import com.thesozluk.app.ui.components.LocalBottomBarInset
+import com.thesozluk.app.ui.components.TopicRow
+import com.thesozluk.app.ui.components.segmentedShape
+import com.thesozluk.app.ui.navigation.Screen
+import com.thesozluk.app.viewmodel.EksiViewModelFactory
+import com.thesozluk.app.viewmodel.HomeCategory
+import com.thesozluk.app.viewmodel.HomeViewModel
+import kotlinx.coroutines.launch
+
+private val loadingMessages = listOf("başlıklar toplanıyor", "gündem taranıyor", "entry'ler sayılıyor")
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun HomeScreen(
+    navController: NavHostController,
+    viewModel: HomeViewModel = viewModel(
+        factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+    )
+) {
+    val isLoggedIn by EksiSession.isLoggedIn
+    val hiddenTabs by AppSettings.hiddenTabs
+    // Personal lists only when logged in; the rest as chosen in settings
+    val categories = remember(isLoggedIn, hiddenTabs) {
+        HomeCategory.entries.filter { (isLoggedIn || !it.needsLogin) && it.name !in hiddenTabs }
+            .ifEmpty { listOf(HomeCategory.Gundem) }
+    }
+    val pagerState = rememberPagerState(pageCount = { categories.size })
+    val requestedTab by HomeTabRequest.tab
+    LaunchedEffect(requestedTab, categories) {
+        val tab = requestedTab ?: return@LaunchedEffect
+        HomeTabRequest.tab.value = null
+        val index = categories.indexOf(tab)
+        if (index >= 0) {
+            pagerState.scrollToPage(index)
+            viewModel.refresh(tab)
+        } else {
+            navController.navigate(Screen.Channels.createRoute(tab.key, tab.label))
+        }
+    }
+    val siteStatus by SiteStatusStore.status
+    // Checked whenever home is shown again (e.g. back from reading a message)
+    LaunchedEffect(isLoggedIn) { SiteStatusStore.refresh() }
+    val scope = rememberCoroutineScope()
+    // Title and tabs float over the lists and slide away together while scrolling down (back on
+    // scrolling up), so the lists run edge to edge under the status bar
+    val density = LocalDensity.current
+    var headerHeight by remember { mutableIntStateOf(0) }
+    var headerOffset by remember { mutableFloatStateOf(0f) }
+    val headerConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // Turned off in settings: the header always stays
+                headerOffset = if (!AppSettings.hideBarsOnScroll.value) 0f
+                else (headerOffset + available.y).coerceIn(-headerHeight.toFloat(), 0f)
+                return Offset.Zero
+            }
+        }
+    }
+    val headerPadding = with(density) { headerHeight.toDp() }
+    // Tapping "akış" again in the bottom bar: back to the top of the open list
+    LaunchedEffect(Unit) {
+        TabReselect.events.collect { route ->
+            if (route != Screen.Home.route) return@collect
+            categories.getOrNull(pagerState.currentPage)?.let { viewModel.listStates.getValue(it).animateScrollToItem(0) }
+            animate(headerOffset, 0f) { value, _ -> headerOffset = value }
+        }
+    }
+    // Another tab's list starts at its own position, so bring the header back with it;
+    // otherwise its space stays empty above that list
+    LaunchedEffect(pagerState.currentPage) {
+        animate(headerOffset, 0f) { value, _ -> headerOffset = value }
+    }
+
+    // Load a tab the first time it is shown
+    LaunchedEffect(pagerState.currentPage, categories) {
+        categories.getOrNull(pagerState.currentPage)?.let(viewModel::ensureLoaded)
+    }
+
+    // Tablets and landscape: the list on the left, the opened topic on the right
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 840.dp
+        var paneTitle by rememberSaveable { mutableStateOf<String?>(null) }
+        var paneUrl by rememberSaveable { mutableStateOf("") }
+        val openTopic: (String, String) -> Unit = { t, u ->
+            if (wide) {
+                paneTitle = t
+                paneUrl = u
+            } else {
+                navController.navigate(Screen.TopicDetail.createRoute(t, u))
+            }
+        }
+        // Back closes the open pane first
+        androidx.activity.compose.BackHandler(enabled = wide && paneTitle != null) { paneTitle = null }
+        Row(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.weight(if (wide) 0.42f else 1f)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .nestedScroll(headerConnection)
+            ) {
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    beyondViewportPageCount = 1
+                ) { page ->
+                    CategoryPage(
+                        category = categories[page],
+                        viewModel = viewModel,
+                        topPadding = headerPadding,
+                        onTopicClick = openTopic
+                    )
+                }
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onSizeChanged { headerHeight = it.height }
+                            .graphicsLayer { translationY = headerOffset }
+                            .background(MaterialTheme.colorScheme.surface)
+                    ) {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    "the sözlük",
+                                    style = MaterialTheme.typography.headlineMediumEmphasized,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            actions = {
+                                if (isLoggedIn) FloatingSurface(shape = CircleShape, modifier = Modifier.padding(end = 8.dp)) {
+                                  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 2.dp)) {
+                                    // The site's header lights: new entries in followed topics, unread messages
+                                    IconButton(onClick = {
+                                        val olay = categories.indexOf(HomeCategory.Olay)
+                                        if (olay >= 0) scope.launch { pagerState.animateScrollToPage(olay) }
+                                        else navController.navigate(Screen.Channels.createRoute(HomeCategory.Olay.key, "olay"))
+                                    }) {
+                                        BadgedBox(badge = { if (siteStatus.hasEvents) Badge() }) {
+                                            Icon(Icons.Rounded.NotificationsNone, contentDescription = "olay")
+                                        }
+                                    }
+                                    IconButton(onClick = { navController.navigate(Screen.Messages.createRoute()) }) {
+                                        BadgedBox(badge = { if (siteStatus.hasMessages) Badge() }) {
+                                            Icon(Icons.Rounded.MailOutline, contentDescription = "mesajlar")
+                                        }
+                                    }
+                                  }
+                                }
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                        )
+                        CategoryButtons(
+                            categories = categories,
+                            selected = pagerState.currentPage,
+                            onSelect = { index ->
+                                scope.launch {
+                                    if (index == pagerState.currentPage) {
+                                        // Tapping the open tab again jumps back to the top
+                                        viewModel.listStates.getValue(categories[index]).animateScrollToItem(0)
+                                    } else {
+                                        pagerState.animateScrollToPage(index)
+                                    }
+                                }
+                            }
+                        )
+                    }
+            }
+            }
+            if (wide) {
+                VerticalDivider()
+                Box(modifier = Modifier.weight(0.58f).fillMaxSize()) {
+                    val t = paneTitle
+                    if (t == null) {
+                        MessageState(
+                            icon = Icons.Rounded.Inbox,
+                            title = "bir başlık seç",
+                            message = "soldaki listeden açtığın başlık burada okunur."
+                        )
+                    } else {
+                        // One view model per opened topic, so switching topics starts fresh
+                        key(paneUrl) {
+                            TopicDetailScreen(
+                                title = t,
+                                url = paneUrl,
+                                navController = navController,
+                                onClose = { paneTitle = null },
+                                viewModel = viewModel(
+                                    key = "pane:$paneUrl",
+                                    factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Connected toggle buttons (the M3 Expressive segmented control) when three tabs fit;
+ * a scrolling row of pill toggles once there are more lists.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CategoryButtons(categories: List<HomeCategory>, selected: Int, onSelect: (Int) -> Unit) {
+    if (categories.size <= 3) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
+        ) {
+            categories.forEachIndexed { index, category ->
+                ToggleButton(
+                    checked = index == selected,
+                    onCheckedChange = { onSelect(index) },
+                    modifier = Modifier.weight(1f),
+                    shapes = when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        categories.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    }
+                ) {
+                    Text(category.label)
+                }
+            }
+        }
+        return
+    }
+    val rowState = rememberLazyListState()
+    // Keep the selected tab in view while swiping between lists
+    LaunchedEffect(selected) { rowState.animateScrollToItem(maxOf(0, selected - 1)) }
+    LazyRow(
+        state = rowState,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        itemsIndexed(categories, key = { _, category -> category.name }) { index, category ->
+            ToggleButton(checked = index == selected, onCheckedChange = { onSelect(index) }) {
+                Text(category.label)
+            }
+        }
+    }
+}
+
+private enum class HomePhase { Loading, Error, Empty, Content }
+
+@Composable
+private fun YearPicker(year: Int?, onPick: (Int?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val thisYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    AssistChip(
+        onClick = { open = true },
+        label = { Text(if (year == null) "yıl seç" else "$year yılında bugün") },
+        leadingIcon = { Icon(Icons.Rounded.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp)) },
+        modifier = Modifier.padding(bottom = 6.dp)
+    )
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("hangi yıl?") },
+            text = {
+                // The sözlük started in 1999
+                LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                    item {
+                        TextButton(onClick = { open = false; onPick(null) }, modifier = Modifier.fillMaxWidth()) { Text("sitenin seçtiği") }
+                    }
+                    items((thisYear - 1 downTo 1999).toList()) { y ->
+                        TextButton(onClick = { open = false; onPick(y) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("$y", color = if (y == year) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("kapat") } }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CategoryPage(
+    category: HomeCategory,
+    viewModel: HomeViewModel,
+    topPadding: androidx.compose.ui.unit.Dp,
+    onTopicClick: (title: String, url: String) -> Unit
+) {
+    val state = viewModel.state(category)
+    val listState = viewModel.listStates.getValue(category)
+    // Topics with a blocked word are left out of every list
+    val blockedWords by AppSettings.blockedWords
+    val topics = remember(state.topics, blockedWords) {
+        state.topics.filterNot { AppSettings.isBlocked(it.title) }
+    }
+    val phase = when {
+        state.error != null -> HomePhase.Error
+        state.isLoaded && topics.isEmpty() && !state.isLoading -> HomePhase.Empty
+        topics.isEmpty() -> HomePhase.Loading
+        else -> HomePhase.Content
+    }
+
+    // Infinite scroll: fetch the next page a few rows before the end
+    val nearEnd by remember(listState) {
+        derivedStateOf {
+            val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = listState.layoutInfo.totalItemsCount
+            total > 0 && last >= total - 6
+        }
+    }
+    LaunchedEffect(nearEnd, topics.size) {
+        if (nearEnd) viewModel.loadMore(category)
+    }
+
+    Crossfade(targetState = phase, label = "homePhase") { current ->
+        when (current) {
+            HomePhase.Loading -> TopicListSkeleton(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 4.dp))
+            HomePhase.Error -> ErrorState(
+                message = state.error.orEmpty(),
+                modifier = Modifier.padding(top = topPadding),
+                onRetry = { viewModel.retry(category) }
+            )
+            HomePhase.Empty -> MessageState(
+                icon = Icons.Rounded.Inbox,
+                modifier = Modifier.padding(top = topPadding),
+                title = "hiç başlık yok",
+                message = "bu listede şu an gösterilecek bir şey yok."
+            )
+            HomePhase.Content -> {
+                RevealPullToRefresh(
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = { viewModel.refresh(category) },
+                    top = topPadding
+                ) { pullOffset ->
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize().then(pullOffset),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 4.dp, bottom = 24.dp + LocalBottomBarInset.current),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        // tarihte bugün: which year's day to look at
+                        if (category == HomeCategory.TarihteBugun) {
+                            item(key = "year") { YearPicker(viewModel.historyYear.value, viewModel::setHistoryYear) }
+                        }
+                        itemsIndexed(topics, key = { _, topic -> topic.url }) { index, topic ->
+                            TopicRow(
+                                topic = topic,
+                                shape = segmentedShape(index, topics.size),
+                                onClick = {
+                                    val filter = when (category) {
+                                        HomeCategory.Gundem -> "a=popular"
+                                        HomeCategory.Caylaklar -> "a=caylaklar"
+                                        else -> null
+                                    }
+                                    val url = if (filter != null) {
+                                        topic.url + if ('?' in topic.url) "&$filter" else "?$filter"
+                                    } else topic.url
+                                    onTopicClick(topic.title, url)
+                                },
+                                modifier = Modifier.animateItem()
+                            )
+                        }
+                        if (state.isLoadingMore) {
+                            item(key = "loadingMore") {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    contentAlignment = Alignment.Center
+                                ) { LoadingIndicator() }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

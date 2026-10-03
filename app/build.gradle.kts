@@ -14,15 +14,15 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.example.eksiscraper"
+    namespace = "com.thesozluk.app"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.eksiscraper"
+        applicationId = "com.thesozluk.app"
         minSdk = 31
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 13
+        versionName = "2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
