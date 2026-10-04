@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.ButtonDefaults
@@ -103,6 +104,7 @@ import com.thesozluk.app.ui.components.LoginRequiredDialog
 import com.thesozluk.app.ui.components.MessageState
 import com.thesozluk.app.ui.components.PagePickerDialog
 import com.thesozluk.app.ui.navigation.Screen
+import com.thesozluk.app.ui.navigation.TopicTabs
 import com.thesozluk.app.ui.navigation.openEksiLink
 import com.thesozluk.app.viewmodel.EksiViewModelFactory
 import com.thesozluk.app.viewmodel.TopicDetailViewModel
@@ -222,6 +224,7 @@ fun TopicDetailScreen(
         else -> TopicPhase.Content
     }
     val displayTitle = topic?.title?.takeIf { it.isNotBlank() } ?: title
+    var showTabsOverview by remember { mutableStateOf(false) }
 
     // Entries with a marker wherever a new page starts
     val rows = remember(topic?.entries, firstPage, lastPage, totalPages, topic?.olderEntriesCount, filter) {
@@ -266,6 +269,12 @@ fun TopicDetailScreen(
                 else -> rows.drop(index.coerceAtLeast(0)).firstNotNullOfOrNull { (it as? TopicRow.EntryItem)?.entry?.page }
             } ?: firstPage
         }
+    }
+    val currentTabId = "${displayTitle.trim().lowercase()}\u0000$url"
+    val tabPreview = topic?.entries?.firstOrNull { it.page == visiblePage }?.content
+        ?: topic?.entries?.firstOrNull()?.content.orEmpty()
+    LaunchedEffect(displayTitle, url, visiblePage, tabPreview, onClose) {
+        if (onClose == null && displayTitle.isNotBlank()) TopicTabs.remember(displayTitle, url, visiblePage, tabPreview)
     }
     // Endless scroll both ways, like long threads in forum apps: the next page comes in near the
     // end, the previous one whenever the top of the loaded pages is close. The previous page is
@@ -566,6 +575,11 @@ fun TopicDetailScreen(
             modifier = Modifier.align(Alignment.TopCenter),
             // Nothing to save or share for a topic that doesn't exist
             actions = if (phase != TopicPhase.Content) null else ({
+                if (onClose == null) {
+                    IconButton(onClick = { showTabsOverview = true }) {
+                        Icon(Icons.Rounded.Layers, contentDescription = "açık sekmeler")
+                    }
+                }
                 // "takip et": new entries then show up in the olay list
                 if (isLoggedIn && topic?.trackUrl != null) {
                     IconToggleButton(checked = topic?.isTracked == true, onCheckedChange = { viewModel.toggleTrack() }) {
@@ -591,6 +605,31 @@ fun TopicDetailScreen(
                 TopicMenu(current = filter, isLoggedIn = isLoggedIn, onAction = onMenu, offlineState = offlineState)
             })
         )
+
+        if (showTabsOverview && onClose == null) {
+            TopicTabsOverview(
+                tabs = TopicTabs.items.toList(),
+                onDismiss = { showTabsOverview = false },
+                onSelect = { tab ->
+                    showTabsOverview = false
+                    if (tab.id != currentTabId) {
+                        navController.navigate(Screen.TopicDetail.createRoute(tab.title, tab.url, tab.page)) {
+                            popUpTo(Screen.Home.route) { inclusive = false }
+                        }
+                    }
+                },
+                onClose = { tab ->
+                    TopicTabs.close(tab.id)
+                    if (tab.id == currentTabId) {
+                        val next = TopicTabs.items.lastOrNull()
+                        if (next == null) navController.popBackStack()
+                        else navController.navigate(Screen.TopicDetail.createRoute(next.title, next.url, next.page)) {
+                            popUpTo(Screen.Home.route) { inclusive = false }
+                        }
+                    }
+                }
+            )
+        }
 
         BottomToolbar(
             visible = phase == TopicPhase.Content && (totalPages > 1 || canWrite) && barsVisible,

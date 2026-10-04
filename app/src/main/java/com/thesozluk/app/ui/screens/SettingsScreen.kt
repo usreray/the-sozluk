@@ -113,6 +113,7 @@ import com.thesozluk.app.ui.components.TextPromptDialog
 import com.thesozluk.app.ui.components.entryBodyStyle
 import com.thesozluk.app.ui.components.segmentedShape
 import com.thesozluk.app.ui.navigation.Screen
+import com.thesozluk.app.ui.navigation.TopicTabs
 import com.thesozluk.app.ui.theme.isAppInDarkTheme
 import com.thesozluk.app.ui.theme.rememberSeedScheme
 import com.thesozluk.app.viewmodel.HomeCategory
@@ -172,7 +173,10 @@ fun SettingsScreen(navController: NavController, section: String? = null) {
             when (page) {
                 null -> categories(navController)
                 SettingsSection.Appearance -> appearance()
-                SettingsSection.Reading -> reading()
+                SettingsSection.Reading -> reading { enabled ->
+                    AppSettings.setRememberOpenTabs(enabled)
+                    TopicTabs.setPersistenceEnabled(enabled)
+                }
                 SettingsSection.Home -> homeLists()
                 SettingsSection.Notifications -> notifications()
                 SettingsSection.Content -> content()
@@ -362,7 +366,7 @@ private fun LazyListScope.appearance() {
 // okuma
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun LazyListScope.reading() {
+private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) {
     // Live preview of an entry with the choices below
     item {
         Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -444,19 +448,31 @@ private fun LazyListScope.reading() {
     }
     item { SectionTitle(
         "ekran",
-        changed = !AppSettings.marqueeTitles.value || !AppSettings.hideBarsOnScroll.value || AppSettings.keepScreenOn.value,
+        changed = !AppSettings.marqueeTitles.value || !AppSettings.hideBarsOnScroll.value ||
+            AppSettings.keepScreenOn.value || !AppSettings.rememberOpenTabs.value,
         onReset = {
             AppSettings.setMarqueeTitles(true); AppSettings.setHideBarsOnScroll(true); AppSettings.setKeepScreenOn(false)
+            AppSettings.setRememberOpenTabs(true); TopicTabs.setPersistenceEnabled(true)
         }
     ) }
     item {
-        SwitchRow("uzun başlıkları kaydır", "üst bara sığmayan başlık sağdan sola aksın; basılı tutunca tamamı görünür", AppSettings.marqueeTitles.value, true, segmentedShape(0, 3), AppSettings::setMarqueeTitles)
+        SwitchRow("uzun başlıkları kaydır", "üst bara sığmayan başlık sağdan sola aksın; basılı tutunca tamamı görünür", AppSettings.marqueeTitles.value, true, segmentedShape(0, 4), AppSettings::setMarqueeTitles)
     }
     item {
-        SwitchRow("kaydırınca barları gizle", "aşağı kaydırırken üst bar, sayfa düğmeleri ve başlık alanları kaybolsun", AppSettings.hideBarsOnScroll.value, true, segmentedShape(1, 3), AppSettings::setHideBarsOnScroll)
+        SwitchRow("kaydırınca barları gizle", "aşağı kaydırırken üst bar, sayfa düğmeleri ve başlık alanları kaybolsun", AppSettings.hideBarsOnScroll.value, true, segmentedShape(1, 4), AppSettings::setHideBarsOnScroll)
     }
     item {
-        SwitchRow("ekranı açık tut", "başlık okurken ekran kararmasın", AppSettings.keepScreenOn.value, true, segmentedShape(2, 3), AppSettings::setKeepScreenOn)
+        SwitchRow("ekranı açık tut", "başlık okurken ekran kararmasın", AppSettings.keepScreenOn.value, true, segmentedShape(2, 4), AppSettings::setKeepScreenOn)
+    }
+    item {
+        SwitchRow(
+            "açık sekmeleri hatırla",
+            "uygulamayı yeniden açınca başlıkları ve önizlemelerini göster",
+            AppSettings.rememberOpenTabs.value,
+            true,
+            segmentedShape(3, 4),
+            onRememberOpenTabsChanged
+        )
     }
 }
 

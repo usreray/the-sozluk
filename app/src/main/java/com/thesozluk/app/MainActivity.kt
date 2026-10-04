@@ -49,6 +49,7 @@ import com.thesozluk.app.ui.components.LocalBottomBarInset
 import com.thesozluk.app.ui.components.NavDestination
 import com.thesozluk.app.ui.navigation.Navigation
 import com.thesozluk.app.ui.navigation.Screen
+import com.thesozluk.app.ui.navigation.TopicTabs
 import com.thesozluk.app.ui.theme.TheSozlukTheme
 import com.thesozluk.app.ui.theme.isAppInDarkTheme
 import com.thesozluk.app.notify.Notifier
@@ -67,6 +68,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         EksiSession.init(this)
         AppSettings.init(this)
+        TopicTabs.init(this, AppSettings.rememberOpenTabs.value)
         com.thesozluk.app.settings.Drafts.init(this)
         com.thesozluk.app.settings.ReadingHistory.init(this)
         com.thesozluk.app.settings.EntryBookmarks.init(this)

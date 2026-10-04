@@ -113,6 +113,10 @@ object AppSettings {
     private val _historyEnabled = mutableStateOf(true)
     val historyEnabled: State<Boolean> = _historyEnabled
 
+    /** Restore the open topic list after the app process is restarted. */
+    private val _rememberOpenTabs = mutableStateOf(true)
+    val rememberOpenTabs: State<Boolean> = _rememberOpenTabs
+
     fun setReadingFont(font: ReadingFont) {
         _readingFont.value = font
         prefs.edit().putInt("readingFont", font.ordinal).apply()
@@ -133,12 +137,18 @@ object AppSettings {
         prefs.edit().putBoolean("historyEnabled", enabled).apply()
     }
 
+    fun setRememberOpenTabs(enabled: Boolean) {
+        _rememberOpenTabs.value = enabled
+        prefs.edit().putBoolean("rememberOpenTabs", enabled).apply()
+    }
+
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         _readingFont.value = ReadingFont.entries.getOrElse(prefs.getInt("readingFont", 0)) { ReadingFont.Default }
         _lineSpacing.floatValue = prefs.getFloat("lineSpacing", 1f)
         _entryPadding.floatValue = prefs.getFloat("entryPadding", 20f)
         _historyEnabled.value = prefs.getBoolean("historyEnabled", true)
+        _rememberOpenTabs.value = prefs.getBoolean("rememberOpenTabs", true)
         _blockedWords.value = prefs.getStringSet("blockedWords", emptySet()).orEmpty().toSet()
         _hiddenTabs.value = prefs.getStringSet("hiddenTabs", DEFAULT_HIDDEN_TABS).orEmpty().toSet()
         _showEntryNumbers.value = prefs.getBoolean("showEntryNumbers", false)
