@@ -26,12 +26,17 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -81,6 +86,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -95,8 +102,11 @@ import com.thesozluk.app.model.AuthorProfile
 import com.thesozluk.app.model.Badge
 import com.thesozluk.app.network.EksiSession
 import com.thesozluk.app.ui.components.AuthorAvatar
+import com.thesozluk.app.ui.components.EksiLink
 import com.thesozluk.app.ui.components.EntryActions
 import com.thesozluk.app.ui.components.EntryCard
+import com.thesozluk.app.ui.components.rememberEntryInlineContent
+import com.thesozluk.app.ui.components.rememberEntryText
 import com.thesozluk.app.ui.components.FloatingTopBar
 import com.thesozluk.app.ui.components.floatingTopBarInset
 import com.thesozluk.app.ui.components.isScrollingUp
@@ -125,6 +135,7 @@ fun AuthorScreen(
     val message by viewModel.message
     val isLoggedIn by EksiSession.isLoggedIn
     var selectedTab by rememberSaveable { mutableStateOf(AuthorTab.Latest) }
+    var expandedEntries by remember(nick) { mutableStateOf(emptySet<String>()) }
     var showLoginDialog by rememberSaveable { mutableStateOf(false) }
     var favoritersOf by remember { mutableStateOf<com.thesozluk.app.model.Entry?>(null) }
     val tabState = viewModel.tab(selectedTab)
@@ -265,6 +276,13 @@ fun AuthorScreen(
                             onFollow = { requireLogin { viewModel.toggleFollow() } },
                             onMessage = { requireLogin { navController.navigate(Screen.Messages.createRoute(nick)) } },
                             onShowFollows = { following -> followSheet = following },
+                            onShowEntries = {
+                                scope.launch {
+                                    listState.animateScrollToItem(1)
+                                    selectedTab = AuthorTab.Latest
+                                }
+                            },
+                            onBioLink = { link -> navController.openEksiLink(link, uriHandler) },
                             onAvatarClick = { url ->
                                 ImageGallery.refs = emptyList()
                                 navController.navigate(Screen.Image.createRoute(url))
@@ -300,15 +318,20 @@ fun AuthorScreen(
                     items(tabState.entries, key = { "${selectedTab.name}:${it.entryId}" }) { entry ->
                         EntryCard(
                             entry = entry,
-                            isExpanded = false,
+                            isExpanded = entry.entryId in expandedEntries,
                             onClick = {
                                 navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle, "/entry/${entry.entryId}"))
                             },
                             onToggleExpand = {
-                                navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle, "/entry/${entry.entryId}"))
+                                expandedEntries = if (entry.entryId in expandedEntries) {
+                                    expandedEntries - entry.entryId
+                                } else {
+                                    expandedEntries + entry.entryId
+                                }
                             },
+                            showExpandToggle = true,
                             actions = actions,
-                            modifier = Modifier.animateItem()
+                            modifier = Modifier
                         )
                     }
                     item(key = "footer:${selectedTab.name}") {
@@ -382,10 +405,13 @@ private fun ProfileHeader(
     onFollow: () -> Unit,
     onMessage: () -> Unit,
     onShowFollows: (following: Boolean) -> Unit,
+    onShowEntries: () -> Unit,
+    onBioLink: (EksiLink) -> Unit,
     /** Opens the profile picture full screen */
     onAvatarClick: (String) -> Unit
 ) {
     var openBadge by remember { mutableStateOf<Badge?>(null) }
+    var showAllBadges by remember { mutableStateOf(false) }
     openBadge?.let { badge ->
         AlertDialog(
             onDismissRequest = { openBadge = null },
@@ -395,6 +421,47 @@ private fun ProfileHeader(
             title = { Text(badge.name) },
             text = { Text(badge.description) },
             confirmButton = { TextButton(onClick = { openBadge = null }) { Text("tamam") } }
+        )
+    }
+    if (showAllBadges) {
+        AlertDialog(
+            onDismissRequest = { showAllBadges = false },
+            title = { Text("bütün rozetler") },
+            text = {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 88.dp),
+                    modifier = Modifier.heightIn(max = 360.dp),
+                    contentPadding = PaddingValues(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(profile.allBadges, key = { it.name }) { badge ->
+                        Surface(
+                            onClick = { showAllBadges = false; openBadge = badge },
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                                AsyncImage(
+                                    model = badge.imageUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(44.dp).alpha(if (badge.owned) 1f else 0.32f)
+                                )
+                                Text(
+                                    badge.name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    textAlign = TextAlign.Center,
+                                    minLines = 2,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showAllBadges = false }) { Text("kapat") } }
         )
     }
 
@@ -437,7 +504,15 @@ private fun ProfileHeader(
                 Icon(
                     Icons.Rounded.Verified,
                     contentDescription = "onaylanmış hesap",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = Color(0xFF34A853),
+                    modifier = Modifier.padding(start = 6.dp).size(24.dp)
+                )
+            }
+            if (profile.isAdFree) {
+                Icon(
+                    Icons.Rounded.Verified,
+                    contentDescription = "reklamsız abone",
+                    tint = Color(0xFFFFC107),
                     modifier = Modifier.padding(start = 6.dp).size(24.dp)
                 )
             }
@@ -457,7 +532,8 @@ private fun ProfileHeader(
             var bioExpanded by remember { mutableStateOf(false) }
             var bioOverflows by remember { mutableStateOf(false) }
             Text(
-                profile.biography,
+                rememberEntryText(profile.biographyHtml, profile.biography, onBioLink),
+                inlineContent = rememberEntryInlineContent(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -473,7 +549,7 @@ private fun ProfileHeader(
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            StatTile("entry", profile.entryCount, Modifier.weight(1f))
+            StatTile("entry", profile.entryCount, Modifier.weight(1f), onShowEntries)
             StatTile("takipçi", profile.followerCount, Modifier.weight(1f)) { onShowFollows(false) }
             StatTile("takip", profile.followingCount, Modifier.weight(1f)) { onShowFollows(true) }
         }
@@ -541,6 +617,30 @@ private fun ProfileHeader(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(top = 6.dp)
                             )
+                        }
+                    }
+                }
+                val featuredBadgeNames = profile.badges.mapTo(mutableSetOf()) { it.name.trim().lowercase() }
+                val featuredBadgeImages = profile.badges.map { it.imageUrl }.filter(String::isNotBlank).toSet()
+                val additionalOwnedBadges = profile.allBadges.count {
+                    it.owned && it.name.trim().lowercase() !in featuredBadgeNames &&
+                        (it.imageUrl.isBlank() || it.imageUrl !in featuredBadgeImages)
+                }
+                if (profile.allBadges.size > profile.badges.size) {
+                    item(key = "all-badges") {
+                        Surface(
+                            onClick = { showAllBadges = true },
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier.width(88.dp).padding(10.dp).height(74.dp)
+                            ) {
+                                Text("+$additionalOwnedBadges", style = MaterialTheme.typography.titleMedium)
+                                Text("tümü", style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
                 }

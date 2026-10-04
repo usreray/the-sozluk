@@ -9,6 +9,7 @@ import com.thesozluk.app.model.MessageBox
 import com.thesozluk.app.model.ThreadDetail
 import com.thesozluk.app.model.Topic
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -525,7 +526,17 @@ object EksiNetworkDataSource {
             .execute()
         if (response.statusCode() == 404) throw IOException("böyle bir yazar yok")
         if (response.statusCode() != 200) throw IOException("profil yüklenemedi (HTTP ${response.statusCode()})")
-        HtmlParser.parseProfile(response.parse(), nick)
+        val profile = HtmlParser.parseProfile(response.parse(), nick)
+        val badges = try {
+            val badgeResponse = applyCommonConnectionSettings(session.newRequest("$BASE_URL/rozetler/${encodePath(nick)}"))
+                .execute()
+            if (badgeResponse.statusCode() == 200) HtmlParser.parseAllBadges(badgeResponse.parse()) else emptyList()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            emptyList()
+        }
+        profile.copy(allBadges = badges.ifEmpty { profile.badges })
     }
 
     /** The author's uploaded images ("görselleri"); the site sends them all at once. */

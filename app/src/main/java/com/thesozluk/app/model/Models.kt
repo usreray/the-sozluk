@@ -47,7 +47,10 @@ data class Entry(
     /** Profile picture; null for the default placeholder */
     val avatarUrl: String? = null,
     /** Topic page the entry was loaded from (the list spans many pages) */
-    val page: Int = 1
+    val page: Int = 1,
+    val eksiSeylerUrl: String? = null,
+    val authorIsVerified: Boolean = false,
+    val authorIsAdFree: Boolean = false
 ) {
     val canVote: Boolean get() = "vote" in flags
     val canDelete: Boolean get() = "deleteself" in flags
@@ -71,7 +74,13 @@ data class RelationAction(
     val isAdded: Boolean
 )
 
-data class Badge(val name: String, val description: String, val imageUrl: String)
+data class Badge(
+    val name: String,
+    val description: String,
+    val imageUrl: String,
+    /** False for catalog badges the profile owner has not earned. */
+    val owned: Boolean = true
+)
 
 data class AuthorProfile(
     val nick: String,
@@ -91,7 +100,13 @@ data class AuthorProfile(
     val isFollowing: Boolean = false,
     /** Other relation buttons besides "takip et"; empty when logged out */
     val relations: List<RelationAction> = emptyList(),
-    val isRookie: Boolean = false
+    val isRookie: Boolean = false,
+    /** The user's badge collection and ownership state from /rozetler/{nick}. */
+    val allBadges: List<Badge> = badges,
+    /** Original biography markup, kept so its links remain tappable. */
+    val biographyHtml: String = "",
+    /** Ekşi Sözlük's reklamsız subscription status badge. */
+    val isAdFree: Boolean = false
 )
 
 /** "Başlığı açan": the author's nick plus the plain facts (date, counts) from the site's box. */

@@ -204,8 +204,65 @@ object HtmlParser {
                         isDisliked = li.attr("data-isdisliked").equals("true", ignoreCase = true),
                         flags = li.attr("data-flags").split(' ').filter { it.isNotBlank() }.toSet(),
                         commentCount = li.attr("data-comment-count").toIntOrNull() ?: 0,
-                        avatarUrl = avatarUrl(li)
+                        avatarUrl = avatarUrl(li),
+                        eksiSeylerUrl = eksiSeylerUrl(li),
+                        authorIsVerified = li.selectFirst("svg.verified-badge, svg[class*=verified], #verified-badge") != null ||
+                                authorBadgePresent(li, "verified", "onaylı hesap"),
+                        authorIsAdFree = hasSubscriberBadge(li) ||
+                                authorStatusAreaHasAdFreeBadge(li) ||
+                                authorBadgePresent(li, "subscriber-badge", "status-badge-large", "ad-free", "adfree", "no-ads", "reklamsız")
                 )
+        }
+
+        private fun hasSubscriberBadge(element: Element): Boolean =
+                element.select("svg").any { svg ->
+                        svg.id().contains("subscriber-badge", ignoreCase = true) ||
+                                svg.classNames().any { it.contains("subscriber-badge", ignoreCase = true) }
+                }
+
+        /** Entry markup may use a compact subscriber SVG next to the author instead of the profile's large variant. */
+        private fun authorStatusAreaHasAdFreeBadge(entry: Element): Boolean {
+                val author = entry.selectFirst(".entry-author, a[href^=/biri/]") ?: return false
+                val area = author.parent() ?: author
+                return hasSubscriberBadge(area)
+        }
+
+        private fun authorBadgePresent(entry: Element, vararg terms: String): Boolean {
+                val author = entry.selectFirst(".entry-author, a[href^=/biri/]") ?: return false
+                val area = author.parent() ?: author
+                val markers = (author.parents() + entry + area + author + author.select("*") + area.select("*")).flatMap { node ->
+                        buildList {
+                                add(node.id())
+                                addAll(node.classNames())
+                                add(node.attr("title"))
+                                add(node.attr("aria-label"))
+                                add(node.attr("data-badge"))
+                                add(node.attr("data-title"))
+                                add(node.attr("data-name"))
+                                add(node.attr("data-author-status"))
+                                add(node.attr("data-author-badge"))
+                                add(node.attr("data-verified"))
+                                add(node.attr("data-ad-free"))
+                                add(node.attr("src"))
+                                add(node.attr("alt"))
+                                add(node.attributes().toString())
+                        }
+                }.filter { it.isNotBlank() }
+                return markers.any { marker -> terms.any { marker.contains(it, ignoreCase = true) } }
+        }
+
+        private fun eksiSeylerUrl(li: Element): String? {
+                val metadata = li.clone().apply {
+                        select(".content, .entry-author, .entry-date").remove()
+                }
+                val href = metadata.select("a[href]").firstOrNull {
+                        it.attr("href").contains("seyler", ignoreCase = true)
+                }?.attr("href")?.trim().orEmpty()
+                return when {
+                        href.startsWith("//") -> "https:$href"
+                        href.startsWith("http://", ignoreCase = true) || href.startsWith("https://", ignoreCase = true) -> href
+                        else -> null
+                }
         }
 
         /** The real profile picture inside an entry/comment footer, if the author set one. */
@@ -393,6 +450,7 @@ object HtmlParser {
                         karma = rank.takeUnless { isRookie }
                                 ?: document.select("p.muted").firstOrNull { it.text().matches(Regex(".*\\(\\d+\\).*")) }?.text().orEmpty(),
                         biography = document.selectFirst("#profile-biography .content")?.text().orEmpty(),
+                        biographyHtml = document.selectFirst("#profile-biography .content")?.html().orEmpty(),
                         entryCount = count("entry-count-total"),
                         followerCount = count("user-follower-count"),
                         followingCount = count("user-following-count"),
@@ -416,12 +474,37 @@ object HtmlParser {
                                 .distinctBy { it.addUrl },
                         isRookie = isRookie,
                         badges = document.select("a.user-profile-badge-item").map {
-                                Badge(
-                                        name = it.attr("data-name"),
-                                        description = it.attr("data-title"),
-                                        imageUrl = it.selectFirst("img")?.attr("src").orEmpty()
-                                )
-                        }
+                                parseBadge(it)
+                        },
+                        // The site includes shared SVG definitions on every page. Only inspect
+                        // the profile header so those definitions cannot badge every author.
+                        isAdFree = headerNodes.any(::hasSubscriberBadge)
+                )
+        }
+
+        /** Each list item is one badge in this author's collection; data-owned distinguishes earned badges. */
+        fun parseAllBadges(document: Document): List<Badge> = document.select("li.badge-item-otheruser[data-owned]").mapNotNull { item ->
+                val image = item.selectFirst("img")
+                val badgeLink = item.selectFirst("a") ?: item
+                val name = badgeLink.attr("data-name")
+                        .ifBlank { item.attr("data-name") }
+                        .ifBlank { image?.attr("alt").orEmpty() }
+                        .ifBlank { item.selectFirst(".badge-name, .badge-title")?.text().orEmpty() }
+                        .ifBlank { item.text().trim() }
+                if (name.isBlank()) return@mapNotNull null
+                parseBadge(item).copy(
+                        name = name,
+                        description = badgeLink.attr("data-title").ifBlank { item.attr("data-title") },
+                        owned = item.attr("data-owned").equals("true", ignoreCase = true)
+                )
+        }.distinctBy { it.name }
+
+        private fun parseBadge(element: Element): Badge {
+                val image = element.selectFirst("img")
+                return Badge(
+                        name = element.attr("data-name").ifBlank { image?.attr("alt").orEmpty() }.ifBlank { element.text().trim() },
+                        description = element.attr("data-title").ifBlank { image?.attr("title").orEmpty() },
+                        imageUrl = image?.attr("src").orEmpty().let { if (it.startsWith("//")) "https:$it" else it }
                 )
         }
 

@@ -33,9 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.WaterDrop
-import androidx.compose.material.icons.rounded.ChatBubble
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
@@ -43,11 +41,10 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenuPopup
@@ -74,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -113,7 +111,6 @@ data class EntryActions(
     val onOpenTopic: ((Entry) -> Unit)? = null,
     // Comments ("yorum"); null hides the comment button (e.g. profile lists)
     val comments: ((Entry) -> CommentsUi)? = null,
-    val onToggleComments: (Entry) -> Unit = {},
     val onVoteComment: (Entry, Comment, Int) -> Unit = { _, _, _ -> },
     val onWriteComment: ((Entry) -> Unit)? = null,
     /** Tapping the favorite count shows who favorited */
@@ -244,21 +241,20 @@ fun EntryCard(
                     onToggle = { actions.onToggleFavorite(entry) },
                     onCountClick = actions.onShowFavoriters?.let { show -> { show(entry) } }
                 )
-                val comments = actions.comments?.invoke(entry)
-                if (comments != null && (entry.commentCount > 0 || actions.onWriteComment != null)) {
-                    IconToggleButton(checked = comments.isOpen, onCheckedChange = { actions.onToggleComments(entry) }) {
-                        BadgedBox(badge = {
-                            if (entry.commentCount > 0) Badge { Text(entry.commentCount.toString()) }
-                        }) {
-                            Icon(
-                                if (comments.isOpen) Icons.Rounded.ChatBubble else Icons.Outlined.ChatBubbleOutline,
-                                contentDescription = "yorumlar",
-                                tint = if (comments.isOpen) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                entry.eksiSeylerUrl?.let { url ->
+                    IconButton(
+                        onClick = { actions.onLink(EksiLink.External(url)) },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.WaterDrop,
+                            contentDescription = "ekşi şeyler'de aç",
+                            tint = Color(0xFF2196F3),
+                            modifier = Modifier.size(22.dp)
+                        )
                     }
                 }
+                val comments = actions.comments?.invoke(entry)
                 Spacer(Modifier.weight(1f))
                 // The user's own entries: the site's flags say so, or the nick matches
                 val own = entry.author.isNotBlank() && entry.author.equals(EksiSession.nick.value, ignoreCase = true)
@@ -286,13 +282,32 @@ fun EntryCard(
                         .clickable { actions.onAuthor(entry.author) }
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    Text(
-                        text = entry.author,
-                        style = MaterialTheme.typography.labelLargeEmphasized,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+                        Text(
+                            text = entry.author,
+                            style = MaterialTheme.typography.labelLargeEmphasized,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (entry.authorIsVerified) {
+                            Icon(
+                                imageVector = Icons.Rounded.Verified,
+                                contentDescription = "onaylanmış hesap",
+                                tint = Color(0xFF34A853),
+                                modifier = Modifier.padding(start = 3.dp).size(16.dp)
+                            )
+                        }
+                        if (entry.authorIsAdFree) {
+                            Icon(
+                                imageVector = Icons.Rounded.Verified,
+                                contentDescription = "reklamsız kullanıcı",
+                                tint = Color(0xFFFFC107),
+                                modifier = Modifier.padding(start = 3.dp).size(16.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = if (showNumbers && number != null) "#$number · ${entry.date}" else entry.date,
                         style = MaterialTheme.typography.labelSmall,
