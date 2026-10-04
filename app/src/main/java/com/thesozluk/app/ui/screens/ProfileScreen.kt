@@ -1,7 +1,7 @@
 package com.thesozluk.app.ui.screens
 
 import androidx.compose.material.icons.rounded.CloudDone
-import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.AutoStories
 import com.thesozluk.app.data.offline.OfflineStore
 import com.thesozluk.app.settings.ReadingHistory
 import com.thesozluk.app.settings.EntryBookmarks
@@ -110,6 +110,7 @@ fun ProfileScreen(
             // The page shows a big "profil"; the bar takes the title only once it scrolled away
             FloatingTopBar(
                 title = if (scrolled) "profil" else null,
+                titleOffset = 32.dp,
                 onTitleClick = { scope.launch { viewModel.scrollState.animateScrollToItem(0) } }
             ) {
                     IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
@@ -144,7 +145,7 @@ fun ProfileScreen(
             item(key = "library") {
                 val rows = listOf(
                     Triple(LibraryKind.Bookmarks, Icons.Rounded.Bookmarks, "${EntryBookmarks.items.value.size} entry"),
-                    Triple(LibraryKind.History, Icons.Rounded.History, "${ReadingHistory.items.value.size} başlık"),
+                    Triple(LibraryKind.History, Icons.Rounded.AutoStories, "${ReadingHistory.items.value.size} başlık"),
                     Triple(LibraryKind.Offline, Icons.Rounded.CloudDone, OfflineStore.topics.value.size.let { n ->
                         val running = OfflineStore.progress.values.count { !it.finished }
                         "$n başlık" + if (running > 0) " · $running indiriliyor" else ""

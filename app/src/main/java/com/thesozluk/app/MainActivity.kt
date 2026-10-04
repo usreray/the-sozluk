@@ -53,6 +53,8 @@ import com.thesozluk.app.ui.navigation.TopicTabs
 import com.thesozluk.app.ui.theme.TheSozlukTheme
 import com.thesozluk.app.ui.theme.isAppInDarkTheme
 import com.thesozluk.app.notify.Notifier
+import com.thesozluk.app.widget.GundemWidgetReceiver
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBars
@@ -143,6 +145,14 @@ private val topLevelDestinations = listOf(
 fun MainScreen(pendingOpen: MutableState<String?>) {
     val navController = rememberNavController()
     val uriHandler = LocalUriHandler.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            runCatching {
+                GlanceAppWidgetManager(context).setWidgetPreviews(GundemWidgetReceiver::class)
+            }
+        }
+    }
     LaunchedEffect(pendingOpen.value) {
         val target = pendingOpen.value
         when {

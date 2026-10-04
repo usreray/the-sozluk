@@ -58,6 +58,21 @@ class GundemWidget : GlanceAppWidget() {
         provideContent { GlanceTheme { Content(context, topics) } }
     }
 
+    override suspend fun providePreview(context: Context, widgetCategory: Int) {
+        provideContent {
+            GlanceTheme {
+                Content(
+                    context,
+                    listOf(
+                        Topic("bugün", commentCount = 1200),
+                        Topic("günün anlam ve önemi", commentCount = 842),
+                        Topic("bugün öğrendiğim bilgiler", commentCount = 516)
+                    )
+                )
+            }
+        }
+    }
+
     @Composable
     private fun Content(context: Context, topics: List<Topic>?) {
         val colors = GlanceTheme.colors

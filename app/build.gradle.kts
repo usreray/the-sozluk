@@ -21,8 +21,8 @@ android {
         applicationId = "com.thesozluk.app"
         minSdk = 31
         targetSdk = 35
-        versionCode = 16
-        versionName = "2.5"
+        versionCode = 18
+        versionName = "2.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

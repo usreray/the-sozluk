@@ -19,7 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.ViewAgenda
 import androidx.compose.material3.Card
@@ -76,7 +75,6 @@ fun TopicTabsOverview(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Rounded.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("açık başlıklar", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = "kapat") }
                 }
@@ -207,15 +205,19 @@ fun TopicTabsOverview(
                                         shape = RoundedCornerShape(16.dp),
                                         modifier = Modifier.fillMaxWidth().weight(1f)
                                     ) {
-                                        Text(
-                                            tab.preview.ifBlank { if (loadingPreview) "önizleme yükleniyor" else "önizleme alınamadı" },
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 5,
-                                            overflow = TextOverflow.Ellipsis,
-                                            minLines = 5,
-                                            modifier = Modifier.fillMaxWidth().padding(12.dp)
-                                        )
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
+                                            Text(
+                                                tab.preview.trimStart().ifBlank {
+                                                    if (loadingPreview) "önizleme yükleniyor" else "önizleme alınamadı"
+                                                },
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 5,
+                                                overflow = TextOverflow.Ellipsis,
+                                                minLines = 5,
+                                                modifier = Modifier.fillMaxWidth().padding(12.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }

@@ -24,10 +24,12 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,7 +50,6 @@ import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.BookmarkBorder
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.ButtonDefaults
@@ -85,6 +86,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -578,12 +583,27 @@ fun TopicDetailScreen(
             // Nothing to save or share for a topic that doesn't exist
             actions = if (phase != TopicPhase.Content) null else ({
                 if (onClose == null) {
-                    IconButton(onClick = { showTabsOverview = true }) {
-                        Icon(
-                            Icons.Rounded.Layers,
-                            contentDescription = "açık sekmeler",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    val tabCount = TopicTabs.items.size
+                    IconButton(
+                        onClick = { showTabsOverview = true },
+                        modifier = Modifier.semantics {
+                            contentDescription = "açık sekmeler, $tabCount"
+                        }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant, RoundedCornerShape(6.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                if (tabCount > 99) "99+" else tabCount.toString(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = if (tabCount > 99) 7.sp else 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
                 // "takip et": new entries then show up in the olay list
