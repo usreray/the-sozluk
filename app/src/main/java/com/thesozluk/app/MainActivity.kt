@@ -72,6 +72,10 @@ class MainActivity : ComponentActivity() {
         com.thesozluk.app.settings.EntryBookmarks.init(this)
         com.thesozluk.app.settings.SearchHistory.init(this)
         com.thesozluk.app.data.offline.OfflineStore.init(this)
+        getSharedPreferences("drive_backup", MODE_PRIVATE).takeIf { it.all.isNotEmpty() }?.let { prefs ->
+            androidx.work.WorkManager.getInstance(this).cancelUniqueWork("google-drive-backup")
+            prefs.edit().clear().apply()
+        }
         Notifier.schedule(this, AppSettings.notifications.value && EksiSession.isLoggedIn.value)
         // Logged in on Android 13+: ask once for the permission the message / olay alerts need
         if (EksiSession.isLoggedIn.value && AppSettings.notifications.value && !Notifier.canNotify(this) &&

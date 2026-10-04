@@ -49,6 +49,7 @@ import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -99,6 +100,7 @@ import com.thesozluk.app.network.EksiSession
 import com.thesozluk.app.notify.Notifier
 import com.thesozluk.app.settings.AppSettings
 import com.thesozluk.app.settings.ContrastChoice
+import com.thesozluk.app.settings.LocalDataBackup
 import com.thesozluk.app.settings.PaletteChoice
 import com.thesozluk.app.settings.ReadingFont
 import com.thesozluk.app.settings.ReadingHistory
@@ -643,6 +645,68 @@ private fun LazyListScope.data(navController: NavController) {
         )
     }
     item { Hint("bir başlığı indirmek için başlıktaki ⋮ menüsünden \"çevrimdışı kaydet\"i seç") }
+
+    item { SectionTitle("uygulama verileri") }
+    item {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        var restoreUri by remember { mutableStateOf<Uri?>(null) }
+        var status by remember { mutableStateOf<String?>(null) }
+        var busy by remember { mutableStateOf(false) }
+        val createBackup = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+            if (uri != null) scope.launch {
+                busy = true
+                status = runCatching { LocalDataBackup.export(context, uri) }
+                    .fold({ "yedek dosyası oluşturuldu" }, { "yedek oluşturulamadı: ${it.message ?: "dosya hatası"}" })
+                busy = false
+            }
+        }
+        val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            restoreUri = uri
+        }
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "ayarlar, arama ve okuma geçmişi, kaydedilen entry'ler ve cihazdaki taslaklar yedeklenir. " +
+                        "yedek dosyasını cihazında seçtiğin konuma kaydedebilirsin. çevrimdışı başlıklar ve site hesabı dahil değildir.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                FilledTonalButton(
+                    enabled = !busy,
+                    onClick = {
+                        val day = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+                        createBackup.launch("the-sozluk-yedek-$day.json")
+                    }
+                ) { Text("yedek dosyası oluştur") }
+                OutlinedButton(enabled = !busy, onClick = { openBackup.launch(arrayOf("application/json", "*/*")) }) {
+                    Text("yedekten geri yükle")
+                }
+                status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
+        }
+        restoreUri?.let { uri ->
+            AlertDialog(
+                onDismissRequest = { restoreUri = null },
+                title = { Text("yedek geri yüklensin mi?") },
+                text = {
+                    Text("yedekteki ayarlar, geçmişler, kaydedilen entry'ler ve cihaz taslakları bu uygulamadaki verilerin yerini alacak. giriş bilgileri etkilenmez.")
+                },
+                confirmButton = {
+                    TextButton(enabled = !busy, onClick = {
+                        restoreUri = null
+                        scope.launch {
+                            busy = true
+                            status = runCatching { LocalDataBackup.restore(context, uri) }
+                                .fold({ "yedek geri yüklendi" }, { "yedek geri yüklenemedi: ${it.message ?: "dosya hatası"}" })
+                            busy = false
+                        }
+                    }) { Text("geri yükle") }
+                },
+                dismissButton = { TextButton(onClick = { restoreUri = null }) { Text("vazgeç") } }
+            )
+        }
+    }
 
     item { SectionTitle("entry yedeği") }
     item {
