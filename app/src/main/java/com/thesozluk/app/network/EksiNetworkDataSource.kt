@@ -105,7 +105,14 @@ object EksiNetworkDataSource {
         }
 
         val document = response.parse()
-        val topics = HtmlParser.parseTopics(document)
+        val parsedTopics = HtmlParser.parseTopics(document)
+        // The site's kenar rows append when the entry was saved; keep that metadata out of
+        // the displayed topic title while retaining the original URL for navigation.
+        val topics = if (category == "basliklar/kenar") {
+            parsedTopics.map { topic ->
+                topic.copy(title = topic.title.replace(Regex("\\s+\\d{2}\\.\\d{2}\\.\\d{4}\\s+\\d{2}:\\d{2}$"), "").trim())
+            }
+        } else parsedTopics
         // An empty follow list is fine ("hiç başlık yok"); a page without any list is not
         val emptyPersonalList = when (category) {
             "basliklar/son" -> document.selectFirst("#left-index h2")?.text().equals("son entryler", ignoreCase = true)
@@ -383,6 +390,9 @@ object EksiNetworkDataSource {
                 val error = document?.select(
                     ".field-validation-error, .validation-summary-errors, #message-validation-result, .error-message"
                 )?.text()?.trim()?.ifEmpty { null }
+                    ?: document?.body()?.text()?.takeIf {
+                        it.contains("yetkiniz olmayan bir iş peşindesiniz", ignoreCase = true)
+                    }?.let { "kenara kaydetme yetkisi bu hesapta yok" }
                 // Diagnostics without content: status, where the post landed, and any error text
                 android.util.Log.d(
                     "EksiForm",
@@ -401,6 +411,14 @@ object EksiNetworkDataSource {
                 e.message ?: "işlem başarısız"
             }
         }
+
+    /** Saves the entry form text to the site's per-topic "kenar" draft for eligible accounts. */
+    suspend fun saveSiteDraft(topicPath: String, form: com.thesozluk.app.model.FormSpec, text: String): String? {
+        val field = form.textFieldName ?: return "entry alanı bulunamadı"
+        val path = topicPath.removePrefix(BASE_URL).substringBefore('?').trimEnd('/')
+        if (path.isBlank()) return "başlık adresi bulunamadı"
+        return submitForm(form.copy(action = "$path/savedraft"), mapOf(field to text), ajax = true)
+    }
 
     /**
      * The file behind an uploaded image. Entries link to a /img/<code> page that only wraps the

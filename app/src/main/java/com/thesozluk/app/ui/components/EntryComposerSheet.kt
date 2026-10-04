@@ -21,6 +21,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -57,7 +58,9 @@ fun EntryComposerSheet(
     /** A saved draft (or the site's "kenar" text) to continue from */
     initialText: String = "",
     /** Called on every edit so the text survives closing the sheet */
-    onTextChange: ((String) -> Unit)? = null
+    onTextChange: ((String) -> Unit)? = null,
+    onSaveToSite: ((String) -> Unit)? = null,
+    isSavingDraft: Boolean = false
 ) {
     var value by remember { mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length))) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -103,15 +106,30 @@ fun EntryComposerSheet(
                     )
                 }
             }
-            Button(
-                onClick = { onSubmit(value.text.trim()) },
-                enabled = value.text.isNotBlank() && !isSubmitting,
-                modifier = Modifier.align(Alignment.End),
-                contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (isSubmitting) LoadingIndicator(modifier = Modifier.size(20.dp))
-                else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                Text("gönder", modifier = Modifier.padding(start = 8.dp))
+                if (onSaveToSite != null) {
+                    OutlinedButton(
+                        onClick = { onSaveToSite(value.text.trim()) },
+                        enabled = value.text.isNotBlank() && !isSubmitting,
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                    ) {
+                        if (isSavingDraft) LoadingIndicator(modifier = Modifier.size(20.dp))
+                        else Text("kenara kaydet")
+                    }
+                }
+                Button(
+                    onClick = { onSubmit(value.text.trim()) },
+                    enabled = value.text.isNotBlank() && !isSubmitting,
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                ) {
+                    if (isSubmitting && !isSavingDraft) LoadingIndicator(modifier = Modifier.size(20.dp))
+                    else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("gönder", modifier = Modifier.padding(start = 8.dp))
+                }
             }
         }
     }

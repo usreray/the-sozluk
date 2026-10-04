@@ -190,6 +190,8 @@ object AppSettings {
         prefs.edit().putStringSet("hiddenTabs", DEFAULT_HIDDEN_TABS).apply()
     }
 
+    fun homeTabsChanged(): Boolean = _hiddenTabs.value != DEFAULT_HIDDEN_TABS
+
     fun setShowEntryNumbers(enabled: Boolean) {
         _showEntryNumbers.value = enabled
         prefs.edit().putBoolean("showEntryNumbers", enabled).apply()

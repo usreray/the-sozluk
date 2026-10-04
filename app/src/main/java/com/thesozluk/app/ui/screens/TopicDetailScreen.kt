@@ -141,6 +141,7 @@ fun TopicDetailScreen(
     url: String,
     navController: NavController,
     startPage: Int = 1,
+    openComposer: Boolean = false,
     /** In the tablet layout's right pane: closing clears the pane instead of leaving the screen */
     onClose: (() -> Unit)? = null,
     viewModel: TopicDetailViewModel = viewModel(
@@ -155,6 +156,7 @@ fun TopicDetailScreen(
     val lastPage by viewModel.lastPage
     val totalPages by viewModel.totalPages
     val isSubmitting by viewModel.isSubmitting
+    val isSavingDraft by viewModel.isSavingDraft
     val error by viewModel.error
     val message by viewModel.message
     val isLoggedIn by EksiSession.isLoggedIn
@@ -167,6 +169,7 @@ fun TopicDetailScreen(
     var showLoginDialog by rememberSaveable { mutableStateOf(false) }
     var favoritersOf by remember { mutableStateOf<com.thesozluk.app.model.Entry?>(null) }
     var showComposer by rememberSaveable { mutableStateOf(false) }
+    var autoOpenedComposer by rememberSaveable { mutableStateOf(false) }
     var commentTarget by remember { mutableStateOf<Entry?>(null) }
     var shareImageOf by remember { mutableStateOf<Entry?>(null) }
     // Entry opened full screen (swipe sideways for the others), null when closed
@@ -206,6 +209,12 @@ fun TopicDetailScreen(
     val loaded = topic?.entriesLoaded == true
     val canWrite = isLoggedIn && topic?.entryForm?.textFieldName != null
     val canComment = isLoggedIn && topic?.commentForm?.textFieldName != null
+    LaunchedEffect(openComposer, loaded, canWrite) {
+        if (openComposer && loaded && canWrite && !autoOpenedComposer) {
+            autoOpenedComposer = true
+            showComposer = true
+        }
+    }
     val phase = when {
         error != null && !loaded -> TopicPhase.Error
         !loaded -> TopicPhase.Loading
@@ -436,6 +445,8 @@ fun TopicDetailScreen(
             topicTitle = displayTitle,
             isSubmitting = isSubmitting,
             onSubmit = { text -> viewModel.submitEntry(text) { showComposer = false } },
+            onSaveToSite = { text -> viewModel.saveSiteDraft(text) { showComposer = false } },
+            isSavingDraft = isSavingDraft,
             onDismiss = { if (!isSubmitting) showComposer = false },
             initialText = remember { Drafts.get(draftKey)?.text ?: topic?.entryForm?.textValue.orEmpty() },
             onTextChange = { text -> Drafts.save(draftKey, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty(), text) }

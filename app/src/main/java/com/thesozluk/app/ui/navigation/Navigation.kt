@@ -148,13 +148,15 @@ fun Navigation(navController: NavHostController) {
             arguments = listOf(
                 navArgument("title") { type = NavType.StringType; defaultValue = "" },
                 navArgument("url") { type = NavType.StringType; defaultValue = "" },
-                navArgument("page") { type = NavType.IntType; defaultValue = 1 }
+                navArgument("page") { type = NavType.IntType; defaultValue = 1 },
+                navArgument("compose") { type = NavType.BoolType; defaultValue = false }
             ),
         ) { backStackEntry ->
             TopicDetailScreen(
                 title = backStackEntry.arguments?.getString("title").orEmpty(),
                 url = backStackEntry.arguments?.getString("url").orEmpty(),
                 startPage = backStackEntry.arguments?.getInt("page") ?: 1,
+                openComposer = backStackEntry.arguments?.getBoolean("compose") ?: false,
                 navController = navController
             )
         }

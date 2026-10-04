@@ -88,6 +88,9 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
     private val _isSubmitting = mutableStateOf(false)
     val isSubmitting: State<Boolean> = _isSubmitting
 
+    private val _isSavingDraft = mutableStateOf(false)
+    val isSavingDraft: State<Boolean> = _isSavingDraft
+
     /** One-off feedback for a snackbar ("entry silindi", errors) */
     private val _message = mutableStateOf<String?>(null)
     val message: State<String?> = _message
@@ -338,6 +341,34 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 _message.value = e.message ?: "entry girilemedi"
             } finally {
                 _isSubmitting.value = false
+            }
+        }
+    }
+
+    /** Saves an entry to the site's "kenar" list; local draft remains if the site rejects it. */
+    fun saveSiteDraft(text: String, onSuccess: () -> Unit) {
+        val topic = _selectedTopic.value ?: return
+        val form = topic.entryForm ?: return
+        _isSubmitting.value = true
+        _isSavingDraft.value = true
+        viewModelScope.launch {
+            try {
+                val path = topic.topicPath.ifBlank { topic.url }
+                val error = repository.saveSiteDraft(path, form, text)
+                if (error != null) {
+                    _message.value = error
+                } else {
+                    com.thesozluk.app.settings.Drafts.delete(topic.title)
+                    _message.value = "kenara kaydedildi"
+                    onSuccess()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = e.message ?: "kenara kaydedilemedi"
+            } finally {
+                _isSubmitting.value = false
+                _isSavingDraft.value = false
             }
         }
     }

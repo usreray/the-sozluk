@@ -39,10 +39,10 @@ sealed class Screen(val route: String) {
         fun createRoute(nick: String): String = "author?nick=${Uri.encode(nick.trim().removePrefix("@"))}"
     }
     object TopicDetail : Screen("topic_detail") {
-        const val pattern = "topic_detail?title={title}&url={url}&page={page}"
+        const val pattern = "topic_detail?title={title}&url={url}&page={page}&compose={compose}"
 
         // Uri.encode keeps '/', '?' and spaces intact through Navigation's argument decoding
-        fun createRoute(title: String, url: String, page: Int = 1): String =
-            "topic_detail?title=${Uri.encode(title)}&url=${Uri.encode(url)}&page=$page"
+        fun createRoute(title: String, url: String, page: Int = 1, compose: Boolean = false): String =
+            "topic_detail?title=${Uri.encode(title)}&url=${Uri.encode(url)}&page=$page&compose=$compose"
     }
 }

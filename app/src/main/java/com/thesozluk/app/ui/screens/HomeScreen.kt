@@ -165,12 +165,14 @@ fun HomeScreen(
         val wide = maxWidth >= 840.dp
         var paneTitle by rememberSaveable { mutableStateOf<String?>(null) }
         var paneUrl by rememberSaveable { mutableStateOf("") }
-        val openTopic: (String, String) -> Unit = { t, u ->
+        var paneCompose by rememberSaveable { mutableStateOf(false) }
+        val openTopic: (String, String, Boolean) -> Unit = { t, u, compose ->
             if (wide) {
                 paneTitle = t
                 paneUrl = u
+                paneCompose = compose
             } else {
-                navController.navigate(Screen.TopicDetail.createRoute(t, u))
+                navController.navigate(Screen.TopicDetail.createRoute(t, u, compose = compose))
             }
         }
         // Back closes the open pane first
@@ -266,6 +268,7 @@ fun HomeScreen(
                             TopicDetailScreen(
                                 title = t,
                                 url = paneUrl,
+                                openComposer = paneCompose,
                                 navController = navController,
                                 onClose = { paneTitle = null },
                                 viewModel = viewModel(
@@ -367,7 +370,7 @@ private fun CategoryPage(
     category: HomeCategory,
     viewModel: HomeViewModel,
     topPadding: androidx.compose.ui.unit.Dp,
-    onTopicClick: (title: String, url: String) -> Unit
+    onTopicClick: (title: String, url: String, openComposer: Boolean) -> Unit
 ) {
     val state = viewModel.state(category)
     val listState = viewModel.listStates.getValue(category)
@@ -438,7 +441,7 @@ private fun CategoryPage(
                                     val url = if (filter != null) {
                                         topic.url + if ('?' in topic.url) "&$filter" else "?$filter"
                                     } else topic.url
-                                    onTopicClick(topic.title, url)
+                                    onTopicClick(topic.title, url, category == HomeCategory.Kenar)
                                 },
                                 modifier = Modifier.animateItem()
                             )

@@ -43,6 +43,9 @@ class EksiRepository(
     suspend fun submitForm(form: FormSpec, values: Map<String, String>, ajax: Boolean = false): String? =
         EksiNetworkDataSource.submitForm(form, values, ajax)
 
+    suspend fun saveSiteDraft(topicPath: String, form: FormSpec, text: String): String? =
+        EksiNetworkDataSource.saveSiteDraft(topicPath, form, text)
+
     suspend fun getProfile(nick: String): AuthorProfile = EksiNetworkDataSource.fetchProfile(nick)
 
     suspend fun getEditForm(entryId: String): FormSpec = EksiNetworkDataSource.fetchEditForm(entryId)

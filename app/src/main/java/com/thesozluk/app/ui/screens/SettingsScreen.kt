@@ -6,6 +6,12 @@ import android.content.pm.verify.domain.DomainVerificationUserState
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -80,6 +86,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -230,11 +237,15 @@ private fun CategoryRow(section: SettingsSection, summary: String, shape: Shape,
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun LazyListScope.appearance() {
+    item { SectionTitle(
+        "tema",
+        changed = AppSettings.themeMode.value != ThemeMode.System || AppSettings.pureBlack.value,
+        onReset = { AppSettings.setThemeMode(ThemeMode.System); AppSettings.setPureBlack(false) }
+    ) }
     item {
         val themeMode by AppSettings.themeMode
         Surface(shape = segmentedShape(0, 3), color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("tema", style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
                     ThemeMode.entries.forEachIndexed { index, mode ->
                         ToggleButton(
@@ -281,7 +292,15 @@ private fun LazyListScope.appearance() {
             onCheckedChange = AppSettings::setPureBlack
         )
     }
-    item { SectionTitle("renkler") }
+    item { SectionTitle(
+        "renkler",
+        changed = !AppSettings.dynamicColor.value || AppSettings.seed.value != SeedColor.Eksi ||
+            AppSettings.palette.value != PaletteChoice.TonalSpot || AppSettings.contrast.value != ContrastChoice.Standard,
+        onReset = {
+            AppSettings.setDynamicColor(true); AppSettings.setSeed(SeedColor.Eksi)
+            AppSettings.setPalette(PaletteChoice.TonalSpot); AppSettings.setContrast(ContrastChoice.Standard)
+        }
+    ) }
     item {
         val dynamicColor by AppSettings.dynamicColor
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
@@ -334,14 +353,6 @@ private fun LazyListScope.appearance() {
             }
         }
     }
-    item { TextButton(onClick = {
-        AppSettings.setThemeMode(ThemeMode.System)
-        AppSettings.setDynamicColor(true)
-        AppSettings.setPureBlack(false)
-        AppSettings.setSeed(SeedColor.Eksi)
-        AppSettings.setPalette(PaletteChoice.TonalSpot)
-        AppSettings.setContrast(ContrastChoice.Standard)
-    }) { Text("görünümü varsayılana getir") } }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -360,7 +371,15 @@ private fun LazyListScope.reading() {
             )
         }
     }
-    item { SectionTitle("metin") }
+    item { SectionTitle(
+        "metin",
+        changed = AppSettings.textScale.value != 1f || AppSettings.readingFont.value != ReadingFont.Default ||
+            AppSettings.lineSpacing.value != 1f || AppSettings.entryPadding.value != 20f,
+        onReset = {
+            AppSettings.setTextScale(1f); AppSettings.setReadingFont(ReadingFont.Default)
+            AppSettings.setLineSpacing(1f); AppSettings.setEntryPadding(20f)
+        }
+    ) }
     item {
         SliderRow(
             title = "yazı boyutu · %${(AppSettings.textScale.value * 100).roundToInt()}",
@@ -409,14 +428,24 @@ private fun LazyListScope.reading() {
             onChange = AppSettings::setEntryPadding
         )
     }
-    item { SectionTitle("entry'ler") }
+    item { SectionTitle(
+        "entry'ler",
+        changed = AppSettings.showEntryNumbers.value || !AppSettings.showAvatars.value,
+        onReset = { AppSettings.setShowEntryNumbers(false); AppSettings.setShowAvatars(true) }
+    ) }
     item {
         SwitchRow("entry sıra numarası", "her entry'nin başlıktaki sırası (#12)", AppSettings.showEntryNumbers.value, true, segmentedShape(0, 2), AppSettings::setShowEntryNumbers)
     }
     item {
         SwitchRow("profil resimleri", "entry'lerde yazarın resmini göster", AppSettings.showAvatars.value, true, segmentedShape(1, 2), AppSettings::setShowAvatars)
     }
-    item { SectionTitle("ekran") }
+    item { SectionTitle(
+        "ekran",
+        changed = !AppSettings.marqueeTitles.value || !AppSettings.hideBarsOnScroll.value || AppSettings.keepScreenOn.value,
+        onReset = {
+            AppSettings.setMarqueeTitles(true); AppSettings.setHideBarsOnScroll(true); AppSettings.setKeepScreenOn(false)
+        }
+    ) }
     item {
         SwitchRow("uzun başlıkları kaydır", "üst bara sığmayan başlık sağdan sola aksın; basılı tutunca tamamı görünür", AppSettings.marqueeTitles.value, true, segmentedShape(0, 3), AppSettings::setMarqueeTitles)
     }
@@ -426,24 +455,21 @@ private fun LazyListScope.reading() {
     item {
         SwitchRow("ekranı açık tut", "başlık okurken ekran kararmasın", AppSettings.keepScreenOn.value, true, segmentedShape(2, 3), AppSettings::setKeepScreenOn)
     }
-    item { TextButton(onClick = {
-        AppSettings.setTextScale(1f); AppSettings.setReadingFont(ReadingFont.Default)
-        AppSettings.setLineSpacing(1f); AppSettings.setEntryPadding(20f)
-        AppSettings.setShowEntryNumbers(false); AppSettings.setShowAvatars(true)
-        AppSettings.setMarqueeTitles(true); AppSettings.setHideBarsOnScroll(true)
-        AppSettings.setKeepScreenOn(false)
-    }) { Text("okuma ayarlarını varsayılana getir") } }
 }
 
 // ---------------------------------------------------------------------------------------------
 // ana sayfa
 
 private fun LazyListScope.homeLists() {
+    item { SectionTitle(
+        "listeler",
+        changed = AppSettings.homeTabsChanged(),
+        onReset = AppSettings::resetHomeTabs
+    ) }
     item {
         val hiddenTabs by AppSettings.hiddenTabs
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("listeler", style = MaterialTheme.typography.titleMedium)
                 Text(
                     "olay, takip, son, kenar ve çaylaklar giriş yapınca görünür",
                     style = MaterialTheme.typography.bodyMedium,
@@ -463,13 +489,24 @@ private fun LazyListScope.homeLists() {
             }
         }
     }
-    item { TextButton(onClick = AppSettings::resetHomeTabs) { Text("liste ayarlarını varsayılana getir") } }
 }
 
 // ---------------------------------------------------------------------------------------------
 // bildirimler
 
 private fun LazyListScope.notifications() {
+    item {
+        val context = LocalContext.current
+        val enabledByDefault = EksiSession.isLoggedIn.value && Notifier.canNotify(context)
+        SectionTitle(
+            "bildirimler",
+            changed = AppSettings.notifications.value != enabledByDefault,
+            onReset = {
+                AppSettings.setNotifications(enabledByDefault)
+                Notifier.schedule(context, enabledByDefault)
+            }
+        )
+    }
     item {
         val context = LocalContext.current
         val isLoggedIn by EksiSession.isLoggedIn
@@ -502,21 +539,17 @@ private fun LazyListScope.notifications() {
             context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
         }) { Text("sistem bildirim ayarlarını aç") }
     }
-    item {
-        val context = LocalContext.current
-        TextButton(onClick = {
-            val enabled = EksiSession.isLoggedIn.value && Notifier.canNotify(context)
-            AppSettings.setNotifications(enabled)
-            Notifier.schedule(context, enabled)
-        }) { Text("bildirim ayarlarını varsayılana getir") }
-    }
 }
 
 // ---------------------------------------------------------------------------------------------
 // içerik ve gizlilik
 
 private fun LazyListScope.content() {
-    item { SectionTitle("engellenen kelimeler") }
+    item { SectionTitle(
+        "engellenen kelimeler",
+        changed = AppSettings.blockedWords.value.isNotEmpty(),
+        onReset = { AppSettings.blockedWords.value.forEach(AppSettings::removeBlockedWord) }
+    ) }
     item {
         val blockedWords by AppSettings.blockedWords
         var adding by remember { mutableStateOf(false) }
@@ -557,7 +590,11 @@ private fun LazyListScope.content() {
             )
         }
     }
-    item { SectionTitle("okuma geçmişi") }
+    item { SectionTitle(
+        "okuma geçmişi",
+        changed = !AppSettings.historyEnabled.value,
+        onReset = { AppSettings.setHistoryEnabled(true) }
+    ) }
     item {
         SwitchRow(
             "okuma geçmişini tut", "açtığın başlıklar profildeki geçmişte listelenir; yalnızca bu cihazda durur",
@@ -575,17 +612,17 @@ private fun LazyListScope.content() {
             onClick = ReadingHistory::clear
         )
     }
-    item { TextButton(onClick = {
-        AppSettings.blockedWords.value.forEach(AppSettings::removeBlockedWord)
-        AppSettings.setHistoryEnabled(true)
-    }) { Text("içerik ayarlarını varsayılana getir") } }
 }
 
 // ---------------------------------------------------------------------------------------------
 // indirme ve arşiv
 
 private fun LazyListScope.data(navController: NavController) {
-    item { SectionTitle("çevrimdışı okuma") }
+    item { SectionTitle(
+        "çevrimdışı okuma",
+        changed = !AppSettings.prefetchNextPage.value,
+        onReset = { AppSettings.setPrefetchNextPage(true) }
+    ) }
     item {
         val topics by OfflineStore.topics
         val downloading = OfflineStore.progress.values.count { !it.finished }
@@ -605,7 +642,6 @@ private fun LazyListScope.data(navController: NavController) {
             AppSettings.prefetchNextPage.value, true, segmentedShape(1, 2), AppSettings::setPrefetchNextPage
         )
     }
-    item { TextButton(onClick = { AppSettings.setPrefetchNextPage(true) }) { Text("çevrimdışı okuma ayarlarını varsayılana getir") } }
     item { Hint("bir başlığı indirmek için başlıktaki ⋮ menüsünden \"çevrimdışı kaydet\"i seç") }
 
     item { SectionTitle("entry yedeği") }
@@ -768,13 +804,33 @@ private fun connectedShapes(index: Int, count: Int) = when (index) {
 }
 
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 8.dp, top = 20.dp, bottom = 8.dp)
-    )
+private fun SectionTitle(text: String, changed: Boolean = false, onReset: (() -> Unit)? = null) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+        AnimatedVisibility(
+            visible = changed && onReset != null,
+            enter = fadeIn(tween(180)) + expandHorizontally(tween(220), expandFrom = Alignment.End),
+            exit = fadeOut(tween(120)) + shrinkHorizontally(tween(180), shrinkTowards = Alignment.End)
+        ) {
+            onReset?.let { reset ->
+                Text(
+                    "varsayılana dön",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.clickable(role = Role.Button, onClick = reset).padding(horizontal = 8.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable
