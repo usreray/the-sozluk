@@ -117,6 +117,9 @@ object AppSettings {
     private val _rememberOpenTabs = mutableStateOf(true)
     val rememberOpenTabs: State<Boolean> = _rememberOpenTabs
 
+    private val _openTabsTwoColumn = mutableStateOf(false)
+    val openTabsTwoColumn: State<Boolean> = _openTabsTwoColumn
+
     fun setReadingFont(font: ReadingFont) {
         _readingFont.value = font
         prefs.edit().putInt("readingFont", font.ordinal).apply()
@@ -142,6 +145,11 @@ object AppSettings {
         prefs.edit().putBoolean("rememberOpenTabs", enabled).apply()
     }
 
+    fun setOpenTabsTwoColumn(enabled: Boolean) {
+        _openTabsTwoColumn.value = enabled
+        prefs.edit().putBoolean("openTabsTwoColumn", enabled).apply()
+    }
+
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         _readingFont.value = ReadingFont.entries.getOrElse(prefs.getInt("readingFont", 0)) { ReadingFont.Default }
@@ -149,6 +157,7 @@ object AppSettings {
         _entryPadding.floatValue = prefs.getFloat("entryPadding", 20f)
         _historyEnabled.value = prefs.getBoolean("historyEnabled", true)
         _rememberOpenTabs.value = prefs.getBoolean("rememberOpenTabs", true)
+        _openTabsTwoColumn.value = prefs.getBoolean("openTabsTwoColumn", false)
         _blockedWords.value = prefs.getStringSet("blockedWords", emptySet()).orEmpty().toSet()
         _hiddenTabs.value = prefs.getStringSet("hiddenTabs", DEFAULT_HIDDEN_TABS).orEmpty().toSet()
         _showEntryNumbers.value = prefs.getBoolean("showEntryNumbers", false)

@@ -213,21 +213,6 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
                 onSelect = { destination ->
                     if (destination.route == currentRoute) {
                         TabReselect.reselect(destination.route)
-                    } else if (destination.route == Screen.Home.route) {
-                        val origin = TopicTabs.consumeSearchOrigin()
-                        if (origin != null) {
-                            TopicTabs.requestOverview(origin.id)
-                            navController.navigate(Screen.TopicDetail.createRoute(origin.title, origin.url, origin.page)) {
-                                popUpTo(Screen.Home.route) { inclusive = false }
-                                launchSingleTop = true
-                            }
-                        } else {
-                            navController.navigate(destination.route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        }
                     } else {
                         navController.navigate(destination.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }

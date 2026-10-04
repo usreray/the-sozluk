@@ -274,12 +274,6 @@ fun TopicDetailScreen(
         }
     }
     val currentTabId = "${displayTitle.trim().lowercase()}\u0000$url"
-    LaunchedEffect(TopicTabs.requestedOverviewId.value, currentTabId) {
-        if (TopicTabs.requestedOverviewId.value == currentTabId) {
-            TopicTabs.consumeOverviewRequest(currentTabId)
-            showTabsOverview = true
-        }
-    }
     val tabPreview = topic?.entries?.firstOrNull { it.page == visiblePage }?.content
         ?: topic?.entries?.firstOrNull()?.content.orEmpty()
     LaunchedEffect(displayTitle, url, visiblePage, tabPreview, onClose) {
@@ -622,11 +616,6 @@ fun TopicDetailScreen(
             TopicTabsOverview(
                 tabs = TopicTabs.items.toList(),
                 onDismiss = { showTabsOverview = false },
-                onNewTopic = {
-                    showTabsOverview = false
-                    TopicTabs.prepareNewTopicSearch(currentTabId)
-                    navController.navigate(Screen.Search.route)
-                },
                 onSelect = { tab ->
                     showTabsOverview = false
                     if (tab.id != currentTabId) {

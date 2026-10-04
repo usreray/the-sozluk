@@ -3,7 +3,6 @@ package com.thesozluk.app.ui.navigation
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -11,12 +10,9 @@ data class TopicTab(val id: String, val title: String, val url: String, val page
 
 object TopicTabs {
     val items = mutableStateListOf<TopicTab>()
-    val requestedOverviewId = mutableStateOf<String?>(null)
     private lateinit var prefs: SharedPreferences
     private var initialized = false
     private var persistenceEnabled = true
-    private var searchOriginId: String? = null
-    val hasSearchOrigin: Boolean get() = searchOriginId != null
 
     fun init(context: Context, enabled: Boolean) {
         if (initialized) return
@@ -63,26 +59,7 @@ object TopicTabs {
         val index = items.indexOfFirst { it.id == id }
         if (index < 0) return
         items.removeAt(index)
-        if (searchOriginId == id) searchOriginId = null
         persist()
-    }
-
-    fun prepareNewTopicSearch(originId: String) {
-        searchOriginId = originId
-    }
-
-    fun consumeSearchOrigin(): TopicTab? {
-        val id = searchOriginId
-        searchOriginId = null
-        return items.firstOrNull { it.id == id }
-    }
-
-    fun requestOverview(id: String) {
-        requestedOverviewId.value = id
-    }
-
-    fun consumeOverviewRequest(id: String) {
-        if (requestedOverviewId.value == id) requestedOverviewId.value = null
     }
 
     fun updatePreview(id: String, preview: String) {

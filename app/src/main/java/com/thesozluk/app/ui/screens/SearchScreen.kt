@@ -50,7 +50,6 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.thesozluk.app.model.Topic
@@ -59,7 +58,6 @@ import com.thesozluk.app.ui.components.MessageState
 import com.thesozluk.app.ui.components.TopicRow
 import com.thesozluk.app.ui.components.segmentedShape
 import com.thesozluk.app.ui.navigation.Screen
-import com.thesozluk.app.ui.navigation.TopicTabs
 import com.thesozluk.app.viewmodel.EksiViewModelFactory
 import com.thesozluk.app.viewmodel.SearchViewModel
 import com.thesozluk.app.viewmodel.ChannelsViewModel
@@ -87,14 +85,6 @@ fun SearchScreen(
     val authors by viewModel.authors
     val isLoading by viewModel.isLoadingSuggestions
     val searchBarState = rememberSearchBarState()
-    BackHandler(
-        enabled = searchBarState.currentValue == SearchBarValue.Collapsed && TopicTabs.hasSearchOrigin
-    ) {
-        TopicTabs.consumeSearchOrigin()?.let { origin ->
-            TopicTabs.requestOverview(origin.id)
-        }
-        navController.popBackStack()
-    }
     // Detailed search sheet, opened with the words typed so far
     var advancedFor by remember { mutableStateOf<String?>(null) }
     advancedFor?.let { initial ->
