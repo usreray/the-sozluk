@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -78,6 +79,8 @@ fun FloatingTopBar(
     leading: (@Composable () -> Unit)? = null,
     /** Makes the title card tappable, e.g. to open the profile of a conversation */
     onTitleClick: (() -> Unit)? = null,
+    /** Balances the title when the trailing action group is wider than the back button. */
+    titleOffset: Dp = 0.dp,
     actions: (@Composable RowScope.() -> Unit)? = null
 ) {
     val showTitle = title != null || subtitle != null || leading != null
@@ -101,7 +104,7 @@ fun FloatingTopBar(
             }
             // The title card sits centered in the space between back and actions, as wide as
             // its text: short titles stay balanced instead of hugging the back button
-            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.weight(1f).offset(x = titleOffset), contentAlignment = Alignment.Center) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showTitle,
                     enter = fadeIn() + scaleIn(initialScale = 0.9f),

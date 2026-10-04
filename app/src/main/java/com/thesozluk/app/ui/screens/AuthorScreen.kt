@@ -363,6 +363,7 @@ fun AuthorScreen(
             // The nick in the bar takes the page back to its top
             onTitleClick = { scope.launch { listState.animateScrollToItem(0) } },
             visible = !AppSettings.hideBarsOnScroll.value || listState.isScrollingUp(),
+            titleOffset = if (profile?.relations?.isNotEmpty() == true) 24.dp else 0.dp,
             modifier = Modifier.align(Alignment.TopCenter)
         ) {
             IconButton(onClick = {

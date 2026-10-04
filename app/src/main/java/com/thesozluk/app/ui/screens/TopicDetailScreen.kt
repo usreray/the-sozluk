@@ -211,6 +211,9 @@ fun TopicDetailScreen(
     val loaded = topic?.entriesLoaded == true
     val canWrite = isLoggedIn && topic?.entryForm?.textFieldName != null
     val canComment = isLoggedIn && topic?.commentForm?.textFieldName != null
+    LaunchedEffect(topic?.entries) {
+        topic?.entries.orEmpty().filter { it.commentCount > 0 }.forEach(viewModel::showComments)
+    }
     LaunchedEffect(openComposer, loaded, canWrite) {
         if (openComposer && loaded && canWrite && !autoOpenedComposer) {
             autoOpenedComposer = true
@@ -271,6 +274,12 @@ fun TopicDetailScreen(
         }
     }
     val currentTabId = "${displayTitle.trim().lowercase()}\u0000$url"
+    LaunchedEffect(TopicTabs.requestedOverviewId.value, currentTabId) {
+        if (TopicTabs.requestedOverviewId.value == currentTabId) {
+            TopicTabs.consumeOverviewRequest(currentTabId)
+            showTabsOverview = true
+        }
+    }
     val tabPreview = topic?.entries?.firstOrNull { it.page == visiblePage }?.content
         ?: topic?.entries?.firstOrNull()?.content.orEmpty()
     LaunchedEffect(displayTitle, url, visiblePage, tabPreview, onClose) {
@@ -341,7 +350,6 @@ fun TopicDetailScreen(
             val state = viewModel.comments(entry.entryId)
             CommentsUi(state.isOpen, state.isLoading, state.comments, state.error)
         },
-        onToggleComments = viewModel::toggleComments,
         onVoteComment = { entry, comment, rate -> requireLogin { viewModel.voteComment(entry.entryId, comment, rate) } },
         onWriteComment = if (canComment) ({ entry -> commentTarget = entry }) else null,
         onAuthorInTopic = { entry -> viewModel.applyFilter(TopicFilter.Author(entry.author)) },
@@ -577,7 +585,11 @@ fun TopicDetailScreen(
             actions = if (phase != TopicPhase.Content) null else ({
                 if (onClose == null) {
                     IconButton(onClick = { showTabsOverview = true }) {
-                        Icon(Icons.Rounded.Layers, contentDescription = "açık sekmeler")
+                        Icon(
+                            Icons.Rounded.Layers,
+                            contentDescription = "açık sekmeler",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
                 // "takip et": new entries then show up in the olay list
@@ -610,6 +622,11 @@ fun TopicDetailScreen(
             TopicTabsOverview(
                 tabs = TopicTabs.items.toList(),
                 onDismiss = { showTabsOverview = false },
+                onNewTopic = {
+                    showTabsOverview = false
+                    TopicTabs.prepareNewTopicSearch(currentTabId)
+                    navController.navigate(Screen.Search.route)
+                },
                 onSelect = { tab ->
                     showTabsOverview = false
                     if (tab.id != currentTabId) {
@@ -620,13 +637,6 @@ fun TopicDetailScreen(
                 },
                 onClose = { tab ->
                     TopicTabs.close(tab.id)
-                    if (tab.id == currentTabId) {
-                        val next = TopicTabs.items.lastOrNull()
-                        if (next == null) navController.popBackStack()
-                        else navController.navigate(Screen.TopicDetail.createRoute(next.title, next.url, next.page)) {
-                            popUpTo(Screen.Home.route) { inclusive = false }
-                        }
-                    }
                 }
             )
         }

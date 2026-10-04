@@ -18,6 +18,8 @@ class SearchViewModel(private val repository: EksiRepository) : ViewModel() {
 
     private val _suggestions = mutableStateOf<List<String>>(emptyList())
     val suggestions: State<List<String>> = _suggestions
+    private val _authors = mutableStateOf<List<String>>(emptyList())
+    val authors: State<List<String>> = _authors
 
     private val _isLoadingSuggestions = mutableStateOf(false)
     val isLoadingSuggestions: State<Boolean> = _isLoadingSuggestions
@@ -28,6 +30,7 @@ class SearchViewModel(private val repository: EksiRepository) : ViewModel() {
         suggestionJob?.cancel()
         if (query.trim().length < 2) {
             _suggestions.value = emptyList()
+            _authors.value = emptyList()
             _isLoadingSuggestions.value = false
             return
         }
@@ -35,11 +38,14 @@ class SearchViewModel(private val repository: EksiRepository) : ViewModel() {
             delay(300) // debounce while typing
             _isLoadingSuggestions.value = true
             try {
-                _suggestions.value = repository.getSearchSuggestions(query)
+                val (titles, authors) = repository.getSearchSuggestions(query)
+                _suggestions.value = titles
+                _authors.value = authors
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _suggestions.value = emptyList()
+                _authors.value = emptyList()
             } finally {
                 _isLoadingSuggestions.value = false
             }

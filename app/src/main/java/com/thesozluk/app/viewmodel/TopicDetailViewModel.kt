@@ -46,7 +46,8 @@ data class CommentsState(
     val comments: List<Comment> = emptyList(),
     val isLoading: Boolean = false,
     val isOpen: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val hasLoaded: Boolean = false
 )
 
 /**
@@ -414,15 +415,12 @@ viewModelScope.launch {
 
     fun comments(entryId: String): CommentsState = _comments[entryId] ?: CommentsState()
 
-    /** Opens or closes an entry's comments, loading them the first time. */
-    fun toggleComments(entry: Entry) {
+    /** Automatically opens comments for entries that have them. */
+    fun showComments(entry: Entry) {
+        if (entry.commentCount <= 0) return
         val state = comments(entry.entryId)
-        if (state.isOpen) {
-            _comments[entry.entryId] = state.copy(isOpen = false)
-            return
-        }
-        _comments[entry.entryId] = state.copy(isOpen = true)
-        if (state.comments.isEmpty()) loadComments(entry.entryId)
+        if (!state.isOpen) _comments[entry.entryId] = state.copy(isOpen = true)
+        if (!state.hasLoaded && !state.isLoading) loadComments(entry.entryId)
     }
 
     private fun loadComments(entryId: String) {
@@ -430,7 +428,7 @@ viewModelScope.launch {
         viewModelScope.launch {
             try {
                 val list = repository.getComments(entryId)
-                _comments[entryId] = comments(entryId).copy(comments = list, isLoading = false)
+                _comments[entryId] = comments(entryId).copy(comments = list, isLoading = false, hasLoaded = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

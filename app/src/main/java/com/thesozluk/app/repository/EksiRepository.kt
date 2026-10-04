@@ -27,7 +27,7 @@ class EksiRepository(
         return updateSavedStatus(topic)
     }
 
-    suspend fun getSearchSuggestions(query: String): List<String> {
+    suspend fun getSearchSuggestions(query: String): Pair<List<String>, List<String>> {
         return EksiNetworkDataSource.fetchSuggestions(query)
     }
 

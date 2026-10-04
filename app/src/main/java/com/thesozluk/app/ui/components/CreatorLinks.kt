@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -35,9 +38,13 @@ fun CreatorLinks(modifier: Modifier = Modifier) {
             onClick = { uriHandler.openUri("https://buymeacoffee.com/usreray") },
             contentPadding = PaddingValues(horizontal = 12.dp)
         ) {
+            val coffeeLogo = painterResource(R.drawable.buymeacoffee_logo)
             Image(
-                painter = painterResource(R.drawable.buymeacoffee_logo),
+                painter = coffeeLogo,
                 contentDescription = null,
+                colorFilter = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) {
+                    ColorFilter.tint(MaterialTheme.colorScheme.onSurface)
+                } else null,
                 modifier = Modifier.height(22.dp).width(15.dp)
             )
             Spacer(Modifier.width(8.dp))

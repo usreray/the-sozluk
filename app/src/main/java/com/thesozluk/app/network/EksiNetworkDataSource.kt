@@ -158,7 +158,7 @@ object EksiNetworkDataSource {
         return@withContext HtmlParser.parseTopicDetail(document, query, page, searchUrl, BASE_URL)
     }
     
-    suspend fun fetchSuggestions(query: String): List<String> = withContext(Dispatchers.IO) {
+    suspend fun fetchSuggestions(query: String): Pair<List<String>, List<String>> = withContext(Dispatchers.IO) {
         val url = "$BASE_URL/autocomplete/query?q=${URLEncoder.encode(query.trim(), "UTF-8")}"
         val response = Jsoup.connect(url)
             .userAgent(USER_AGENT)
@@ -168,11 +168,14 @@ object EksiNetworkDataSource {
             .header("Accept", "application/json")
             .header("X-Requested-With", "XMLHttpRequest")
             .execute()
-        if (response.statusCode() != 200) return@withContext emptyList()
+        if (response.statusCode() != 200) return@withContext emptyList<String>() to emptyList<String>()
 
         // Response: {"Titles":[...],"Query":"...","Nicks":[...]}
-        val titles = JSONObject(response.body()).optJSONArray("Titles") ?: return@withContext emptyList()
-        List(titles.length()) { titles.getString(it) }
+        val json = JSONObject(response.body())
+        val titles = json.optJSONArray("Titles")
+        val nicks = json.optJSONArray("Nicks")
+        (0 until (titles?.length() ?: 0)).mapNotNull { titles?.optString(it)?.takeIf { value -> value.isNotBlank() } } to
+            (0 until (nicks?.length() ?: 0)).mapNotNull { nicks?.optString(it)?.takeIf { value -> value.isNotBlank() } }
     }
 
     /** True if these cookies belong to a logged-in user (the login-only page doesn't redirect). */

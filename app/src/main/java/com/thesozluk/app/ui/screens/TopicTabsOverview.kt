@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Layers
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -54,7 +55,8 @@ fun TopicTabsOverview(
     tabs: List<TopicTab>,
     onDismiss: () -> Unit,
     onSelect: (TopicTab) -> Unit,
-    onClose: (TopicTab) -> Unit
+    onClose: (TopicTab) -> Unit,
+    onNewTopic: () -> Unit
 ) {
     Dialog(
         onDismissRequest = onDismiss,
@@ -67,8 +69,15 @@ fun TopicTabsOverview(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(Icons.Rounded.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(Icons.Rounded.Layers, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("açık başlıklar", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onNewTopic) {
+                        Icon(
+                            Icons.Rounded.Search,
+                            contentDescription = "başlık ara",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = "kapat") }
                 }
                 if (tabs.isEmpty()) {
@@ -131,8 +140,9 @@ fun TopicTabsOverview(
                                         Text(
                                             tab.title,
                                             style = MaterialTheme.typography.titleMedium,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
+                                            minLines = 2,
+                                            maxLines = Int.MAX_VALUE,
+                                            overflow = TextOverflow.Clip,
                                             modifier = Modifier.weight(1f)
                                         )
                                         IconButton(onClick = { onClose(tab) }, modifier = Modifier.padding(start = 2.dp)) {
@@ -150,7 +160,7 @@ fun TopicTabsOverview(
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 6,
                                             overflow = TextOverflow.Ellipsis,
-                                            minLines = 4,
+                                            minLines = 6,
                                             modifier = Modifier.fillMaxWidth().padding(12.dp)
                                         )
                                     }

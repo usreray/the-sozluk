@@ -50,6 +50,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.thesozluk.app.model.Topic
@@ -58,6 +59,7 @@ import com.thesozluk.app.ui.components.MessageState
 import com.thesozluk.app.ui.components.TopicRow
 import com.thesozluk.app.ui.components.segmentedShape
 import com.thesozluk.app.ui.navigation.Screen
+import com.thesozluk.app.ui.navigation.TopicTabs
 import com.thesozluk.app.viewmodel.EksiViewModelFactory
 import com.thesozluk.app.viewmodel.SearchViewModel
 import com.thesozluk.app.viewmodel.ChannelsViewModel
@@ -82,8 +84,17 @@ fun SearchScreen(
 ) {
     val channels by channelsViewModel.channels
     val suggestions by viewModel.suggestions
+    val authors by viewModel.authors
     val isLoading by viewModel.isLoadingSuggestions
     val searchBarState = rememberSearchBarState()
+    BackHandler(
+        enabled = searchBarState.currentValue == SearchBarValue.Collapsed && TopicTabs.hasSearchOrigin
+    ) {
+        TopicTabs.consumeSearchOrigin()?.let { origin ->
+            TopicTabs.requestOverview(origin.id)
+        }
+        navController.popBackStack()
+    }
     // Detailed search sheet, opened with the words typed so far
     var advancedFor by remember { mutableStateOf<String?>(null) }
     advancedFor?.let { initial ->
@@ -207,7 +218,14 @@ fun SearchScreen(
                 SuggestionList(
                     query = query,
                     suggestions = suggestions,
+                    authors = authors,
                     onSelect = ::open,
+                    onSelectAuthor = { nick ->
+                        scope.launch { searchBarState.animateToCollapsed() }
+                        val author = nick.removePrefix("@")
+                        SearchHistory.add("@$author")
+                        navController.navigate(Screen.Author.createRoute(author))
+                    },
                     onAdvanced = { text ->
                         scope.launch { searchBarState.animateToCollapsed() }
                         advancedFor = text
@@ -267,7 +285,9 @@ private fun SearchHistoryList(history: List<String>, onSelect: (String) -> Unit,
 private fun SuggestionList(
     query: String,
     suggestions: List<String>,
+    authors: List<String>,
     onSelect: (String) -> Unit,
+    onSelectAuthor: (String) -> Unit,
     onSearchTitles: (String) -> Unit,
     onAdvanced: (String) -> Unit
 ) {
@@ -310,6 +330,31 @@ private fun SuggestionList(
                     )
                 }
             )
+        }
+        if (authors.isNotEmpty()) {
+            item(key = "authorsHeader") {
+                Text(
+                    "yazarlar",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp)
+                )
+            }
+            itemsIndexed(authors, key = { index, nick -> "author:$index:$nick" }) { index, nick ->
+                Surface(
+                    onClick = { onSelectAuthor(nick) },
+                    shape = segmentedShape(index, authors.size),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.fillMaxWidth().animateItem()
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)
+                    ) {
+                        Text("@${nick.removePrefix("@")}", style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
         }
     }
 }
