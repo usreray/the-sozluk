@@ -69,6 +69,7 @@ import androidx.navigation.NavController
 import com.thesozluk.app.network.EksiSession
 import com.thesozluk.app.ui.components.FloatingTopBar
 import com.thesozluk.app.ui.components.LargeTitle
+import com.thesozluk.app.ui.components.CreatorLinks
 import androidx.compose.runtime.derivedStateOf
 import com.thesozluk.app.ui.components.LocalBottomBarInset
 import com.thesozluk.app.ui.components.MessageState
@@ -164,6 +165,18 @@ fun ProfileScreen(
                                 Text(count, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
+                    }
+                }
+            }
+            item(key = "creator-links") {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.padding(top = 20.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("geliştirici", style = MaterialTheme.typography.titleMedium)
+                        CreatorLinks()
                     }
                 }
             }

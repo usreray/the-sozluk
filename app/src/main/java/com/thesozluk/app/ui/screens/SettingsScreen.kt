@@ -108,6 +108,7 @@ import com.thesozluk.app.settings.SeedColor
 import com.thesozluk.app.settings.ThemeMode
 import com.thesozluk.app.ui.components.FloatingTopBar
 import com.thesozluk.app.ui.components.LargeTitle
+import com.thesozluk.app.ui.components.CreatorLinks
 import com.thesozluk.app.ui.components.TextPromptDialog
 import com.thesozluk.app.ui.components.entryBodyStyle
 import com.thesozluk.app.ui.components.segmentedShape
@@ -838,6 +839,7 @@ private fun LazyListScope.about() {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("the sözlük", style = MaterialTheme.typography.headlineSmallEmphasized, color = MaterialTheme.colorScheme.primary)
                 Text("sürüm ${appVersion()}", style = MaterialTheme.typography.bodyMedium)
+                CreatorLinks()
                 Text(
                     "ekşi sözlük'ün resmi uygulaması değildir; içerik eksisozluk.com'dan okunur, hesabınla yapılan her işlem site üzerinden gider.",
                     style = MaterialTheme.typography.bodyMedium,
