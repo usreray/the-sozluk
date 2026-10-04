@@ -334,6 +334,14 @@ private fun LazyListScope.appearance() {
             }
         }
     }
+    item { TextButton(onClick = {
+        AppSettings.setThemeMode(ThemeMode.System)
+        AppSettings.setDynamicColor(true)
+        AppSettings.setPureBlack(false)
+        AppSettings.setSeed(SeedColor.Eksi)
+        AppSettings.setPalette(PaletteChoice.TonalSpot)
+        AppSettings.setContrast(ContrastChoice.Standard)
+    }) { Text("görünümü varsayılana getir") } }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -418,6 +426,13 @@ private fun LazyListScope.reading() {
     item {
         SwitchRow("ekranı açık tut", "başlık okurken ekran kararmasın", AppSettings.keepScreenOn.value, true, segmentedShape(2, 3), AppSettings::setKeepScreenOn)
     }
+    item { TextButton(onClick = {
+        AppSettings.setTextScale(1f); AppSettings.setReadingFont(ReadingFont.Default)
+        AppSettings.setLineSpacing(1f); AppSettings.setEntryPadding(20f)
+        AppSettings.setShowEntryNumbers(false); AppSettings.setShowAvatars(true)
+        AppSettings.setMarqueeTitles(true); AppSettings.setHideBarsOnScroll(true)
+        AppSettings.setKeepScreenOn(false)
+    }) { Text("okuma ayarlarını varsayılana getir") } }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -448,6 +463,7 @@ private fun LazyListScope.homeLists() {
             }
         }
     }
+    item { TextButton(onClick = AppSettings::resetHomeTabs) { Text("liste ayarlarını varsayılana getir") } }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -485,6 +501,14 @@ private fun LazyListScope.notifications() {
         TextButton(onClick = {
             context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
         }) { Text("sistem bildirim ayarlarını aç") }
+    }
+    item {
+        val context = LocalContext.current
+        TextButton(onClick = {
+            val enabled = EksiSession.isLoggedIn.value && Notifier.canNotify(context)
+            AppSettings.setNotifications(enabled)
+            Notifier.schedule(context, enabled)
+        }) { Text("bildirim ayarlarını varsayılana getir") }
     }
 }
 
@@ -551,6 +575,10 @@ private fun LazyListScope.content() {
             onClick = ReadingHistory::clear
         )
     }
+    item { TextButton(onClick = {
+        AppSettings.blockedWords.value.forEach(AppSettings::removeBlockedWord)
+        AppSettings.setHistoryEnabled(true)
+    }) { Text("içerik ayarlarını varsayılana getir") } }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -577,6 +605,7 @@ private fun LazyListScope.data(navController: NavController) {
             AppSettings.prefetchNextPage.value, true, segmentedShape(1, 2), AppSettings::setPrefetchNextPage
         )
     }
+    item { TextButton(onClick = { AppSettings.setPrefetchNextPage(true) }) { Text("çevrimdışı okuma ayarlarını varsayılana getir") } }
     item { Hint("bir başlığı indirmek için başlıktaki ⋮ menüsünden \"çevrimdışı kaydet\"i seç") }
 
     item { SectionTitle("entry yedeği") }

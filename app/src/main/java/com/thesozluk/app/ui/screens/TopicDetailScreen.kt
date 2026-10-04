@@ -306,7 +306,18 @@ fun TopicDetailScreen(
         onToggleFavorite = { entry -> requireLogin { viewModel.toggleEntryFavorite(entry) } },
         onVote = { entry, rate -> requireLogin { viewModel.vote(entry, rate) } },
         onAuthor = { nick -> navController.navigate(Screen.Author.createRoute(nick)) },
-        onLink = { link -> navController.openEksiLink(link, uriHandler) },
+        onLink = { link ->
+            if (link is com.thesozluk.app.ui.components.EksiLink.Image) {
+                val images = topic?.entries.orEmpty().flatMap { entry ->
+                    org.jsoup.Jsoup.parseBodyFragment(entry.contentHtml).select("a[href]").mapNotNull { anchor ->
+                        val href = anchor.attr("href")
+                        (com.thesozluk.app.ui.components.eksiLinkFor(href, anchor.text()) as? com.thesozluk.app.ui.components.EksiLink.Image)?.ref
+                    }
+                }.distinct()
+                com.thesozluk.app.ui.screens.ImageGallery.refs = (images + link.ref).distinct()
+            }
+            navController.openEksiLink(link, uriHandler)
+        },
         onDelete = if (topic?.deleteForm != null) viewModel::deleteEntry else null,
         comments = { entry ->
             val state = viewModel.comments(entry.entryId)

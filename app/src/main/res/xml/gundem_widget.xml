@@ -3,6 +3,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_gundem_description"
     android:initialLayout="@layout/glance_default_loading_layout"
+    android:previewImage="@drawable/gundem_widget_preview"
     android:minWidth="180dp"
     android:minHeight="180dp"
     android:minResizeWidth="140dp"

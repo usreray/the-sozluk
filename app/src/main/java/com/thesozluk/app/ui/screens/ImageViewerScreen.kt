@@ -1,6 +1,8 @@
 package com.thesozluk.app.ui.screens
 
 import android.content.Intent
+import android.content.ContentValues
+import android.provider.MediaStore
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -14,6 +16,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.BrokenImage
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -47,6 +50,10 @@ import com.thesozluk.app.ui.components.MessageState
 import kotlinx.coroutines.CancellationException
 import kotlin.math.abs
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.URL
+import android.widget.Toast
 
 /**
  * Images opened from a list (an author's uploads): the viewer pages through them left and right.
@@ -132,6 +139,40 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
                     context.startActivity(Intent.createChooser(send, null))
                 }) {
                     Icon(Icons.Rounded.Share, contentDescription = "paylaş")
+                }
+                IconButton(onClick = {
+                    scope.launch {
+                        val saved = runCatching {
+                            withContext(Dispatchers.IO) {
+                                val resolver = context.contentResolver
+                                val connection = URL(current).openConnection()
+                                val mime = connection.contentType?.substringBefore(';') ?: "image/jpeg"
+                                val extension = mime.substringAfter('/', "jpeg").takeIf { it.matches(Regex("[a-zA-Z0-9]+")) } ?: "jpg"
+                                val name = "the-sozluk-${System.currentTimeMillis()}.$extension"
+                                val values = ContentValues().apply {
+                                    put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                                    put(MediaStore.Images.Media.MIME_TYPE, mime)
+                                    put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/the sözlük")
+                                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                                }
+                                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                                    ?: error("görsel kaydedilemedi")
+                                try {
+                                    connection.getInputStream().use { input ->
+                                        resolver.openOutputStream(uri)?.use { output -> input.copyTo(output) } ?: error("dosya açılamadı")
+                                    }
+                                    resolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null)
+                                    true
+                                } catch (e: Exception) {
+                                    resolver.delete(uri, null, null)
+                                    throw e
+                                }
+                            }
+                        }.isSuccess
+                        Toast.makeText(context, if (saved) "görsel indirildi" else "görsel indirilemedi", Toast.LENGTH_SHORT).show()
+                    }
+                }) {
+                    Icon(Icons.Rounded.Download, contentDescription = "cihaza indir")
                 }
                 IconButton(onClick = { runCatching { uriHandler.openUri(current) } }) {
                     Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = "tarayıcıda aç")

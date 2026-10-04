@@ -137,7 +137,7 @@ fun AdvancedSearchSheet(initialKeywords: String, onSearch: (path: String, name: 
                         add("SearchForm.SortOrder=${order.value}")
                     }
                     val name = keywords.trim().ifBlank { author.trim().let { if (it.isNotBlank()) "@$it" else "arama" } }
-                    onSearch("basliklar/ara?" + params.joinToString("&"), "“$name”")
+                    onSearch("basliklar/ara?" + params.joinToString("&"), name)
                 },
                 enabled = keywords.isNotBlank() || author.isNotBlank(),
                 modifier = Modifier.align(Alignment.End),

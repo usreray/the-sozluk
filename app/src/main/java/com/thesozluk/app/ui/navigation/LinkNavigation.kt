@@ -13,8 +13,9 @@ fun NavController.openEksiLink(link: EksiLink, uriHandler: UriHandler) {
         is EksiLink.Author -> navigate(Screen.Author.createRoute(link.nick))
         is EksiLink.External -> runCatching { uriHandler.openUri(link.url) }
         is EksiLink.Image -> {
-            // A single image from an entry: no gallery to page through
-            com.thesozluk.app.ui.screens.ImageGallery.refs = emptyList()
+            if (link.ref !in com.thesozluk.app.ui.screens.ImageGallery.refs) {
+                com.thesozluk.app.ui.screens.ImageGallery.refs = emptyList()
+            }
             navigate(Screen.Image.createRoute(link.ref))
         }
     }

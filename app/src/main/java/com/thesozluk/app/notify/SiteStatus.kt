@@ -62,7 +62,7 @@ class SiteStatusWorker(context: Context, params: WorkerParameters) : CoroutineWo
         }
         val previous = runCatching { JSONObject(prefs.getString(KEY_EVENT_COUNTS, "{}").orEmpty()) }.getOrDefault(JSONObject())
         var current = JSONObject()
-        val fresh = mutableListOf<Pair<String, Int>>()
+        val fresh = mutableListOf<Triple<String, Int, String>>()
         if (status.hasEvents) {
             val topics = try {
                 EksiNetworkDataSource.fetchTopics(1, "basliklar/olay")
@@ -77,17 +77,18 @@ class SiteStatusWorker(context: Context, params: WorkerParameters) : CoroutineWo
                     val count = maxOf(topic.commentCount, 1)
                     current.put(topic.title, count)
                     val before = previous.optInt(topic.title, 0)
-                    if (count > before) fresh += topic.title to (count - before)
+                    if (count > before) fresh += Triple(topic.title, count - before, topic.url)
                 }
             }
         }
         if (fresh.isNotEmpty()) {
-            val (title, text) = if (fresh.size == 1) {
-                fresh[0].first to "${fresh[0].second} yeni entry"
-            } else {
-                "${fresh.size} takip ettiğin başlıkta yeni entry" to fresh.joinToString(", ") { it.first }
+            fresh.forEach { (title, count, path) ->
+                val id = 1000 + (path.hashCode() and 0x3fffffff)
+                Notifier.show(
+                    applicationContext, id, title, "$count yeni entry", Notifier.OPEN_EVENTS,
+                    topicPath = path
+                )
             }
-            Notifier.show(applicationContext, ID_EVENTS, title, text, Notifier.OPEN_EVENTS)
         }
         prefs.edit()
             .putBoolean(KEY_MESSAGES, status.hasMessages)
@@ -107,6 +108,7 @@ class SiteStatusWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
 object Notifier {
     const val EXTRA_OPEN = "open"
+    const val EXTRA_TOPIC_PATH = "topic_path"
     const val OPEN_MESSAGES = "messages"
     const val OPEN_EVENTS = "olay"
     private const val CHANNEL = "site_status"
@@ -130,12 +132,13 @@ object Notifier {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
 
-    fun show(context: Context, id: Int, title: String, text: String, open: String) {
+    fun show(context: Context, id: Int, title: String, text: String, open: String, topicPath: String? = null) {
         if (!canNotify(context)) return
         createChannel(context)
         val intent = Intent(context, MainActivity::class.java)
             .putExtra(EXTRA_OPEN, open)
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        topicPath?.let { intent.putExtra(EXTRA_TOPIC_PATH, it).putExtra("topic_title", title) }
         val pending = PendingIntent.getActivity(
             context, id, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

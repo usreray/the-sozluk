@@ -116,6 +116,10 @@ class MainActivity : ComponentActivity() {
     /** What an intent asks for: a notification / shortcut target, or "link:<url>" for an ekşi link. */
     private fun openTarget(intent: Intent?): String? {
         intent ?: return null
+        intent.getStringExtra(Notifier.EXTRA_TOPIC_PATH)?.let { path ->
+            val title = intent.getStringExtra("topic_title").orEmpty()
+            return "topic:${android.net.Uri.encode(title)}|${android.net.Uri.encode(path)}"
+        }
         intent.getStringExtra(Notifier.EXTRA_OPEN)?.let { return it }
         val data = intent.data
         if (intent.action == Intent.ACTION_VIEW && data != null && data.scheme?.startsWith("http") == true) return "link:$data"
@@ -136,6 +140,11 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
     LaunchedEffect(pendingOpen.value) {
         val target = pendingOpen.value
         when {
+            target?.startsWith("topic:") == true -> {
+                val (title, path) = target.removePrefix("topic:").split('|', limit = 2)
+                    .let { android.net.Uri.decode(it[0]) to android.net.Uri.decode(it.getOrElse(1) { "" }) }
+                navController.navigate(Screen.TopicDetail.createRoute(title, path))
+            }
             // A link from another app: open it like a link inside an entry
             target?.startsWith("link:") == true -> {
                 val url = target.removePrefix("link:")

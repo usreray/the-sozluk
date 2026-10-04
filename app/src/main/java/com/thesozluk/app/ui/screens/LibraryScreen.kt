@@ -1,7 +1,6 @@
 package com.thesozluk.app.ui.screens
 
 import android.app.Application
-import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -66,6 +65,9 @@ import com.thesozluk.app.ui.navigation.openEksiLink
 import com.thesozluk.app.viewmodel.EksiViewModelFactory
 import com.thesozluk.app.viewmodel.ProfileViewModel
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** The device-side collections reachable from the profile and settings. */
 enum class LibraryKind(val title: String) {
@@ -75,6 +77,9 @@ enum class LibraryKind(val title: String) {
     Drafts("taslaklar"),
     SavedTopics("kaydedilen başlıklar")
 }
+
+private fun formatLibraryDate(timestamp: Long): String =
+    SimpleDateFormat("dd MMM yyyy · HH:mm", Locale.forLanguageTag("tr")).format(Date(timestamp))
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -118,7 +123,7 @@ fun LibraryScreen(
                     itemsIndexed(history, key = { _, it -> "h:${it.title}" }) { index, item ->
                         Row2(
                             title = item.title,
-                            subtitle = DateUtils.getRelativeTimeSpanString(item.openedAt).toString(),
+                            subtitle = formatLibraryDate(item.openedAt),
                             shape = segmentedShape(index, history.size),
                             onClick = { navController.navigate(Screen.TopicDetail.createRoute(item.title, item.url)) },
                             trailing = {
@@ -166,7 +171,7 @@ fun LibraryScreen(
                                 title = topic.title,
                                 subtitle = if (updating) "güncelleniyor · ${p!!.done} / ${p.total} sayfa"
                                 else "${topic.pages} sayfa · ${topic.entries} entry · ${formatBytes(topic.bytes)} · " +
-                                    DateUtils.getRelativeTimeSpanString(topic.savedAt),
+                                    formatLibraryDate(topic.savedAt),
                                 shape = segmentedShape(running.size + i, count),
                                 progress = if (updating && p!!.total > 0) p.done.toFloat() / p.total else null,
                                 onClick = { navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.path)) },

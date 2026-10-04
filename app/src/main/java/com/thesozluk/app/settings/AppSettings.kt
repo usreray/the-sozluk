@@ -185,6 +185,11 @@ object AppSettings {
         prefs.edit().putStringSet("hiddenTabs", _hiddenTabs.value).apply()
     }
 
+    fun resetHomeTabs() {
+        _hiddenTabs.value = DEFAULT_HIDDEN_TABS
+        prefs.edit().putStringSet("hiddenTabs", DEFAULT_HIDDEN_TABS).apply()
+    }
+
     fun setShowEntryNumbers(enabled: Boolean) {
         _showEntryNumbers.value = enabled
         prefs.edit().putBoolean("showEntryNumbers", enabled).apply()

@@ -17,6 +17,7 @@ import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.TextNode
 import org.jsoup.select.Elements
+import kotlin.math.roundToInt
 
 object HtmlParser {
 
@@ -62,9 +63,8 @@ object HtmlParser {
 
                         if (title.isNotEmpty() && href.isNotEmpty()) {
                                 // Don't fetch entries yet, just store the topic info
-                                val commentCountText =
-                                        topicElement.parent()?.select("small")?.text()?.trim() ?: ""
-                                val commentCount = commentCountText.toIntOrNull() ?: 0
+                                val commentCountText = topicElement.parent()?.select("small")?.text().orEmpty()
+                                val commentCount = parseTopicCount(commentCountText)
                                 topics.add(
                                         Topic(
                                                 title = title,
@@ -78,6 +78,22 @@ object HtmlParser {
                 }
 
                 return topics
+        }
+
+        /** Parses both exact counts and the site's shortened forms such as "1,1 bin" / "1.1b". */
+        private fun parseTopicCount(text: String): Int {
+                val match = Regex("""^\s*([\d., ]+)\s*(bin|b|k)?\s*$""", RegexOption.IGNORE_CASE).matchEntire(text)
+                        ?: return 0
+                val raw = match.groupValues[1].replace(" ", "")
+                val unit = match.groupValues[2]
+                if (unit.isNotEmpty()) {
+                        val value = raw.replace(',', '.').toDoubleOrNull() ?: return 0
+                        return (value * 1_000).roundToInt()
+                }
+                if (Regex("""^\d{1,3}(?:[.,]\d{3})+$""").matches(raw)) {
+                        return raw.filter(Char::isDigit).toIntOrNull() ?: 0
+                }
+                return raw.filter(Char::isDigit).toIntOrNull() ?: 0
         }
 
         fun parseTopicDetail(

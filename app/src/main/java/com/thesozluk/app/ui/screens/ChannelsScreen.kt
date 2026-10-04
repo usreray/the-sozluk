@@ -60,6 +60,7 @@ fun ChannelsScreen(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
 ) {
+    val isSearchResults = path.startsWith("basliklar/ara")
     val channels by viewModel.channels
     val channelsError by viewModel.channelsError
     val selected by viewModel.selected
@@ -81,13 +82,13 @@ fun ChannelsScreen(
         topBar = {
             Column {
                 FloatingTopBar(
-                    title = "#${selected?.name ?: name}",
-                    subtitle = "kanal",
+                    title = if (isSearchResults) name else "#${selected?.name ?: name}",
+                    subtitle = if (isSearchResults) "arama sonuçları" else "kanal",
                     onBack = { navController.popBackStack() },
                     // The title takes the list back to its top
                     onTitleClick = { scope.launch { listState.animateScrollToItem(0) } }
                 )
-                LazyRow(
+                if (!isSearchResults) LazyRow(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -130,7 +131,7 @@ fun ChannelsScreen(
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            selected?.description?.takeIf { it.isNotBlank() }?.let { description ->
+                            selected?.description?.takeIf { !isSearchResults && it.isNotBlank() }?.let { description ->
                                 item(key = "description") {
                                     Text(
                                         description,

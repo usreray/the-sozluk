@@ -21,10 +21,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
@@ -95,6 +97,13 @@ fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): 
                     node is Element && node.tagName() == "br" -> {
                         append('\n')
                         lineStart = true
+                    }
+                    node is Element && node.tagName() == "sup" -> {
+                        append('(')
+                        withStyle(SpanStyle(baselineShift = BaselineShift.Superscript, fontSize = 0.72.em)) {
+                            appendNodes(node.childNodes())
+                        }
+                        append(')')
                     }
                     node is Element && node.tagName() == "a" -> {
                         // Hidden bkz is a "*" whose target sits in data-query

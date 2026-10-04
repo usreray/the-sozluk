@@ -107,7 +107,12 @@ object EksiNetworkDataSource {
         val document = response.parse()
         val topics = HtmlParser.parseTopics(document)
         // An empty follow list is fine ("hiç başlık yok"); a page without any list is not
-        if (topics.isEmpty() && document.selectFirst(".topic-list, #content-body, #partial-index") == null) {
+        val emptyPersonalList = when (category) {
+            "basliklar/son" -> document.selectFirst("#left-index h2")?.text().equals("son entryler", ignoreCase = true)
+            "basliklar/kenar" -> document.selectFirst("#left-index h2")?.text().equals("kenar", ignoreCase = true)
+            else -> false
+        }
+        if (topics.isEmpty() && !emptyPersonalList && document.selectFirst(".topic-list, #content-body, #partial-index") == null) {
             throw IOException("başlık listesi okunamadı")
         }
 
