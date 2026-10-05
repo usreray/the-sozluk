@@ -19,7 +19,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -50,8 +54,7 @@ private val markups = listOf(
     Markup("(bkz: )", "(bkz: ", ")"),
     Markup("hede", "`", "`"),
     Markup("* gizli bkz", "`:", "`"),
-    Markup("spoiler", "--- `spoiler` ---\n", "\n--- `spoiler` ---"),
-    Markup("link", "[http:// ", "]")
+    Markup("spoiler", "--- `spoiler` ---\n", "\n--- `spoiler` ---")
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -71,6 +74,18 @@ fun EntryComposerSheet(
 ) {
     var value by remember { mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length))) }
     var previewing by remember { mutableStateOf(false) }
+    var addingLink by remember { mutableStateOf(false) }
+    if (addingLink) {
+        LinkDialog(
+            initialText = value.text.substring(value.selection.min, value.selection.max),
+            onConfirm = { url, label ->
+                addingLink = false
+                value = value.replaceSelection(if (label.isBlank()) "[$url]" else "[$url $label]")
+                onTextChange?.invoke(value.text)
+            },
+            onDismiss = { addingLink = false }
+        )
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -126,6 +141,7 @@ fun EntryComposerSheet(
                             enabled = !isSubmitting
                         )
                     }
+                    SuggestionChip(onClick = { addingLink = true }, label = { Text("link") }, enabled = !isSubmitting)
                 }
             }
             Row(
@@ -179,6 +195,51 @@ private fun EntryPreview(raw: String) {
             }
         }
     }
+}
+
+/** Asks for the address and the text shown for it, as the site's link button does. */
+@Composable
+private fun LinkDialog(initialText: String, onConfirm: (url: String, label: String) -> Unit, onDismiss: () -> Unit) {
+    var url by remember { mutableStateOf("") }
+    var label by remember { mutableStateOf(initialText) }
+    // The site only links http(s) addresses; a bare "site.com" gets https:// in front
+    val address = url.trim().let { if (it.isEmpty() || it.contains("://")) it else "https://$it" }
+    val valid = address.startsWith("http://") || address.startsWith("https://")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("link ekle") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it.trim() },
+                    label = { Text("hangi adrese gidilecek?") },
+                    placeholder = { Text("https://") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = label,
+                    onValueChange = { label = it.replace("\n", " ").replace("]", "") },
+                    label = { Text("verilecek ad (isteğe bağlı)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(address, label.trim()) }, enabled = valid) { Text("ekle") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("vazgeç") } }
+    )
+}
+
+/** Puts [insert] in place of the selection, the cursor right after it. */
+private fun TextFieldValue.replaceSelection(insert: String): TextFieldValue {
+    val start = selection.min
+    val newText = text.substring(0, start) + insert + text.substring(selection.max)
+    return copy(text = newText, selection = TextRange(start + insert.length))
 }
 
 private fun TextFieldValue.wrapSelection(markup: Markup): TextFieldValue {
