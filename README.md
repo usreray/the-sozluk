@@ -40,32 +40,58 @@
 
 ## Özellikler
 
-### Okuma
-- Gündem, bugün, debe, olay, takip ve kanal listeleri
-- Kaydırdıkça otomatik yüklenen sayfalar ve istenen sayfaya doğrudan geçiş
+### Akış ve listeler
+- Gündem, bugün, debe, olay, takip, son, kenar, çaylaklar ve kanal listeleri; hangi listelerin görüneceği ayarlanabilir
+- Belirli kelimeleri içeren başlıkları listelerden gizleyen kelime engelleme
+- Daha önce okunan başlıkların listelerde soluk gösterilmesi
+- Gündem widget'ı
+
+### Başlık okuma
+- Kaydırdıkça otomatik yüklenen sayfalar, sonraki sayfanın önceden yüklenmesi ve istenen sayfaya doğrudan geçiş
 - Başlık filtreleri: şükela, bugünün şükelaları, görseller, linkler, ekşi şeyler, benimkiler, takip ettiklerim ve çaylaklar
-- Başlık içinde arama ve yazar, tarih aralığı ile sıralama seçenekleri sunan ayrıntılı arama
-- Bkz ve bağlantıların uygulama içinde açılması, spoiler gizleme ve tam ekran görsel görüntüleyici
-- Yazı tipi, satır aralığı ve kenar boşluğu ayarları
+- Başlık içinde kelime ve yazar araması, yazarın o başlıktaki entry'lerini listeleme
+- Başlığı takip etme, başlığı açan yazarın bilgileri ve tarihte bugün için yıl seçimi
+- Sekmeler: Birden fazla başlığı tarayıcıdaki gibi sekmelerde açık tutma, sekmeler arasında geçiş; açık sekmelerin uygulama kapansa da hatırlanması ve isteğe bağlı iki sütunlu sekme görünümü
+- Spoiler gizleme: Spoiler içeren bölümler kapalı gelir, dokunulduğunda açılır
+- Bkz, gizli bkz ve bağlantıların uygulama içinde açılması; istenirse bağlantı adreslerinin metnin yanında gösterilmesi
+- Yakınlaştırılabilir tam ekran görsel görüntüleyici ve görsel indirme
+- Entry sıra numaraları, yazar profil resimleri, uzun başlıkların kayan yazıyla gösterilmesi
+- Okurken ekranın kararmasını engelleme, kaydırırken üst ve alt çubukların gizlenmesi
+
+### Entry ve yazar
+- Entry'leri kopyalama, bağlantısını paylaşma ve görsel olarak paylaşma
+- Favorileyenler ve çaylak favorileyenler listesi, yorumlar
+- Yazar profili: karma, biyografi, rozetler, takipçi ve takip edilen listeleri, paylaştığı görseller
+- Yazarın son entry'leri, en beğenilenleri ve en çok favorilenenleri
 
 ### Yazma ve hesap
 - ekşi sözlük hesabıyla giriş; favori, oy, takip ve yorum işlemleri
-- Entry yazma ve düzenleme; bkz, hede, gizli bkz, spoiler ve bağlantı araçları ile önizleme
-- Galeriden görsel ekleme (konum gibi fotoğraf bilgileri kaldırılarak)
-- Cihazda saklanan taslaklar ve mesajlaşma
+- Entry yazma; bkz, hede, gizli bkz, spoiler ve bağlantı araçları ile yazarken önizleme
+- Galeriden görsel ekleme; konum gibi fotoğraf bilgileri yüklemeden önce kaldırılır, yüklenen görsel önizlenebilir ve silinebilir
+- Kendi entry'lerini düzenleme ve silme
+- Cihazda otomatik saklanan taslaklar
+- Mesajlaşma ve yeni olay ile mesajlar için isteğe bağlı bildirimler
+
+### Arama
+- Başlık, #entry ve @yazar araması; yazarken öneriler ve son aramalar
+- Ayrıntılı arama: kelimeler, yazar, tarih aralığı, yalnızca şükela entry'ler ve sıralama seçenekleri
 
 ### Arşiv
 - Başlıkları indirerek internet bağlantısı olmadan okuma
-- Entry kaydetme ve not ekleme, okuma geçmişi
-- Kullanıcının kendi entry'lerini Markdown dosyası olarak yedekleme
-- Entry'leri görsel olarak paylaşma
+- Entry kaydetme ve kaydedilen entry'lere not ekleme
+- Okuma geçmişi ve kaydedilen başlıklar
+- Kendi entry'lerini Markdown dosyası olarak yedekleme
+- Ayarları, arama ve okuma geçmişini, kaydedilen entry'leri ve taslakları tek dosyaya yedekleme ve geri yükleme
 
-### Görünüm ve sistem
-- Material 3 tasarımı; açık, koyu ve tam siyah tema seçenekleri; renk paletleri ve duvar kâğıdı renkleri
-- Gündem widget'ı ve uygulama simgesi kısayolları (ara, mesajlar, olay)
-- eksisozluk.com bağlantılarının uygulamada açılması
+### Görünüm
+- Material 3 Expressive tasarım dili
+- Açık, koyu ve tam siyah (OLED) tema; hazır renk paletleri, duvar kâğıdından renk alma ve kontrast ayarı
+- Yazı tipi, yazı boyutu, satır aralığı ve kenar boşluğu ayarları
+
+### Sistem
+- eksisozluk.com bağlantılarının doğrudan uygulamada açılması
+- Uygulama simgesi kısayolları: ara, mesajlar, olay
 - Tablet ve yatay ekranlarda iki bölmeli görünüm
-- Yeni olay ve mesajlar için isteğe bağlı bildirimler
 
 ## Kurulum
 
