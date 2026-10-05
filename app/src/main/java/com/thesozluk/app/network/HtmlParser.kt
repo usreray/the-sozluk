@@ -220,35 +220,25 @@ object HtmlParser {
                                 svg.classNames().any { it.contains("subscriber-badge", ignoreCase = true) }
                 }
 
-        /** Entry markup may use a compact subscriber SVG next to the author instead of the profile's large variant. */
-        private fun authorStatusAreaHasAdFreeBadge(entry: Element): Boolean {
-                val author = entry.selectFirst(".entry-author, a[href^=/biri/]") ?: return false
-                val area = author.parent() ?: author
-                return hasSubscriberBadge(area)
-        }
+        /** The author link and its direct container: where the site puts status badges next to the nick. */
+        private fun authorArea(entry: Element): Element? =
+                entry.selectFirst(".entry-author, a[href^=/biri/]")?.let { it.parent() ?: it }
 
+        /** Entry markup may use a compact subscriber SVG next to the author instead of the profile's large variant. */
+        private fun authorStatusAreaHasAdFreeBadge(entry: Element): Boolean =
+                authorArea(entry)?.let(::hasSubscriberBadge) == true
+
+        private val badgeAttributes = listOf("title", "aria-label", "alt", "data-badge", "data-title", "data-name")
+        private val entryBadgeAttributes = listOf("data-author-status", "data-author-badge", "data-verified", "data-ad-free")
+
+        /** Looks for a badge term in the author area's ids, classes and labels, plus the entry's own badge data. */
         private fun authorBadgePresent(entry: Element, vararg terms: String): Boolean {
-                val author = entry.selectFirst(".entry-author, a[href^=/biri/]") ?: return false
-                val area = author.parent() ?: author
-                val markers = (author.parents() + entry + area + author + author.select("*") + area.select("*")).flatMap { node ->
-                        buildList {
-                                add(node.id())
-                                addAll(node.classNames())
-                                add(node.attr("title"))
-                                add(node.attr("aria-label"))
-                                add(node.attr("data-badge"))
-                                add(node.attr("data-title"))
-                                add(node.attr("data-name"))
-                                add(node.attr("data-author-status"))
-                                add(node.attr("data-author-badge"))
-                                add(node.attr("data-verified"))
-                                add(node.attr("data-ad-free"))
-                                add(node.attr("src"))
-                                add(node.attr("alt"))
-                                add(node.attributes().toString())
-                        }
-                }.filter { it.isNotBlank() }
-                return markers.any { marker -> terms.any { marker.contains(it, ignoreCase = true) } }
+                fun matches(value: String) = value.isNotBlank() && terms.any { value.contains(it, ignoreCase = true) }
+                if (entryBadgeAttributes.any { matches(entry.attr(it)) }) return true
+                val area = authorArea(entry) ?: return false
+                return area.select("*").any { node ->
+                        matches(node.id()) || node.classNames().any(::matches) || badgeAttributes.any { matches(node.attr(it)) }
+                }
         }
 
         private fun eksiSeylerUrl(li: Element): String? {

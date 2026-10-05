@@ -9,6 +9,7 @@ import com.thesozluk.app.model.MessageBox
 import com.thesozluk.app.model.ThreadDetail
 import com.thesozluk.app.model.Topic
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -525,21 +526,27 @@ object EksiNetworkDataSource {
     }
 
     suspend fun fetchProfile(nick: String): AuthorProfile = withContext(Dispatchers.IO) {
+        // The badge page loads alongside the profile; its failure leaves the profile intact
+        val badgesAsync = async {
+            try {
+                val badgeResponse = applyCommonConnectionSettings(session.newRequest("$BASE_URL/rozetler/${encodePath(nick)}"))
+                    .execute()
+                if (badgeResponse.statusCode() == 200) HtmlParser.parseAllBadges(badgeResponse.parse()) else emptyList()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/biri/${encodePath(nick)}"))
             .execute()
-        if (response.statusCode() == 404) throw IOException("böyle bir yazar yok")
-        if (response.statusCode() != 200) throw IOException("profil yüklenemedi (HTTP ${response.statusCode()})")
-        val profile = HtmlParser.parseProfile(response.parse(), nick)
-        val badges = try {
-            val badgeResponse = applyCommonConnectionSettings(session.newRequest("$BASE_URL/rozetler/${encodePath(nick)}"))
-                .execute()
-            if (badgeResponse.statusCode() == 200) HtmlParser.parseAllBadges(badgeResponse.parse()) else emptyList()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (_: Exception) {
-            emptyList()
+        if (response.statusCode() != 200) {
+            badgesAsync.cancel()
+            if (response.statusCode() == 404) throw IOException("böyle bir yazar yok")
+            throw IOException("profil yüklenemedi (HTTP ${response.statusCode()})")
         }
-        profile.copy(allBadges = badges.ifEmpty { profile.badges })
+        val profile = HtmlParser.parseProfile(response.parse(), nick)
+        profile.copy(allBadges = badgesAsync.await().ifEmpty { profile.badges })
     }
 
     /** The author's uploaded images ("görselleri"); the site sends them all at once. */

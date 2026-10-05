@@ -278,11 +278,11 @@ fun TopicDetailScreen(
             } ?: firstPage
         }
     }
-    val currentTabId = "${displayTitle.trim().lowercase()}\u0000$url"
+    val currentTabId = TopicTabs.tabId(title, url)
     val tabPreview = topic?.entries?.firstOrNull { it.page == visiblePage }?.content
         ?: topic?.entries?.firstOrNull()?.content.orEmpty()
-    LaunchedEffect(displayTitle, url, visiblePage, tabPreview, onClose) {
-        if (onClose == null && displayTitle.isNotBlank()) TopicTabs.remember(displayTitle, url, visiblePage, tabPreview)
+    LaunchedEffect(currentTabId, displayTitle, visiblePage, tabPreview, onClose) {
+        if (onClose == null && displayTitle.isNotBlank()) TopicTabs.remember(currentTabId, displayTitle, url, visiblePage, tabPreview)
     }
     // Endless scroll both ways, like long threads in forum apps: the next page comes in near the
     // end, the previous one whenever the top of the loaded pages is close. The previous page is

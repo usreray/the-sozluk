@@ -148,8 +148,13 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
     val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-            runCatching {
-                GlanceAppWidgetManager(context).setWidgetPreviews(GundemWidgetReceiver::class)
+            // The system rate-limits preview updates, so publish once per app version
+            val prefs = context.getSharedPreferences("widget_preview", android.content.Context.MODE_PRIVATE)
+            val version = context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode
+            if (prefs.getLong("publishedVersion", -1L) != version) {
+                runCatching {
+                    GlanceAppWidgetManager(context).setWidgetPreviews(GundemWidgetReceiver::class)
+                }.onSuccess { prefs.edit().putLong("publishedVersion", version).apply() }
             }
         }
     }

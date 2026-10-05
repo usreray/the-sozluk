@@ -33,7 +33,7 @@ object TopicTabs {
             val url = json.optString("url")
             val page = json.optInt("page", 1).coerceAtLeast(1)
             val preview = json.optString("preview")
-            val id = "${title.lowercase()}\u0000$url"
+            val id = json.optString("id").ifBlank { tabId(title, url) }
             restored.add(TopicTab(id, title, url, page, preview))
         }
         val order = if (prefs.getBoolean("tabsNewestFirst", false)) restored else restored.reversed()
@@ -45,9 +45,16 @@ object TopicTabs {
         persist()
     }
 
-    fun remember(title: String, url: String, page: Int, preview: String): TopicTab {
-        val id = "${title.trim().lowercase()}\u0000$url"
-        val index = items.indexOfFirst { it.id == id }
+    /** Built from the route the topic was opened with, so it stays the same once the site's title loads. */
+    fun tabId(routeTitle: String, url: String) = "${routeTitle.trim().lowercase()}\u0000$url"
+
+    fun remember(id: String, title: String, url: String, page: Int, preview: String): TopicTab {
+        // The same topic opened another way (e.g. from an /entry/ link) takes over its older tab
+        val duplicate = items.indexOfFirst { it.id != id && it.title.trim().equals(title.trim(), ignoreCase = true) }
+        var index = items.indexOfFirst { it.id == id }
+        if (duplicate >= 0) {
+            if (index < 0) index = duplicate else items.removeAt(duplicate).also { if (duplicate < index) index-- }
+        }
         val savedPreview = preview.ifBlank { items.getOrNull(index)?.preview.orEmpty() }
         val tab = TopicTab(id, title, url, page.coerceAtLeast(1), savedPreview)
         if (index < 0) items.add(0, tab) else items[index] = tab
@@ -78,6 +85,7 @@ object TopicTabs {
         val saved = JSONArray()
         items.forEach { tab ->
             saved.put(JSONObject()
+                .put("id", tab.id)
                 .put("title", tab.title)
                 .put("url", tab.url)
                 .put("page", tab.page)
