@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.TopicFilterSheet
 import com.thesozluk.app.ui.components.ShareEntryImageSheet
 import com.thesozluk.app.settings.ReadingHistory
 import com.thesozluk.app.data.offline.OfflineStore
@@ -184,6 +185,7 @@ fun TopicDetailScreen(
     // Entry being edited, with its "düzelt" form
     var editTarget by remember { mutableStateOf<Pair<Entry, com.thesozluk.app.model.FormSpec>?>(null) }
     var prompt by remember { mutableStateOf<TopicMenuAction?>(null) }
+    var showFilters by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var showCreator by remember { mutableStateOf(false) }
     val filter by viewModel.filter
@@ -384,9 +386,22 @@ fun TopicDetailScreen(
             onDismiss = { if (!isSubmitting) editTarget = null }
         )
     }
+    if (showFilters) {
+        TopicFilterSheet(
+            current = filter,
+            isLoggedIn = isLoggedIn,
+            nick = EksiSession.nick.value,
+            onPick = { picked ->
+                showFilters = false
+                viewModel.applyFilter(picked)
+            },
+            onDismiss = { showFilters = false }
+        )
+    }
     val onMenu: (TopicMenuAction) -> Unit = { action ->
         when (action) {
             is TopicMenuAction.Filter -> viewModel.applyFilter(action.filter)
+            TopicMenuAction.Filters -> showFilters = true
             TopicMenuAction.Creator -> showCreator = true
             TopicMenuAction.Share -> topic?.let { shareTopic(context, it) }
             TopicMenuAction.SaveOffline -> topic?.let {

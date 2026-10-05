@@ -36,6 +36,13 @@ sealed class TopicFilter(val label: String, val query: String?) {
     data object Buddies : TopicFilter("takip ettiklerim", "a=buddyrecent")
     data object Rookies : TopicFilter("çaylaklar", "a=caylaklar")
     data object Images : TopicFilter("görseller", "a=gorseller")
+    /** Entries with a web link in them (the site searches the topic for "http://") */
+    data object Links : TopicFilter("linkler", "a=find&keywords=" + URLEncoder.encode("http://", "UTF-8"))
+    /** Entries picked for an ekşi şeyler compilation */
+    data object Seyler : TopicFilter("ekşi şeyler", "a=eksiseyler")
+    /** The logged-in user's own entries in the topic */
+    data class Mine(val nick: String) :
+        TopicFilter("benimkiler", "a=search&author=" + URLEncoder.encode(nick, "UTF-8"))
     data class Find(val keywords: String) :
         TopicFilter("\"$keywords\"", "a=find&keywords=" + URLEncoder.encode(keywords, "UTF-8"))
     data class Author(val nick: String) :
@@ -123,6 +130,7 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
             day != null -> TopicFilter.Day(day)
             params.any { it == "a=popular" } -> TopicFilter.Popular
             params.any { it == "a=caylaklar" } -> TopicFilter.Rookies
+            params.any { it == "a=eksiseyler" } -> TopicFilter.Seyler
             params.any { it == "a=tracked" } -> TopicFilter.Linked(params.joinToString("&"), "yeni entry'ler")
             params.any { it.startsWith("searchform.", ignoreCase = true) } ->
                 TopicFilter.Linked(params.joinToString("&"), "arama sonucu")

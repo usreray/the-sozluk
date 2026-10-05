@@ -1,5 +1,16 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.WaterDrop
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Downloading
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CloudSync
@@ -57,6 +68,8 @@ import kotlinx.coroutines.CancellationException
 /** What the topic's "⋮" menu can ask for. */
 sealed interface TopicMenuAction {
     data class Filter(val filter: TopicFilter) : TopicMenuAction
+    /** Opens the filter sheet */
+    data object Filters : TopicMenuAction
     data object SearchInTopic : TopicMenuAction
     data object SearchAuthor : TopicMenuAction
     data object Creator : TopicMenuAction
@@ -86,22 +99,13 @@ fun TopicMenu(
         }
         DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
-                FilterItem("tümü", Icons.Rounded.ViewAgenda, current == TopicFilter.All) { pick(TopicMenuAction.Filter(TopicFilter.All)) }
-                FilterItem("şükela", Icons.Rounded.Star, current == TopicFilter.Nice) { pick(TopicMenuAction.Filter(TopicFilter.Nice)) }
-                FilterItem("bugünün şükelaları", Icons.Rounded.Today, current == TopicFilter.DailyNice) {
-                    pick(TopicMenuAction.Filter(TopicFilter.DailyNice))
-                }
-                FilterItem("görseller", Icons.Rounded.Image, current == TopicFilter.Images) { pick(TopicMenuAction.Filter(TopicFilter.Images)) }
-                if (isLoggedIn) {
-                    FilterItem("takip ettiklerim", Icons.Rounded.Group, current == TopicFilter.Buddies) {
-                        pick(TopicMenuAction.Filter(TopicFilter.Buddies))
-                    }
-                    FilterItem("çaylaklar", Icons.Rounded.Spa, current == TopicFilter.Rookies) {
-                        pick(TopicMenuAction.Filter(TopicFilter.Rookies))
-                    }
-                }
-                // One menu surface; a divider separates filters from search and topic info
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                // All filters live in their own sheet (as chips) so the menu stays short; the
+                // row shows the one that is on
+                FilterItem(
+                    if (current == TopicFilter.All) "filtrele" else "filtrele: ${current.label}",
+                    Icons.Rounded.FilterList,
+                    current != TopicFilter.All && current !is TopicFilter.Find && current !is TopicFilter.Author
+                ) { pick(TopicMenuAction.Filters) }
                 FilterItem("başlıkta ara", Icons.Rounded.Search, current is TopicFilter.Find) { pick(TopicMenuAction.SearchInTopic) }
                 FilterItem("yazara göre", Icons.Rounded.AlternateEmail, current is TopicFilter.Author) { pick(TopicMenuAction.SearchAuthor) }
                 FilterItem("başlığı açan", Icons.Rounded.Info, false) { pick(TopicMenuAction.Creator) }
@@ -225,4 +229,53 @@ fun TopicCreatorDialog(
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("tamam") } }
     )
+}
+
+/**
+ * The site's "filtrele" options as chips: şükela, today's şükela, images, links, ekşi şeyler and,
+ * when logged in, the user's own entries, followed authors' and rookies' entries.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun TopicFilterSheet(current: TopicFilter, isLoggedIn: Boolean, nick: String?, onPick: (TopicFilter) -> Unit, onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val filters = buildList {
+        add(TopicFilter.All to Icons.Rounded.ViewAgenda)
+        add(TopicFilter.Nice to Icons.Rounded.Star)
+        add(TopicFilter.DailyNice to Icons.Rounded.Today)
+        add(TopicFilter.Images to Icons.Rounded.Image)
+        add(TopicFilter.Links to Icons.Rounded.Link)
+        add(TopicFilter.Seyler to Icons.Rounded.WaterDrop)
+        if (isLoggedIn) {
+            nick?.let { add(TopicFilter.Mine(it) to Icons.Rounded.Person) }
+            add(TopicFilter.Buddies to Icons.Rounded.Group)
+            add(TopicFilter.Rookies to Icons.Rounded.Spa)
+        }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("filtrele", style = MaterialTheme.typography.titleLargeEmphasized)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                filters.forEach { (filter, icon) ->
+                    val selected = current == filter
+                    FilterChip(
+                        selected = selected,
+                        onClick = { onPick(filter) },
+                        label = { Text(filter.label) },
+                        leadingIcon = { Icon(if (selected) Icons.Rounded.Check else icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                }
+            }
+            if (!isLoggedIn) {
+                Text(
+                    "benimkiler, takip ettiklerim ve çaylaklar giriş yapınca görünür",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
 }
