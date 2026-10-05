@@ -282,7 +282,7 @@ private fun SavedEntryCard(item: SavedEntry, navController: NavController, modif
     val entry = item.entry
     val uriHandler = LocalUriHandler.current
     var editingNote by remember { mutableStateOf(false) }
-    val text = rememberEntryText(entry.contentHtml, entry.content) { link -> navController.openEksiLink(link, uriHandler) }
+    val text = rememberEntryText(entry.contentHtml, entry.content, onLink = { link -> navController.openEksiLink(link, uriHandler) })
     Surface(
         onClick = { navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle.ifBlank { "#${entry.entryId}" }, "/entry/${entry.entryId}")) },
         shape = RoundedCornerShape(28.dp),
