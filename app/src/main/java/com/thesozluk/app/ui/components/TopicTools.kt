@@ -244,9 +244,10 @@ fun TopicFilterSheet(current: TopicFilter, isLoggedIn: Boolean, nick: String?, o
         add(TopicFilter.Nice to Icons.Rounded.Star)
         add(TopicFilter.DailyNice to Icons.Rounded.Today)
         add(TopicFilter.Images to Icons.Rounded.Image)
-        add(TopicFilter.Links to Icons.Rounded.Link)
         add(TopicFilter.Seyler to Icons.Rounded.WaterDrop)
         if (isLoggedIn) {
+            // The site answers the link search only for members
+            add(TopicFilter.Links to Icons.Rounded.Link)
             nick?.let { add(TopicFilter.Mine(it) to Icons.Rounded.Person) }
             add(TopicFilter.Buddies to Icons.Rounded.Group)
             add(TopicFilter.Rookies to Icons.Rounded.Spa)
@@ -271,7 +272,7 @@ fun TopicFilterSheet(current: TopicFilter, isLoggedIn: Boolean, nick: String?, o
             }
             if (!isLoggedIn) {
                 Text(
-                    "benimkiler, takip ettiklerim ve çaylaklar giriş yapınca görünür",
+                    "linkler, benimkiler, takip ettiklerim ve çaylaklar giriş yapınca görünür",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
