@@ -22,7 +22,14 @@ enum class SeedColor(val label: String, val argb: Long) {
     Earth("toprak", 0xFF8D6E63),
     Cherry("kiraz", 0xFFD32F2F),
     Lime("limon", 0xFFC0CA33),
-    Graphite("grafit", 0xFF607D8B)
+    Graphite("grafit", 0xFF607D8B),
+    // Saved by position, so the app's own color goes last; it is the default and listed first
+    Brand("the sözlük", 0xFF4B3FA8);
+
+    companion object {
+        /** The palette list in settings: the app's own color first */
+        val ordered: List<SeedColor> get() = listOf(Brand) + entries.filter { it != Brand }
+    }
 }
 
 /** How a palette is derived from its seed (material-kolor's PaletteStyle). */
@@ -58,14 +65,14 @@ object AppSettings {
     private val _themeMode = mutableStateOf(ThemeMode.System)
     val themeMode: State<ThemeMode> = _themeMode
 
-    private val _dynamicColor = mutableStateOf(true)
+    private val _dynamicColor = mutableStateOf(false)
     val dynamicColor: State<Boolean> = _dynamicColor
 
     /** Pure black surfaces in dark mode (saves battery on OLED screens) */
     private val _pureBlack = mutableStateOf(false)
     val pureBlack: State<Boolean> = _pureBlack
 
-    private val _seed = mutableStateOf(SeedColor.Eksi)
+    private val _seed = mutableStateOf(SeedColor.Brand)
     val seed: State<SeedColor> = _seed
 
     private val _palette = mutableStateOf(PaletteChoice.TonalSpot)
@@ -182,10 +189,11 @@ object AppSettings {
         _marqueeTitles.value = prefs.getBoolean("marqueeTitles", true)
         _hideBarsOnScroll.value = prefs.getBoolean("hideBarsOnScroll", true)
         _themeMode.value = ThemeMode.entries.getOrElse(prefs.getInt("themeMode", 0)) { ThemeMode.System }
-        _dynamicColor.value = prefs.getBoolean("dynamicColor", true)
+        // The logo's purple by default; wallpaper colors are a choice in settings
+        _dynamicColor.value = prefs.getBoolean("dynamicColor", false)
         _pureBlack.value = prefs.getBoolean("pureBlack", false)
         _textScale.floatValue = prefs.getFloat("textScale", 1f)
-        _seed.value = SeedColor.entries.getOrElse(prefs.getInt("seed", 0)) { SeedColor.Eksi }
+        _seed.value = SeedColor.entries.getOrElse(prefs.getInt("seed", SeedColor.Brand.ordinal)) { SeedColor.Brand }
         _palette.value = PaletteChoice.entries.getOrElse(prefs.getInt("palette", 0)) { PaletteChoice.TonalSpot }
         _contrast.value = ContrastChoice.entries.getOrElse(prefs.getInt("contrast", 0)) { ContrastChoice.Standard }
     }

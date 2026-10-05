@@ -8,7 +8,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.FilterList
 import androidx.compose.material.icons.rounded.Downloading
@@ -244,7 +243,7 @@ fun TopicFilterSheet(current: TopicFilter, isLoggedIn: Boolean, nick: String?, o
         add(TopicFilter.Nice to Icons.Rounded.Star)
         add(TopicFilter.DailyNice to Icons.Rounded.Today)
         add(TopicFilter.Images to Icons.Rounded.Image)
-        add(TopicFilter.Seyler to Icons.Rounded.WaterDrop)
+        add(TopicFilter.Seyler to FavoriteIcons.DropFilled)
         if (isLoggedIn) {
             // The site answers the link search only for members
             add(TopicFilter.Links to Icons.Rounded.Link)

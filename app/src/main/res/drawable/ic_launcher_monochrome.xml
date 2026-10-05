@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Two parentheses that draw a drop: (bkz: ) and the site's drop, in our own colors -->
+<!-- Themed icon: the same drop in one color (the launcher tints it) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Scaled into the adaptive icon's safe zone -->
     <group
         android:pivotX="54"
         android:pivotY="54"
@@ -20,7 +19,7 @@
         <path
             android:pathData="M58,22c10,16 20,28 20,42a22,22 0,0 1,-20 21"
             android:strokeWidth="8"
-            android:strokeColor="#F2B544"
+            android:strokeColor="#FFFFFF"
             android:strokeLineCap="round" />
     </group>
 </vector>

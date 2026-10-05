@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -121,7 +120,7 @@ private fun StepButton(label: String, modifier: Modifier, onClick: () -> Unit) {
 fun LoginRequiredDialog(onLogin: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        icon = { Icon(Icons.Rounded.WaterDrop, contentDescription = null) },
+        icon = { Icon(FavoriteIcons.DropFilled, contentDescription = null) },
         title = { Text("giriş yapın") },
         text = { Text("entry'leri favorilemek için ekşi sözlük hesabınızla giriş yapmanız gerekiyor.") },
         confirmButton = { TextButton(onClick = onLogin) { Text("giriş yap") } },

@@ -33,7 +33,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Delete
@@ -43,7 +42,6 @@ import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -255,7 +253,7 @@ fun EntryCard(
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Rounded.WaterDrop,
+                            imageVector = FavoriteIcons.DropFilled,
                             contentDescription = "ekşi şeyler'de aç",
                             tint = Color(0xFF2196F3),
                             modifier = Modifier.size(22.dp)
@@ -480,7 +478,7 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
     Row(verticalAlignment = Alignment.CenterVertically) {
         IconToggleButton(checked = isFavorited, onCheckedChange = { onToggle() }) {
             Icon(
-                imageVector = if (isFavorited) Icons.Rounded.WaterDrop else Icons.Outlined.WaterDrop,
+                imageVector = if (isFavorited) FavoriteIcons.DropFilled else FavoriteIcons.Drop,
                 contentDescription = if (isFavorited) "favoriden çıkar" else "favorile",
                 tint = if (isFavorited) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant,

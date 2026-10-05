@@ -301,10 +301,10 @@ private fun LazyListScope.appearance() {
     }
     item { SectionTitle(
         "renkler",
-        changed = !AppSettings.dynamicColor.value || AppSettings.seed.value != SeedColor.Eksi ||
+        changed = AppSettings.dynamicColor.value || AppSettings.seed.value != SeedColor.Brand ||
             AppSettings.palette.value != PaletteChoice.TonalSpot || AppSettings.contrast.value != ContrastChoice.Standard,
         onReset = {
-            AppSettings.setDynamicColor(true); AppSettings.setSeed(SeedColor.Eksi)
+            AppSettings.setDynamicColor(false); AppSettings.setSeed(SeedColor.Brand)
             AppSettings.setPalette(PaletteChoice.TonalSpot); AppSettings.setContrast(ContrastChoice.Standard)
         }
     ) }
@@ -321,7 +321,7 @@ private fun LazyListScope.appearance() {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    SeedColor.entries.forEach { seed ->
+                    SeedColor.ordered.forEach { seed ->
                         SeedSwatch(
                             seed = seed,
                             selected = !dynamicColor && seed == AppSettings.seed.value,

@@ -1,17 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Two parentheses that draw a drop: (bkz: ) and the site's drop, in our own colors -->
+<!-- Status bar icon: the parenthesis drop in one color (the system tints it) -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- Scaled into the adaptive icon's safe zone -->
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
     <group
-        android:pivotX="54"
-        android:pivotY="54"
-        android:scaleX="0.82"
-        android:scaleY="0.82"
-        android:translateY="-1.5">
+        android:translateX="-18"
+        android:translateY="-17.5">
         <path
             android:pathData="M50,22C40,38 30,50 30,64a22,22 0,0 0,20 21"
             android:strokeWidth="8"
@@ -20,7 +16,7 @@
         <path
             android:pathData="M58,22c10,16 20,28 20,42a22,22 0,0 1,-20 21"
             android:strokeWidth="8"
-            android:strokeColor="#F2B544"
+            android:strokeColor="#FFFFFF"
             android:strokeLineCap="round" />
     </group>
 </vector>

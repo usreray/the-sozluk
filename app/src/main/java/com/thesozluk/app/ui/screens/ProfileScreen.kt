@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.foundation.Image
+import com.thesozluk.app.ui.components.BrandIcons
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.AutoStories
 import com.thesozluk.app.data.offline.OfflineStore
@@ -32,7 +34,6 @@ import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Mail
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.WaterDrop
 import androidx.compose.material3.Button
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -213,13 +214,19 @@ private fun AccountCard(
                         modifier = Modifier.size(64.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = if (loggedIn) Icons.Rounded.WaterDrop else Icons.Rounded.Person,
-                                contentDescription = null,
-                                tint = if (loggedIn) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(30.dp)
-                            )
+                            if (loggedIn) {
+                                // The logo in one color from the theme, so it fits any palette
+                                val color = MaterialTheme.colorScheme.onPrimary
+                                val logo = remember(color) { BrandIcons.logo(color, color) }
+                                Image(logo, contentDescription = null, modifier = Modifier.size(34.dp))
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Rounded.Person,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
                         }
                     }
                     Column(modifier = Modifier.padding(start = 16.dp)) {
