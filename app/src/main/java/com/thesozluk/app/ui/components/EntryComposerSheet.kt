@@ -1,5 +1,12 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import androidx.compose.runtime.mutableStateListOf
+import com.thesozluk.app.model.UploadedImage
 import java.nio.ByteBuffer
 import java.io.IOException
 import java.io.ByteArrayOutputStream
@@ -89,13 +96,17 @@ fun EntryComposerSheet(
     onSaveToSite: ((String) -> Unit)? = null,
     isSavingDraft: Boolean = false,
     /** Uploads a picture (bytes, file name, type) and returns its link; null hides "görsel" */
-    onUploadImage: (suspend (ByteArray, String, String) -> String)? = null
+    onUploadImage: (suspend (ByteArray, String, String) -> UploadedImage)? = null,
+    /** Takes an uploaded picture down from the site; returns an error message, or null */
+    onDeleteImage: (suspend (String) -> String?)? = null
 ) {
     var value by remember { mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length))) }
     var previewing by remember { mutableStateOf(false) }
     var addingLink by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
     var uploadError by remember { mutableStateOf<String?>(null) }
+    // Pictures uploaded in this sheet, with the file picked so the preview needs no download
+    val uploaded = remember { mutableStateListOf<Pair<UploadedImage, Uri>>() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -106,7 +117,9 @@ fun EntryComposerSheet(
         scope.launch {
             try {
                 val (bytes, name, type) = readImageForUpload(context, uri)
-                val link = upload(bytes, name, type)
+                val image = upload(bytes, name, type)
+                val link = image.link
+                uploaded.add(image to uri)
                 // The same markup the site's uploader puts in the entry box, on its own line
                 val at = value.selection.min
                 val insert = (if (at > 0 && value.text[at - 1] != '\n') "\n" else "") + "[$link görsel]\n"
@@ -200,6 +213,30 @@ fun EntryComposerSheet(
                             },
                             enabled = !isSubmitting && !uploading
                         )
+                    }
+                }
+                // Pictures still in the text, each with a way to take it back out
+                val shown = uploaded.filter { (image, _) -> value.text.contains(image.link) }
+                if (shown.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        shown.forEach { (image, uri) ->
+                            UploadedThumb(
+                                uri = uri,
+                                enabled = !isSubmitting,
+                                onRemove = {
+                                    value = value.removeImage(image.link)
+                                    onTextChange?.invoke(value.text)
+                                    uploaded.removeAll { it.first == image }
+                                    val delete = onDeleteImage ?: return@UploadedThumb
+                                    scope.launch {
+                                        delete(image.key)?.let { uploadError = "görsel metinden çıktı ama sitede kaldı: $it" }
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
                 uploadError?.let {
@@ -311,6 +348,37 @@ private fun TextFieldValue.wrapSelection(markup: Markup): TextFieldValue {
     val newText = text.substring(0, start) + markup.before + selected + markup.after + text.substring(end)
     // Cursor lands inside the markup, ready to type the target
     val cursor = start + markup.before.length + selected.length
+    return copy(text = newText, selection = TextRange(cursor))
+}
+
+/** A picked picture's preview with "görseli sil" under it. */
+@Composable
+private fun UploadedThumb(uri: Uri, enabled: Boolean, onRemove: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        AsyncImage(
+            model = uri,
+            contentDescription = "yüklenen görsel",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(88.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+        )
+        TextButton(onClick = onRemove, enabled = enabled) {
+            Icon(Icons.Rounded.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+            Text("görseli sil", modifier = Modifier.padding(start = 4.dp), style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+/** Takes "[link görsel]" out of the text, with the line break the upload put after it. */
+private fun TextFieldValue.removeImage(link: String): TextFieldValue {
+    val markup = "[$link görsel]"
+    val start = text.indexOf(markup).takeIf { it >= 0 } ?: return this
+    var end = start + markup.length
+    if (end < text.length && text[end] == '\n') end++
+    val newText = text.removeRange(start, end)
+    val cursor = selection.min.let { if (it >= end) it - (end - start) else minOf(it, start) }
     return copy(text = newText, selection = TextRange(cursor))
 }
 

@@ -178,6 +178,7 @@ object HtmlParser {
                         deleteForm = findDeleteForm(document),
                         commentForm = document.selectFirst("form#comment-entry-form")?.let(::formSpec),
                         imageUploadForm = findImageUploadForm(document),
+                        imageDeleteUrl = document.selectFirst("input#delete-image")?.attr("value")?.ifBlank { null },
                         topicPath = heading?.selectFirst("a[href]")?.attr("href")?.substringBefore("?").orEmpty(),
                         topicId = heading?.attr("data-id").orEmpty(),
                         // The site toggles data-tracked (0/1) and posts to data-trackurl / data-untrackurl

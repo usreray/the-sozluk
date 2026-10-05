@@ -422,7 +422,13 @@ object EksiNetworkDataSource {
      * "file" next to the form's hidden fields) and returns the image's link, which the entry
      * carries as "[<link> görsel]".
      */
-    suspend fun uploadImage(form: FormSpec, bytes: ByteArray, fileName: String, mimeType: String, referrer: String): String =
+    suspend fun uploadImage(
+        form: FormSpec,
+        bytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        referrer: String
+    ): com.thesozluk.app.model.UploadedImage =
         withContext(Dispatchers.IO) {
             val action = if (form.action.startsWith("http")) form.action else BASE_URL + form.action
             val request = applyCommonConnectionSettings(session.newRequest(action))
@@ -445,8 +451,17 @@ object EksiNetworkDataSource {
             if (!json.optBoolean("Success")) {
                 throw IOException(json.optString("Message").ifBlank { "görsel yüklenemedi" })
             }
-            json.optString("Result").ifBlank { null } ?: throw IOException("görsel yüklenemedi")
+            val link = json.optString("Result").ifBlank { null } ?: throw IOException("görsel yüklenemedi")
+            com.thesozluk.app.model.UploadedImage(link, json.optString("ImageKey"))
         }
+
+    /** Takes an uploaded picture back down, as the site does when it is removed from the box. */
+    suspend fun deleteImage(url: String, uploadForm: FormSpec, key: String): String? =
+        submitForm(
+            FormSpec(action = url, fields = uploadForm.fields),
+            mapOf("imageKey" to key, "reasonCode" to "osel"),
+            ajax = true
+        )
 
     /** Saves the entry form text to the site's per-topic "kenar" draft for eligible accounts. */
     suspend fun saveSiteDraft(topicPath: String, form: com.thesozluk.app.model.FormSpec, text: String): String? {

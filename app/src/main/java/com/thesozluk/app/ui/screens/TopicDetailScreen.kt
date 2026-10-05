@@ -479,6 +479,7 @@ fun TopicDetailScreen(
             onSaveToSite = { text -> viewModel.saveSiteDraft(text) { showComposer = false } },
             isSavingDraft = isSavingDraft,
             onUploadImage = if (topic?.imageUploadForm != null) viewModel::uploadImage else null,
+            onDeleteImage = if (topic?.imageDeleteUrl != null) viewModel::deleteImage else null,
             onDismiss = { if (!isSubmitting) showComposer = false },
             initialText = remember { Drafts.get(draftKey)?.text ?: topic?.entryForm?.textValue.orEmpty() },
             onTextChange = { text -> Drafts.save(draftKey, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty(), text) }

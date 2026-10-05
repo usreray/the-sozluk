@@ -355,10 +355,19 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
     }
 
     /** Uploads a picture for the entry being written; returns its link or throws with the reason. */
-    suspend fun uploadImage(bytes: ByteArray, fileName: String, mimeType: String): String {
+    suspend fun uploadImage(bytes: ByteArray, fileName: String, mimeType: String): com.thesozluk.app.model.UploadedImage {
         val topic = _selectedTopic.value ?: throw java.io.IOException("başlık yüklenmedi")
         val form = topic.imageUploadForm ?: throw java.io.IOException("görsel yükleme bu hesapta açık değil")
         return repository.uploadImage(form, bytes, fileName, mimeType, topic.topicPath.ifBlank { topic.url })
+    }
+
+    /** Removes an uploaded picture from the site; returns an error message, or null. */
+    suspend fun deleteImage(key: String): String? {
+        val topic = _selectedTopic.value ?: return "başlık yüklenmedi"
+        val url = topic.imageDeleteUrl ?: return "görsel silinemedi"
+        val form = topic.imageUploadForm ?: return "görsel silinemedi"
+        if (key.isBlank()) return "görsel silinemedi"
+        return repository.deleteImage(url, form, key)
     }
 
     /** Saves an entry to the site's "kenar" list; local draft remains if the site rejects it. */
