@@ -25,3 +25,5 @@ build_*.txt
 keystore.properties
 
 keystore-legacy.properties
+
+/.idea/
