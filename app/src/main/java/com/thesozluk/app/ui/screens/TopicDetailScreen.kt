@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.ImageActions
 import com.thesozluk.app.ui.components.TopicFilterSheet
 import com.thesozluk.app.ui.components.ShareEntryImageSheet
 import com.thesozluk.app.settings.ReadingHistory
@@ -376,12 +377,24 @@ fun TopicDetailScreen(
             }
         }
     )
+    val topicReferrer = topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty()
+    val imageActions: (com.thesozluk.app.model.ImageUploader?) -> ImageActions? = { uploader ->
+        uploader?.let { u ->
+            ImageActions(
+                upload = { bytes, name, type -> viewModel.uploadImage(u, bytes, name, type, topicReferrer) },
+                delete = if (u.deleteUrl != null) ({ key -> viewModel.deleteImage(u, key) }) else null
+            )
+        }
+    }
     editTarget?.let { (entry, form) ->
         EntryComposerSheet(
             topicTitle = displayTitle,
             heading = "entry'yi düzelt",
             isSubmitting = isSubmitting,
             initialText = form.textValue.ifBlank { entry.content },
+            // The düzelt page's own uploader, else the one under the topic's entry box
+            onUploadImage = imageActions(form.imageUploader ?: topic?.imageUploader)?.upload,
+            onDeleteImage = imageActions(form.imageUploader ?: topic?.imageUploader)?.delete,
             onSubmit = { text -> viewModel.submitEdit(form, text) { editTarget = null } },
             onDismiss = { if (!isSubmitting) editTarget = null }
         )
@@ -478,8 +491,8 @@ fun TopicDetailScreen(
             onSubmit = { text -> viewModel.submitEntry(text) { showComposer = false } },
             onSaveToSite = { text -> viewModel.saveSiteDraft(text) { showComposer = false } },
             isSavingDraft = isSavingDraft,
-            onUploadImage = if (topic?.imageUploadForm != null) viewModel::uploadImage else null,
-            onDeleteImage = if (topic?.imageDeleteUrl != null) viewModel::deleteImage else null,
+            onUploadImage = imageActions(topic?.imageUploader)?.upload,
+            onDeleteImage = imageActions(topic?.imageUploader)?.delete,
             onDismiss = { if (!isSubmitting) showComposer = false },
             initialText = remember { Drafts.get(draftKey)?.text ?: topic?.entryForm?.textValue.orEmpty() },
             onTextChange = { text -> Drafts.save(draftKey, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty(), text) }

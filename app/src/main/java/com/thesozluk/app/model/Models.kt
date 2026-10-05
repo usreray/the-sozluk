@@ -17,10 +17,8 @@ data class Topic(
     val entryForm: FormSpec? = null,
     val deleteForm: FormSpec? = null,
     val commentForm: FormSpec? = null,
-    /** The "görsel yükle" drop zone under the entry box: where pictures are posted and its hidden fields */
-    val imageUploadForm: FormSpec? = null,
-    /** Where the site posts an uploaded picture's key to take it back down */
-    val imageDeleteUrl: String? = null,
+    /** The "görsel yükle" drop zone under the entry box */
+    val imageUploader: ImageUploader? = null,
     /** The topic's own path (/slug--id) as linked from its heading; differs on /entry/<id> pages */
     val topicPath: String = "",
     val topicId: String = "",
@@ -66,8 +64,13 @@ data class FormSpec(
     val fields: Map<String, String>,
     val textFieldName: String? = null,
     /** Text already in the field, e.g. an entry left "kenarda" (saved as a draft on the site) */
-    val textValue: String = ""
+    val textValue: String = "",
+    /** The page's picture uploader (the "düzelt" page has one too) */
+    val imageUploader: ImageUploader? = null
 )
+
+/** The site's picture uploader: the form pictures are posted to, and where a picture's key deletes it. */
+data class ImageUploader(val form: FormSpec, val deleteUrl: String?)
 
 /** A picture uploaded for an entry: its link (soz.lk/i/...) and the key that deletes it. */
 data class UploadedImage(val link: String, val key: String)

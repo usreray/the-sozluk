@@ -351,6 +351,12 @@ private fun TextFieldValue.wrapSelection(markup: Markup): TextFieldValue {
     return copy(text = newText, selection = TextRange(cursor))
 }
 
+/** Upload and delete callbacks for [EntryComposerSheet] from a page's uploader; null hides "görsel". */
+class ImageActions(
+    val upload: suspend (ByteArray, String, String) -> UploadedImage,
+    val delete: (suspend (String) -> String?)?
+)
+
 /** A picked picture's preview with "görseli sil" under it. */
 @Composable
 private fun UploadedThumb(uri: Uri, enabled: Boolean, onRemove: () -> Unit) {

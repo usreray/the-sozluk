@@ -215,6 +215,22 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
 
     suspend fun editForm(entry: Entry): com.thesozluk.app.model.FormSpec = repository.getEditForm(entry.entryId)
 
+    /** Uploads a picture for the entry being written; returns its link or throws with the reason. */
+    suspend fun uploadImage(
+        uploader: com.thesozluk.app.model.ImageUploader,
+        bytes: ByteArray,
+        fileName: String,
+        mimeType: String,
+        referrer: String
+    ): com.thesozluk.app.model.UploadedImage = repository.uploadImage(uploader.form, bytes, fileName, mimeType, referrer)
+
+    /** Removes an uploaded picture from the site; returns an error message, or null. */
+    suspend fun deleteImage(uploader: com.thesozluk.app.model.ImageUploader, key: String): String? {
+        val url = uploader.deleteUrl ?: return "görsel silinemedi"
+        if (key.isBlank()) return "görsel silinemedi"
+        return repository.deleteImage(url, uploader.form, key)
+    }
+
     /** Saves an edited entry and reloads the open lists so they show it. */
     fun submitEdit(form: com.thesozluk.app.model.FormSpec, text: String, onSuccess: () -> Unit) {
         _isSubmitting.value = true

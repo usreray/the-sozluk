@@ -237,6 +237,14 @@ fun AuthorScreen(
             heading = "entry'yi düzelt",
             isSubmitting = isSubmitting,
             initialText = form.textValue.ifBlank { entry.content },
+            onUploadImage = form.imageUploader?.let { u ->
+                { bytes: ByteArray, name: String, type: String ->
+                    viewModel.uploadImage(u, bytes, name, type, "/entry/duzelt/${entry.entryId}")
+                }
+            },
+            onDeleteImage = form.imageUploader?.takeIf { it.deleteUrl != null }?.let { u ->
+                { key: String -> viewModel.deleteImage(u, key) }
+            },
             onSubmit = { text -> viewModel.submitEdit(form, text) { editTarget = null } },
             onDismiss = { if (!isSubmitting) editTarget = null }
         )

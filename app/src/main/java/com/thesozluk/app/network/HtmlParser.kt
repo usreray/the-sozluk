@@ -1,5 +1,6 @@
 package com.thesozluk.app.network
 
+import com.thesozluk.app.model.ImageUploader
 import com.thesozluk.app.model.AuthorProfile
 import com.thesozluk.app.model.Badge
 import com.thesozluk.app.model.Channel
@@ -177,8 +178,7 @@ object HtmlParser {
                         entryForm = findEntryForm(document),
                         deleteForm = findDeleteForm(document),
                         commentForm = document.selectFirst("form#comment-entry-form")?.let(::formSpec),
-                        imageUploadForm = findImageUploadForm(document),
-                        imageDeleteUrl = document.selectFirst("input#delete-image")?.attr("value")?.ifBlank { null },
+                        imageUploader = parseImageUploader(document),
                         topicPath = heading?.selectFirst("a[href]")?.attr("href")?.substringBefore("?").orEmpty(),
                         topicId = heading?.attr("data-id").orEmpty(),
                         // The site toggles data-tracked (0/1) and posts to data-trackurl / data-untrackurl
@@ -386,12 +386,18 @@ object HtmlParser {
         }
 
         /** "düzelt" page of an entry: its form, with the entry's current text in the field. */
-        fun parseEditForm(document: Document): FormSpec? = findEntryForm(document)
+        fun parseEditForm(document: Document): FormSpec? =
+                findEntryForm(document)?.copy(imageUploader = parseImageUploader(document))
 
         /**
          * The picture uploader inside #image-drop-zone: a Dropzone form (id dropzone-form) that posts
          * the file as "file" and answers {Success, Result: the image's link, ImageKey}.
          */
+        private fun parseImageUploader(document: Document): ImageUploader? {
+                val form = findImageUploadForm(document) ?: return null
+                return ImageUploader(form, document.selectFirst("input#delete-image")?.attr("value")?.ifBlank { null })
+        }
+
         private fun findImageUploadForm(document: Document): FormSpec? {
                 val zone = document.selectFirst("#image-drop-zone") ?: return null
                 val form = zone.takeIf { it.tagName() == "form" } ?: zone.selectFirst("form#dropzone-form, form#dropzoneForm, form.dropzone, form[action]")
