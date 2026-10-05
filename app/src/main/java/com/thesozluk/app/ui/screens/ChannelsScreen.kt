@@ -45,6 +45,7 @@ import com.thesozluk.app.ui.components.ErrorState
 import androidx.compose.material.icons.rounded.Inbox
 import com.thesozluk.app.ui.components.LoadingState
 import com.thesozluk.app.ui.components.TopicRow
+import com.thesozluk.app.ui.components.rememberReadTitles
 import com.thesozluk.app.ui.components.segmentedShape
 import com.thesozluk.app.ui.navigation.Screen
 import com.thesozluk.app.viewmodel.ChannelsViewModel
@@ -60,6 +61,7 @@ fun ChannelsScreen(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
 ) {
+    val readTitles = rememberReadTitles()
     val isSearchResults = path.startsWith("basliklar/ara")
     val channels by viewModel.channels
     val channelsError by viewModel.channelsError
@@ -145,6 +147,7 @@ fun ChannelsScreen(
                                 TopicRow(
                                     topic = topic,
                                     shape = segmentedShape(index, state.topics.size),
+                                    isRead = topic.title.trim().lowercase() in readTitles,
                                     onClick = { navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url)) },
                                     modifier = Modifier.animateItem()
                                 )

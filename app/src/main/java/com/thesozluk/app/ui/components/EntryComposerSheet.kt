@@ -1,6 +1,13 @@
 package com.thesozluk.app.ui.components
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -63,6 +70,7 @@ fun EntryComposerSheet(
     isSavingDraft: Boolean = false
 ) {
     var value by remember { mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length))) }
+    var previewing by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -79,31 +87,45 @@ fun EntryComposerSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            OutlinedTextField(
-                value = value,
-                onValueChange = {
-                    if (it.text != value.text) onTextChange?.invoke(it.text)
-                    value = it
-                },
-                placeholder = { Text("ne düşünüyorsun?") },
-                enabled = !isSubmitting,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
-                minLines = 6
-            )
-            // Wraps the selection (or inserts at the cursor) in ekşi's markup
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                markups.forEach { markup ->
-                    SuggestionChip(
-                        onClick = {
-                            value = value.wrapSelection(markup)
-                            onTextChange?.invoke(value.text)
-                        },
-                        label = { Text(markup.label) },
-                        enabled = !isSubmitting
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                listOf("yaz", "önizle").forEachIndexed { index, label ->
+                    SegmentedButton(
+                        selected = previewing == (index == 1),
+                        onClick = { previewing = index == 1 },
+                        shape = SegmentedButtonDefaults.itemShape(index, 2),
+                        label = { Text(label) }
                     )
+                }
+            }
+            if (previewing) {
+                EntryPreview(value.text)
+            } else {
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = {
+                        if (it.text != value.text) onTextChange?.invoke(it.text)
+                        value = it
+                    },
+                    placeholder = { Text("ne düşünüyorsun?") },
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
+                    minLines = 6
+                )
+                // Wraps the selection (or inserts at the cursor) in ekşi's markup
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    markups.forEach { markup ->
+                        SuggestionChip(
+                            onClick = {
+                                value = value.wrapSelection(markup)
+                                onTextChange?.invoke(value.text)
+                            },
+                            label = { Text(markup.label) },
+                            enabled = !isSubmitting
+                        )
+                    }
                 }
             }
             Row(
@@ -130,6 +152,30 @@ fun EntryComposerSheet(
                     else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
                     Text("gönder", modifier = Modifier.padding(start = 8.dp))
                 }
+            }
+        }
+    }
+}
+
+/** The entry as it will look once sent: bkz, hede and links in color, spoilers marked. */
+@Composable
+private fun EntryPreview(raw: String) {
+    val html = remember(raw) { entryMarkupToHtml(raw) }
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 360.dp)
+    ) {
+        Box(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
+            if (raw.isBlank()) {
+                Text("önizlenecek bir şey yok", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text(
+                    rememberEntryText(html, raw, onLink = {}, spoilersHidden = false, onToggleSpoilers = {}),
+                    inlineContent = rememberEntryInlineContent(),
+                    style = entryBodyStyle(),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
         }
     }

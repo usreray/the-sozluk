@@ -438,20 +438,31 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
     item { SectionTitle(
         "entry'ler",
         changed = AppSettings.showEntryNumbers.value || !AppSettings.showAvatars.value ||
-            AppSettings.showLinkAddresses.value,
+            AppSettings.showLinkAddresses.value || !AppSettings.hideSpoilers.value ||
+            !AppSettings.bkzPreview.value || !AppSettings.dimReadTopics.value,
         onReset = {
             AppSettings.setShowEntryNumbers(false); AppSettings.setShowAvatars(true)
-            AppSettings.setShowLinkAddresses(false)
+            AppSettings.setShowLinkAddresses(false); AppSettings.setHideSpoilers(true)
+            AppSettings.setBkzPreview(true); AppSettings.setDimReadTopics(true)
         }
     ) }
     item {
-        SwitchRow("entry sıra numarası", "her entry'nin başlıktaki sırası (#12)", AppSettings.showEntryNumbers.value, true, segmentedShape(0, 3), AppSettings::setShowEntryNumbers)
+        SwitchRow("entry sıra numarası", "her entry'nin başlıktaki sırası (#12)", AppSettings.showEntryNumbers.value, true, segmentedShape(0, 6), AppSettings::setShowEntryNumbers)
     }
     item {
-        SwitchRow("profil resimleri", "entry'lerde yazarın resmini göster", AppSettings.showAvatars.value, true, segmentedShape(1, 3), AppSettings::setShowAvatars)
+        SwitchRow("profil resimleri", "entry'lerde yazarın resmini göster", AppSettings.showAvatars.value, true, segmentedShape(1, 6), AppSettings::setShowAvatars)
     }
     item {
-        SwitchRow("link adreslerini göster", "entry'de görünen bağlantı metninin yanında adresini de göster", AppSettings.showLinkAddresses.value, true, segmentedShape(2, 3), AppSettings::setShowLinkAddresses)
+        SwitchRow("link adreslerini göster", "entry'de görünen bağlantı metninin yanında adresini de göster", AppSettings.showLinkAddresses.value, true, segmentedShape(2, 6), AppSettings::setShowLinkAddresses)
+    }
+    item {
+        SwitchRow("spoiler'ları gizle", "spoiler arasındaki yazı kapalı gelsin, dokununca açılsın", AppSettings.hideSpoilers.value, true, segmentedShape(3, 6), AppSettings::setHideSpoilers)
+    }
+    item {
+        SwitchRow("bkz önizlemesi", "bkz'ye dokununca başlığın ilk entry'si açılır pencerede görünsün", AppSettings.bkzPreview.value, true, segmentedShape(4, 6), AppSettings::setBkzPreview)
+    }
+    item {
+        SwitchRow("okunan başlıkları soldur", "geçmişte açtığın başlıklar listelerde soluk görünsün", AppSettings.dimReadTopics.value, true, segmentedShape(5, 6), AppSettings::setDimReadTopics)
     }
     item { SectionTitle(
         "ekran",

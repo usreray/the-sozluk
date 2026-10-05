@@ -75,20 +75,57 @@ fun eksiLinkFor(href: String, text: String): EksiLink? {
     }
 }
 
-/** Builds the entry body with tappable links; falls back to plain text without HTML. */
+/** "--- spoiler ---" as the site renders it: the word is a bkz between dashes. */
+private val SPOILER_MARKER = Regex(
+    """-{3}(?:\s|&nbsp;)*<a\b[^>]*>(?:\s|&nbsp;)*spoiler(?:\s|&nbsp;)*</a>(?:\s|&nbsp;)*-{3}""",
+    RegexOption.IGNORE_CASE
+)
+private const val SPOILER_TAG = "spoiler-mark"
+
+/**
+ * Builds the entry body with tappable links; falls back to plain text without HTML.
+ * With [onToggleSpoilers], text between spoiler markers is covered while [spoilersHidden]
+ * and tapping the markers or the covered text calls it.
+ */
 @Composable
-fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): AnnotatedString {
+fun rememberEntryText(
+    html: String,
+    plain: String,
+    onLink: (EksiLink) -> Unit,
+    spoilersHidden: Boolean = false,
+    onToggleSpoilers: (() -> Unit)? = null
+): AnnotatedString {
     val linkStyle = TextLinkStyles(
         style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
     )
+    val coverColor = MaterialTheme.colorScheme.onSurfaceVariant
     val showLinkAddresses = AppSettings.showLinkAddresses.value
-    return remember(html, plain, linkStyle, showLinkAddresses) {
+    return remember(html, plain, linkStyle, showLinkAddresses, spoilersHidden, onToggleSpoilers != null, coverColor) {
         if (html.isBlank()) AnnotatedString(plain)
         else buildAnnotatedString {
             // The site indents lines after <br>; drop that so paragraphs start flush
             var lineStart = true
+            var inSpoiler = false
+            // Covered text has no links of its own: one tap anywhere on it reveals the spoiler
+            fun covered() = inSpoiler && spoilersHidden
             fun appendNodes(nodes: List<Node>) {
                 for (node in nodes) when {
+                    node is Element && node.tagName() == SPOILER_TAG -> {
+                        if (inSpoiler && spoilersHidden) { pop(); pop() }
+                        withLink(LinkAnnotation.Clickable("spoiler", linkStyle) { onToggleSpoilers?.invoke() }) {
+                            append("--- spoiler ---")
+                        }
+                        inSpoiler = !inSpoiler
+                        if (inSpoiler && spoilersHidden) {
+                            pushLink(LinkAnnotation.Clickable("spoiler-reveal") { onToggleSpoilers?.invoke() })
+                            pushStyle(SpanStyle(color = coverColor, background = coverColor))
+                        }
+                        lineStart = false
+                    }
+                    covered() && node is Element && node.tagName() != "br" && node.select("br").isEmpty() -> {
+                        append(node.text().ifBlank { "*" })
+                        lineStart = false
+                    }
                     node is TextNode -> {
                         val text = if (lineStart) node.text().trimStart() else node.text()
                         if (text.isNotEmpty()) {
@@ -155,9 +192,45 @@ fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): 
                     node is Element -> appendNodes(node.childNodes())
                 }
             }
-            appendNodes(Jsoup.parseBodyFragment(html).body().childNodes())
+            val source = if (onToggleSpoilers != null) html.replace(SPOILER_MARKER, "<$SPOILER_TAG></$SPOILER_TAG>") else html
+            appendNodes(Jsoup.parseBodyFragment(source).body().childNodes())
+            // An unclosed spoiler covers the rest of the entry
+            if (inSpoiler && spoilersHidden) { pop(); pop() }
         }.trimmed()
     }
+}
+
+/**
+ * Turns what the user typed in ekşi's markup into the HTML the site would show, so the
+ * composer can preview it with [rememberEntryText]: (bkz: x), `hede`, `:gizli bkz`,
+ * [http://adres metin] and line breaks.
+ */
+fun entryMarkupToHtml(raw: String): String {
+    fun esc(text: String) = org.jsoup.nodes.Entities.escape(text)
+    fun href(target: String) = when {
+        target.matches(Regex("#\\d+")) -> "/entry/${target.drop(1)}"
+        target.startsWith("@") -> "/biri/${Uri.encode(target.drop(1))}"
+        else -> "/?q=${Uri.encode(target)}"
+    }
+    fun bkz(target: String) = "<a class=\"b\" href=\"${esc(href(target.trim()))}\">${esc(target.trim())}</a>"
+    val markup = Regex("""\(bkz: ?([^)]+)\)|`:([^`]+)`|`([^`]+)`|\[(https?://[^\s\]]+)(?: ([^\]]+))?]""")
+    val html = StringBuilder()
+    var last = 0
+    for (match in markup.findAll(raw)) {
+        html.append(esc(raw.substring(last, match.range.first)))
+        val (bkzTarget, hidden, hede, url, label) = match.destructured
+        html.append(
+            when {
+                bkzTarget.isNotEmpty() -> "(bkz: ${bkz(bkzTarget)})"
+                hidden.isNotEmpty() -> "<sup class=\"ab\"><a data-query=\"${esc(hidden.trim())}\">*</a></sup>"
+                hede.isNotEmpty() -> bkz(hede)
+                else -> "<a href=\"${esc(url)}\">${esc(label.ifBlank { url })}</a>"
+            }
+        )
+        last = match.range.last + 1
+    }
+    html.append(esc(raw.substring(last)))
+    return html.toString().replace("\n", "<br>")
 }
 
 private const val LINK_ICON_EXTERNAL = "link_external"

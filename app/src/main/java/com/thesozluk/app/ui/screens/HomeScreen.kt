@@ -84,6 +84,7 @@ import com.thesozluk.app.ui.components.ErrorState
 import com.thesozluk.app.ui.components.LoadingState
 import com.thesozluk.app.ui.components.LocalBottomBarInset
 import com.thesozluk.app.ui.components.TopicRow
+import com.thesozluk.app.ui.components.rememberReadTitles
 import com.thesozluk.app.ui.components.segmentedShape
 import com.thesozluk.app.ui.navigation.Screen
 import com.thesozluk.app.viewmodel.EksiViewModelFactory
@@ -376,6 +377,7 @@ private fun CategoryPage(
     val listState = viewModel.listStates.getValue(category)
     // Topics with a blocked word are left out of every list
     val blockedWords by AppSettings.blockedWords
+    val readTitles = rememberReadTitles()
     val topics = remember(state.topics, blockedWords) {
         state.topics.filterNot { AppSettings.isBlocked(it.title) }
     }
@@ -432,6 +434,7 @@ private fun CategoryPage(
                             TopicRow(
                                 topic = topic,
                                 shape = segmentedShape(index, topics.size),
+                                isRead = topic.title.trim().lowercase() in readTitles,
                                 onClick = {
                                     val filter = when (category) {
                                         HomeCategory.Gundem -> "a=popular"

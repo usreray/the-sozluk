@@ -96,6 +96,18 @@ object AppSettings {
     private val _showLinkAddresses = mutableStateOf(false)
     val showLinkAddresses: State<Boolean> = _showLinkAddresses
 
+    /** Text between "--- spoiler ---" markers stays covered until tapped. */
+    private val _hideSpoilers = mutableStateOf(true)
+    val hideSpoilers: State<Boolean> = _hideSpoilers
+
+    /** Tapping a (bkz) shows the topic's first entry in a sheet instead of opening it. */
+    private val _bkzPreview = mutableStateOf(true)
+    val bkzPreview: State<Boolean> = _bkzPreview
+
+    /** Topics already in the reading history look faded in lists. */
+    private val _dimReadTopics = mutableStateOf(true)
+    val dimReadTopics: State<Boolean> = _dimReadTopics
+
     /** Keep the screen on while reading a topic */
     private val _keepScreenOn = mutableStateOf(false)
     val keepScreenOn: State<Boolean> = _keepScreenOn
@@ -166,6 +178,9 @@ object AppSettings {
         _showEntryNumbers.value = prefs.getBoolean("showEntryNumbers", false)
         _showAvatars.value = prefs.getBoolean("showAvatars", true)
         _showLinkAddresses.value = prefs.getBoolean("showLinkAddresses", false)
+        _hideSpoilers.value = prefs.getBoolean("hideSpoilers", true)
+        _bkzPreview.value = prefs.getBoolean("bkzPreview", true)
+        _dimReadTopics.value = prefs.getBoolean("dimReadTopics", true)
         _keepScreenOn.value = prefs.getBoolean("keepScreenOn", false)
         _prefetchNextPage.value = prefs.getBoolean("prefetchNextPage", true)
         _notifications.value = prefs.getBoolean("notifications", true)
@@ -228,6 +243,21 @@ object AppSettings {
     fun setShowLinkAddresses(enabled: Boolean) {
         _showLinkAddresses.value = enabled
         prefs.edit().putBoolean("showLinkAddresses", enabled).apply()
+    }
+
+    fun setHideSpoilers(enabled: Boolean) {
+        _hideSpoilers.value = enabled
+        prefs.edit().putBoolean("hideSpoilers", enabled).apply()
+    }
+
+    fun setBkzPreview(enabled: Boolean) {
+        _bkzPreview.value = enabled
+        prefs.edit().putBoolean("bkzPreview", enabled).apply()
+    }
+
+    fun setDimReadTopics(enabled: Boolean) {
+        _dimReadTopics.value = enabled
+        prefs.edit().putBoolean("dimReadTopics", enabled).apply()
     }
 
     fun setKeepScreenOn(enabled: Boolean) {

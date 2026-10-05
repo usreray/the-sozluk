@@ -65,6 +65,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -154,7 +155,14 @@ fun EntryCard(
     val showAvatars by AppSettings.showAvatars
     val showNumbers by AppSettings.showEntryNumbers
     var confirmDelete by remember { mutableStateOf(false) }
-    val text = rememberEntryText(entry.contentHtml, entry.content, actions.onLink)
+    var spoilersRevealed by rememberSaveable(entry.entryId) { mutableStateOf(false) }
+    val text = rememberEntryText(
+        entry.contentHtml,
+        entry.content,
+        actions.onLink,
+        spoilersHidden = !spoilersRevealed,
+        onToggleSpoilers = if (AppSettings.hideSpoilers.value) ({ spoilersRevealed = !spoilersRevealed }) else null
+    )
 
     if (confirmDelete && actions.onDelete != null) {
         AlertDialog(
