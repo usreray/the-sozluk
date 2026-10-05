@@ -108,28 +108,40 @@ fun rememberEntryText(
             var inSpoiler = false
             // Covered text has no links of its own: one tap anywhere on it reveals the spoiler
             fun covered() = inSpoiler && spoilersHidden
+            // Only the words get the cover; spaces and line breaks around them stay open,
+            // so the bar doesn't start right after the marker's dashes
+            fun appendCovered(text: String) {
+                val start = text.indexOfFirst { !it.isWhitespace() }
+                if (start < 0) {
+                    append(text)
+                    return
+                }
+                val end = text.indexOfLast { !it.isWhitespace() } + 1
+                append(text.substring(0, start))
+                withLink(LinkAnnotation.Clickable("spoiler-reveal") { onToggleSpoilers?.invoke() }) {
+                    withStyle(SpanStyle(color = coverColor, background = coverColor)) {
+                        append(text.substring(start, end))
+                    }
+                }
+                append(text.substring(end))
+            }
             fun appendNodes(nodes: List<Node>) {
                 for (node in nodes) when {
                     node is Element && node.tagName() == SPOILER_TAG -> {
-                        if (inSpoiler && spoilersHidden) { pop(); pop() }
                         withLink(LinkAnnotation.Clickable("spoiler", linkStyle) { onToggleSpoilers?.invoke() }) {
                             append("--- spoiler ---")
                         }
                         inSpoiler = !inSpoiler
-                        if (inSpoiler && spoilersHidden) {
-                            pushLink(LinkAnnotation.Clickable("spoiler-reveal") { onToggleSpoilers?.invoke() })
-                            pushStyle(SpanStyle(color = coverColor, background = coverColor))
-                        }
                         lineStart = false
                     }
                     covered() && node is Element && node.tagName() != "br" && node.select("br").isEmpty() -> {
-                        append(node.text().ifBlank { "*" })
+                        appendCovered(node.text().ifBlank { "*" })
                         lineStart = false
                     }
                     node is TextNode -> {
                         val text = if (lineStart) node.text().trimStart() else node.text()
                         if (text.isNotEmpty()) {
-                            append(text)
+                            if (covered()) appendCovered(text) else append(text)
                             lineStart = false
                         }
                     }
@@ -194,8 +206,6 @@ fun rememberEntryText(
             }
             val source = if (onToggleSpoilers != null) html.replace(SPOILER_MARKER, "<$SPOILER_TAG></$SPOILER_TAG>") else html
             appendNodes(Jsoup.parseBodyFragment(source).body().childNodes())
-            // An unclosed spoiler covers the rest of the entry
-            if (inSpoiler && spoilersHidden) { pop(); pop() }
         }.trimmed()
     }
 }

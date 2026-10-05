@@ -170,7 +170,7 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
             target?.startsWith("link:") == true -> {
                 val url = target.removePrefix("link:")
                 val link = eksiLinkFor(url, "")
-                if (link != null && link !is EksiLink.External) navController.openEksiLink(link, uriHandler, preview = false)
+                if (link != null && link !is EksiLink.External) navController.openEksiLink(link, uriHandler)
             }
             // App icon shortcut "ara": the search tab with its field open
             target == "search" -> {
@@ -205,7 +205,6 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
         CompositionLocalProvider(LocalBottomBarInset provides if (showBar) FloatingNavBarInset else 0.dp) {
             Navigation(navController)
         }
-        com.thesozluk.app.ui.components.BkzPreviewHost(navController)
         // Edge to edge: content scrolls under the status bar, so the bar gets a soft scrim of the
         // surface color that keeps the clock and icons readable (not over full-screen images)
         if (currentRoute?.startsWith(Screen.Image.route) != true) {
