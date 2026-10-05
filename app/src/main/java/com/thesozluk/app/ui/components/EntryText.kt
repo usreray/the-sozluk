@@ -27,6 +27,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import com.thesozluk.app.settings.AppSettings
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
@@ -80,7 +81,8 @@ fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): 
     val linkStyle = TextLinkStyles(
         style = SpanStyle(color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
     )
-    return remember(html, plain, linkStyle) {
+    val showLinkAddresses = AppSettings.showLinkAddresses.value
+    return remember(html, plain, linkStyle, showLinkAddresses) {
         if (html.isBlank()) AnnotatedString(plain)
         else buildAnnotatedString {
             // The site indents lines after <br>; drop that so paragraphs start flush
@@ -99,11 +101,25 @@ fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): 
                         lineStart = true
                     }
                     node is Element && node.tagName() == "sup" -> {
-                        append('(')
-                        withStyle(SpanStyle(baselineShift = BaselineShift.Superscript, fontSize = 0.72.em)) {
-                            appendNodes(node.childNodes())
+                        val query = node.selectFirst("a[data-query]")?.attr("data-query").orEmpty()
+                        val referenceStyle = SpanStyle(baselineShift = BaselineShift.Superscript, fontSize = 0.72.em)
+                        if (query.isNotBlank()) {
+                            val target = query.removePrefix(":").trim().removeSurrounding("(", ")")
+                            val link = EksiLink.Search(query)
+                            withLink(LinkAnnotation.Clickable(link.toString(), linkStyle) { onLink(link) }) {
+                                withStyle(referenceStyle) {
+                                    append('(')
+                                    append(target)
+                                    append(')')
+                                }
+                            }
+                        } else {
+                            withStyle(referenceStyle) {
+                                append('(')
+                                appendNodes(node.childNodes())
+                                append(')')
+                            }
                         }
-                        append(')')
                     }
                     node is Element && node.tagName() == "a" -> {
                         // Hidden bkz is a "*" whose target sits in data-query
@@ -111,7 +127,18 @@ fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): 
                         val link = if (query.isNotBlank()) EksiLink.Search(query)
                         else eksiLinkFor(node.attr("href"), node.text())
                         val label = node.text().ifBlank { "*" }
-                        if (link == null) append(label)
+                        if (query.isNotBlank()) {
+                            val target = query.removePrefix(":").trim().removeSurrounding("(", ")")
+                            val appendReference: androidx.compose.ui.text.AnnotatedString.Builder.() -> Unit = {
+                                withStyle(SpanStyle(baselineShift = BaselineShift.Superscript, fontSize = 0.72.em)) {
+                                    append(target)
+                                }
+                            }
+                            if (link == null) appendReference()
+                            else withLink(LinkAnnotation.Clickable(link.toString(), linkStyle) { onLink(link) }) {
+                                appendReference()
+                            }
+                        } else if (link == null) append(label)
                         else withLink(LinkAnnotation.Clickable(link.toString(), linkStyle) { onLink(link) }) {
                             // bkz / hede stay plain; a link out of the sözlük or to an image shows
                             // what it is, since its text ("görsel", "şurada") looks like a bkz
@@ -121,6 +148,7 @@ fun rememberEntryText(html: String, plain: String, onLink: (EksiLink) -> Unit): 
                                 else -> Unit
                             }
                             append(label)
+                            if (showLinkAddresses && link is EksiLink.External) append(" (${link.url})")
                         }
                         lineStart = false
                     }

@@ -93,7 +93,7 @@ fun FloatingTopBar(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().height(52.dp)
         ) {
             if (onBack != null) {
                 FloatingSurface(shape = CircleShape) {

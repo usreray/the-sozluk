@@ -93,6 +93,9 @@ object AppSettings {
     private val _showAvatars = mutableStateOf(true)
     val showAvatars: State<Boolean> = _showAvatars
 
+    private val _showLinkAddresses = mutableStateOf(false)
+    val showLinkAddresses: State<Boolean> = _showLinkAddresses
+
     /** Keep the screen on while reading a topic */
     private val _keepScreenOn = mutableStateOf(false)
     val keepScreenOn: State<Boolean> = _keepScreenOn
@@ -162,6 +165,7 @@ object AppSettings {
         _hiddenTabs.value = prefs.getStringSet("hiddenTabs", DEFAULT_HIDDEN_TABS).orEmpty().toSet()
         _showEntryNumbers.value = prefs.getBoolean("showEntryNumbers", false)
         _showAvatars.value = prefs.getBoolean("showAvatars", true)
+        _showLinkAddresses.value = prefs.getBoolean("showLinkAddresses", false)
         _keepScreenOn.value = prefs.getBoolean("keepScreenOn", false)
         _prefetchNextPage.value = prefs.getBoolean("prefetchNextPage", true)
         _notifications.value = prefs.getBoolean("notifications", true)
@@ -219,6 +223,11 @@ object AppSettings {
     fun setShowAvatars(enabled: Boolean) {
         _showAvatars.value = enabled
         prefs.edit().putBoolean("showAvatars", enabled).apply()
+    }
+
+    fun setShowLinkAddresses(enabled: Boolean) {
+        _showLinkAddresses.value = enabled
+        prefs.edit().putBoolean("showLinkAddresses", enabled).apply()
     }
 
     fun setKeepScreenOn(enabled: Boolean) {

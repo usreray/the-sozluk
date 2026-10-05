@@ -437,14 +437,21 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
     }
     item { SectionTitle(
         "entry'ler",
-        changed = AppSettings.showEntryNumbers.value || !AppSettings.showAvatars.value,
-        onReset = { AppSettings.setShowEntryNumbers(false); AppSettings.setShowAvatars(true) }
+        changed = AppSettings.showEntryNumbers.value || !AppSettings.showAvatars.value ||
+            AppSettings.showLinkAddresses.value,
+        onReset = {
+            AppSettings.setShowEntryNumbers(false); AppSettings.setShowAvatars(true)
+            AppSettings.setShowLinkAddresses(false)
+        }
     ) }
     item {
-        SwitchRow("entry sıra numarası", "her entry'nin başlıktaki sırası (#12)", AppSettings.showEntryNumbers.value, true, segmentedShape(0, 2), AppSettings::setShowEntryNumbers)
+        SwitchRow("entry sıra numarası", "her entry'nin başlıktaki sırası (#12)", AppSettings.showEntryNumbers.value, true, segmentedShape(0, 3), AppSettings::setShowEntryNumbers)
     }
     item {
-        SwitchRow("profil resimleri", "entry'lerde yazarın resmini göster", AppSettings.showAvatars.value, true, segmentedShape(1, 2), AppSettings::setShowAvatars)
+        SwitchRow("profil resimleri", "entry'lerde yazarın resmini göster", AppSettings.showAvatars.value, true, segmentedShape(1, 3), AppSettings::setShowAvatars)
+    }
+    item {
+        SwitchRow("link adreslerini göster", "entry'de görünen bağlantı metninin yanında adresini de göster", AppSettings.showLinkAddresses.value, true, segmentedShape(2, 3), AppSettings::setShowLinkAddresses)
     }
     item { SectionTitle(
         "ekran",

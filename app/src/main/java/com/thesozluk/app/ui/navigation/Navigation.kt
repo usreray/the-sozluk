@@ -4,8 +4,6 @@ import com.thesozluk.app.ui.screens.LibraryScreen
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.navigation.NavBackStackEntry
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -46,20 +44,18 @@ fun Navigation(navController: NavHostController) {
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route,
-        enterTransition = { if (betweenTabs()) tabEnter() else slideIntoContainer(SlideDirection.Start, tween(320)) },
-        // The screen underneath shifts a little instead of vanishing, so it is there to go back to
+        enterTransition = { if (betweenTabs()) tabEnter() else slideIntoContainer(SlideDirection.Start, tween(280)) },
         exitTransition = {
             if (betweenTabs()) fadeOut(tween(90))
-            else slideOutHorizontally(tween(320)) { -it / 4 } + fadeOut(tween(320), targetAlpha = 0.6f)
+            else slideOutOfContainer(SlideDirection.Start, tween(280)) + fadeOut(tween(280), targetAlpha = 0.6f)
         },
-        // Keep both screens moving together during predictive back.
         popEnterTransition = {
             if (betweenTabs()) tabEnter()
-            else slideInHorizontally(tween(260)) { -it / 4 }
+            else slideIntoContainer(SlideDirection.End, tween(280))
         },
         popExitTransition = {
             if (betweenTabs()) fadeOut(tween(90))
-            else slideOutHorizontally(tween(260)) { it }
+            else slideOutOfContainer(SlideDirection.End, tween(280)) + fadeOut(tween(280), targetAlpha = 0.6f)
         }
     ) {
         composable(Screen.Home.route) { HomeScreen(navController) }
