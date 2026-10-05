@@ -1,5 +1,22 @@
 package com.thesozluk.app.ui.components
 
+import java.nio.ByteBuffer
+import java.io.IOException
+import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material.icons.rounded.AddPhotoAlternate
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.net.Uri
+import android.graphics.ImageDecoder
+import android.graphics.Bitmap
+import android.content.Context
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,11 +87,40 @@ fun EntryComposerSheet(
     /** Called on every edit so the text survives closing the sheet */
     onTextChange: ((String) -> Unit)? = null,
     onSaveToSite: ((String) -> Unit)? = null,
-    isSavingDraft: Boolean = false
+    isSavingDraft: Boolean = false,
+    /** Uploads a picture (bytes, file name, type) and returns its link; null hides "görsel" */
+    onUploadImage: (suspend (ByteArray, String, String) -> String)? = null
 ) {
     var value by remember { mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length))) }
     var previewing by remember { mutableStateOf(false) }
     var addingLink by remember { mutableStateOf(false) }
+    var uploading by remember { mutableStateOf(false) }
+    var uploadError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val upload = onUploadImage ?: return@rememberLauncherForActivityResult
+        if (uri == null) return@rememberLauncherForActivityResult
+        uploading = true
+        uploadError = null
+        scope.launch {
+            try {
+                val (bytes, name, type) = readImageForUpload(context, uri)
+                val link = upload(bytes, name, type)
+                // The same markup the site's uploader puts in the entry box, on its own line
+                val at = value.selection.min
+                val insert = (if (at > 0 && value.text[at - 1] != '\n') "\n" else "") + "[$link görsel]\n"
+                value = value.replaceSelection(insert)
+                onTextChange?.invoke(value.text)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                uploadError = e.message ?: "görsel yüklenemedi"
+            } finally {
+                uploading = false
+            }
+        }
+    }
     if (addingLink) {
         LinkDialog(
             initialText = value.text.substring(value.selection.min, value.selection.max),
@@ -142,6 +188,22 @@ fun EntryComposerSheet(
                         )
                     }
                     SuggestionChip(onClick = { addingLink = true }, label = { Text("link") }, enabled = !isSubmitting)
+                    if (onUploadImage != null) {
+                        SuggestionChip(
+                            onClick = {
+                                pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
+                            label = { Text(if (uploading) "yükleniyor" else "görsel") },
+                            icon = {
+                                if (uploading) LoadingIndicator(modifier = Modifier.size(18.dp))
+                                else Icon(Icons.Rounded.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(18.dp))
+                            },
+                            enabled = !isSubmitting && !uploading
+                        )
+                    }
+                }
+                uploadError?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
             Row(
@@ -152,7 +214,7 @@ fun EntryComposerSheet(
                 if (onSaveToSite != null) {
                     OutlinedButton(
                         onClick = { onSaveToSite(value.text.trim()) },
-                        enabled = value.text.isNotBlank() && !isSubmitting,
+                        enabled = value.text.isNotBlank() && !isSubmitting && !uploading,
                         contentPadding = ButtonDefaults.ButtonWithIconContentPadding
                     ) {
                         if (isSavingDraft) LoadingIndicator(modifier = Modifier.size(20.dp))
@@ -161,7 +223,7 @@ fun EntryComposerSheet(
                 }
                 Button(
                     onClick = { onSubmit(value.text.trim()) },
-                    enabled = value.text.isNotBlank() && !isSubmitting,
+                    enabled = value.text.isNotBlank() && !isSubmitting && !uploading,
                     contentPadding = ButtonDefaults.ButtonWithIconContentPadding
                 ) {
                     if (isSubmitting && !isSavingDraft) LoadingIndicator(modifier = Modifier.size(20.dp))
@@ -251,3 +313,44 @@ private fun TextFieldValue.wrapSelection(markup: Markup): TextFieldValue {
     val cursor = start + markup.before.length + selected.length
     return copy(text = newText, selection = TextRange(cursor))
 }
+
+/** The site turns down pictures over 4 MB */
+private const val MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+
+/**
+ * The picked picture, ready to send: re-encoded so camera metadata (location, device) stays on
+ * the phone, and made smaller until it fits the limit. GIFs go as they are to keep the motion.
+ */
+private suspend fun readImageForUpload(context: Context, uri: Uri): Triple<ByteArray, String, String> =
+    withContext(Dispatchers.IO) {
+        val resolver = context.contentResolver
+        val type = resolver.getType(uri).orEmpty()
+        val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: throw IOException("görsel okunamadı")
+        if (type == "image/gif") {
+            if (bytes.size > MAX_UPLOAD_BYTES) throw IOException("gif 4 MB'tan büyük olamaz")
+            return@withContext Triple(bytes, "gorsel.gif", type)
+        }
+        var bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            val longest = maxOf(info.size.width, info.size.height)
+            if (longest > 3200) {
+                val scale = 3200f / longest
+                decoder.setTargetSize((info.size.width * scale).toInt(), (info.size.height * scale).toInt())
+            }
+        }
+        // Transparent PNGs stay PNG; everything else becomes a JPEG
+        if (type == "image/png" && bitmap.hasAlpha()) {
+            val out = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            if (out.size() <= MAX_UPLOAD_BYTES) return@withContext Triple(out.toByteArray(), "gorsel.png", "image/png")
+        }
+        repeat(4) {
+            for (quality in intArrayOf(90, 80, 70)) {
+                val out = ByteArrayOutputStream()
+                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+                if (out.size() <= MAX_UPLOAD_BYTES) return@withContext Triple(out.toByteArray(), "gorsel.jpg", "image/jpeg")
+            }
+            bitmap = Bitmap.createScaledBitmap(bitmap, (bitmap.width * 0.75f).toInt(), (bitmap.height * 0.75f).toInt(), true)
+        }
+        throw IOException("görsel 4 MB'a sığdırılamadı")
+    }

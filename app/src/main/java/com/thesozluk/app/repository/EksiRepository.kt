@@ -43,6 +43,10 @@ class EksiRepository(
     suspend fun submitForm(form: FormSpec, values: Map<String, String>, ajax: Boolean = false): String? =
         EksiNetworkDataSource.submitForm(form, values, ajax)
 
+    /** The uploaded picture's link */
+    suspend fun uploadImage(form: FormSpec, bytes: ByteArray, fileName: String, mimeType: String, referrer: String): String =
+        EksiNetworkDataSource.uploadImage(form, bytes, fileName, mimeType, referrer)
+
     suspend fun saveSiteDraft(topicPath: String, form: FormSpec, text: String): String? =
         EksiNetworkDataSource.saveSiteDraft(topicPath, form, text)
 

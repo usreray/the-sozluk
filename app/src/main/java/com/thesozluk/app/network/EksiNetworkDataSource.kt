@@ -417,6 +417,37 @@ object EksiNetworkDataSource {
             }
         }
 
+    /**
+     * Uploads a picture the way the site's "görsel yükle" drop zone does (multipart, the file as
+     * "file" next to the form's hidden fields) and returns the image's link, which the entry
+     * carries as "[<link> görsel]".
+     */
+    suspend fun uploadImage(form: FormSpec, bytes: ByteArray, fileName: String, mimeType: String, referrer: String): String =
+        withContext(Dispatchers.IO) {
+            val action = if (form.action.startsWith("http")) form.action else BASE_URL + form.action
+            val request = applyCommonConnectionSettings(session.newRequest(action))
+                .method(org.jsoup.Connection.Method.POST)
+                .timeout(60000)
+                .ignoreContentType(true)
+                .ignoreHttpErrors(true)
+                .referrer(if (referrer.startsWith("http")) referrer else BASE_URL + referrer)
+                .header("Origin", BASE_URL)
+                .header("X-Requested-With", "XMLHttpRequest")
+                .header("Accept", "application/json")
+                .header("Sec-Fetch-Dest", "empty")
+                .header("Sec-Fetch-Mode", "cors")
+            form.fields.forEach { (key, value) -> request.data(key, value) }
+            request.data("file", fileName, bytes.inputStream(), mimeType)
+            val response = request.execute()
+            if (response.statusCode() !in 200..299) throw IOException("görsel yüklenemedi (HTTP ${response.statusCode()})")
+            val json = runCatching { JSONObject(response.body()) }.getOrNull()
+                ?: throw IOException("görsel yüklenemedi")
+            if (!json.optBoolean("Success")) {
+                throw IOException(json.optString("Message").ifBlank { "görsel yüklenemedi" })
+            }
+            json.optString("Result").ifBlank { null } ?: throw IOException("görsel yüklenemedi")
+        }
+
     /** Saves the entry form text to the site's per-topic "kenar" draft for eligible accounts. */
     suspend fun saveSiteDraft(topicPath: String, form: com.thesozluk.app.model.FormSpec, text: String): String? {
         val field = form.textFieldName ?: return "entry alanı bulunamadı"

@@ -17,6 +17,8 @@ data class Topic(
     val entryForm: FormSpec? = null,
     val deleteForm: FormSpec? = null,
     val commentForm: FormSpec? = null,
+    /** The "görsel yükle" drop zone under the entry box: where pictures are posted and its hidden fields */
+    val imageUploadForm: FormSpec? = null,
     /** The topic's own path (/slug--id) as linked from its heading; differs on /entry/<id> pages */
     val topicPath: String = "",
     val topicId: String = "",

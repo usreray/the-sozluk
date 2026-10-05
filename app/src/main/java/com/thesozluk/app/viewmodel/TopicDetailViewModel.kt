@@ -354,6 +354,13 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
+    /** Uploads a picture for the entry being written; returns its link or throws with the reason. */
+    suspend fun uploadImage(bytes: ByteArray, fileName: String, mimeType: String): String {
+        val topic = _selectedTopic.value ?: throw java.io.IOException("başlık yüklenmedi")
+        val form = topic.imageUploadForm ?: throw java.io.IOException("görsel yükleme bu hesapta açık değil")
+        return repository.uploadImage(form, bytes, fileName, mimeType, topic.topicPath.ifBlank { topic.url })
+    }
+
     /** Saves an entry to the site's "kenar" list; local draft remains if the site rejects it. */
     fun saveSiteDraft(text: String, onSuccess: () -> Unit) {
         val topic = _selectedTopic.value ?: return
