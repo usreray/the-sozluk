@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.navigation
 
+import androidx.compose.animation.ExitTransition
 import com.thesozluk.app.ui.screens.LibraryScreen
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
@@ -29,7 +30,7 @@ import com.thesozluk.app.ui.screens.SettingsScreen
 import com.thesozluk.app.ui.screens.ImageViewerScreen
 import com.thesozluk.app.ui.screens.TopicDetailScreen
 
-private val tabRoutes = setOf(Screen.Home.route, Screen.Search.route, Screen.Profile.route)
+private val tabRoutes = setOf(Screen.Home.route, Screen.Search.route, Screen.Random.route, Screen.Profile.route)
 
 /** Switching bottom-bar tabs, as opposed to opening or leaving a screen. */
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.betweenTabs(): Boolean =
@@ -49,19 +50,23 @@ fun Navigation(navController: NavHostController) {
             if (betweenTabs()) fadeOut(tween(90))
             else slideOutOfContainer(SlideDirection.Start, tween(280)) + fadeOut(tween(280), targetAlpha = 0.6f)
         },
+        // Going back (the back gesture plays this with the finger): the page below is already in
+        // place, and the leaving page moves itself off in BackSwipe; the host only keeps it drawn
         popEnterTransition = {
             if (betweenTabs()) tabEnter()
-            else slideIntoContainer(SlideDirection.End, tween(280))
+            else EnterTransition.None
         },
         popExitTransition = {
             if (betweenTabs()) fadeOut(tween(90))
-            else slideOutOfContainer(SlideDirection.End, tween(280)) + fadeOut(tween(280), targetAlpha = 0.6f)
+            else ExitTransition.KeepUntilTransitionsFinished
         }
     ) {
-        composable(Screen.Home.route) { HomeScreen(navController) }
-        composable(Screen.Search.route) { SearchScreen(navController) }
-        composable(Screen.Profile.route) { ProfileScreen(navController) }
-        composable(
+        screen(navController, Screen.Home.route, backSwipe = false) { HomeScreen(navController) }
+        screen(navController, Screen.Search.route, backSwipe = false) { SearchScreen(navController) }
+        screen(navController, Screen.Random.route, backSwipe = false) { com.thesozluk.app.ui.screens.RandomScreen(navController) }
+        screen(navController, Screen.Profile.route, backSwipe = false) { ProfileScreen(navController) }
+        screen(
+            navController,
             route = Screen.Channels.pattern,
             arguments = listOf(
                 navArgument("path") { type = NavType.StringType; defaultValue = "" },
@@ -75,14 +80,16 @@ fun Navigation(navController: NavHostController) {
             )
         }
 
-        composable(
+        screen(
+            navController,
             Screen.Messages.pattern,
             arguments = listOf(navArgument("to") { type = NavType.StringType; defaultValue = "" }),
         ) { backStackEntry ->
             MessagesScreen(navController, composeTo = backStackEntry.arguments?.getString("to").orEmpty())
         }
 
-        composable(
+        screen(
+            navController,
             Screen.MessageThread.pattern,
             arguments = listOf(
                 navArgument("id") { type = NavType.StringType; defaultValue = "" },
@@ -96,7 +103,8 @@ fun Navigation(navController: NavHostController) {
             )
         }
 
-        composable(
+        screen(
+            navController,
             route = Screen.Author.pattern,
             arguments = listOf(navArgument("nick") { type = NavType.StringType; defaultValue = "" }),
         ) { backStackEntry ->
@@ -113,14 +121,16 @@ fun Navigation(navController: NavHostController) {
             ImageViewerScreen(ref = backStackEntry.arguments?.getString("ref").orEmpty(), navController = navController)
         }
 
-        composable(
+        screen(
+            navController,
             Screen.Settings.pattern,
             arguments = listOf(navArgument("section") { type = NavType.StringType; nullable = true; defaultValue = null })
         ) { backStackEntry ->
             SettingsScreen(navController, backStackEntry.arguments?.getString("section"))
         }
 
-        composable(
+        screen(
+            navController,
             Screen.Library.pattern,
             arguments = listOf(navArgument("kind") { type = NavType.StringType; defaultValue = "History" })
         ) { backStackEntry ->
@@ -133,19 +143,23 @@ fun Navigation(navController: NavHostController) {
         }
 
         // Login rises from the bottom like a sheet
-        composable(
+        screen(
+            navController,
             Screen.Login.route,
             enterTransition = { slideInVertically { it } + fadeIn() },
-            popExitTransition = { slideOutVertically { it } + fadeOut() }
+            popExitTransition = { slideOutVertically { it } + fadeOut() },
+            backSwipe = false
         ) { LoginScreen(navController) }
 
-        composable(
+        screen(
+            navController,
             route = Screen.TopicDetail.pattern,
             arguments = listOf(
                 navArgument("title") { type = NavType.StringType; defaultValue = "" },
                 navArgument("url") { type = NavType.StringType; defaultValue = "" },
                 navArgument("page") { type = NavType.IntType; defaultValue = 1 },
-                navArgument("compose") { type = NavType.BoolType; defaultValue = false }
+                navArgument("compose") { type = NavType.BoolType; defaultValue = false },
+                navArgument("focus") { type = NavType.StringType; defaultValue = "" }
             ),
         ) { backStackEntry ->
             TopicDetailScreen(
@@ -153,6 +167,7 @@ fun Navigation(navController: NavHostController) {
                 url = backStackEntry.arguments?.getString("url").orEmpty(),
                 startPage = backStackEntry.arguments?.getInt("page") ?: 1,
                 openComposer = backStackEntry.arguments?.getBoolean("compose") ?: false,
+                focusEntry = backStackEntry.arguments?.getString("focus").orEmpty(),
                 navController = navController
             )
         }

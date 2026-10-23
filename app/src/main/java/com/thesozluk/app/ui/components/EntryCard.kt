@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.BookmarkRemove
 import androidx.compose.material.icons.rounded.BookmarkAdd
@@ -445,9 +446,13 @@ private fun CommentsSection(
 /** şükela / çok kötü: chevrons like on the site; the active one is tinted. */
 @Composable
 private fun VoteButtons(entry: Entry, onVote: (Entry, Int) -> Unit) {
+    val up = remember { MutableInteractionSource() }
+    val down = remember { MutableInteractionSource() }
     IconToggleButton(
         checked = entry.isLiked,
         onCheckedChange = { onVote(entry, if (entry.isLiked) 0 else 1) },
+        interactionSource = up,
+        modifier = Modifier.pressBounce(up, pressedScale = 0.75f),
         colors = IconButtonDefaults.iconToggleButtonColors(
             checkedContentColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -458,6 +463,8 @@ private fun VoteButtons(entry: Entry, onVote: (Entry, Int) -> Unit) {
     IconToggleButton(
         checked = entry.isDisliked,
         onCheckedChange = { onVote(entry, if (entry.isDisliked) 0 else -1) },
+        interactionSource = down,
+        modifier = Modifier.pressBounce(down, pressedScale = 0.75f),
         colors = IconButtonDefaults.iconToggleButtonColors(
             checkedContentColor = MaterialTheme.colorScheme.error,
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -475,8 +482,14 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
         animationSpec = spring(dampingRatio = Spring.DampingRatioHighBouncy, stiffness = Spring.StiffnessMedium),
         label = "favScale"
     )
+    val favInteraction = remember { MutableInteractionSource() }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        IconToggleButton(checked = isFavorited, onCheckedChange = { onToggle() }) {
+        IconToggleButton(
+            checked = isFavorited,
+            onCheckedChange = { onToggle() },
+            interactionSource = favInteraction,
+            modifier = Modifier.pressBounce(favInteraction, pressedScale = 0.75f)
+        ) {
             Icon(
                 imageVector = if (isFavorited) FavoriteIcons.DropFilled else FavoriteIcons.Drop,
                 contentDescription = if (isFavorited) "favoriden çıkar" else "favorile",

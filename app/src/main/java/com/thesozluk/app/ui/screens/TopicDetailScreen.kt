@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.glassSource
+import androidx.compose.material3.Button
 import com.thesozluk.app.ui.components.ImageActions
 import com.thesozluk.app.ui.components.TopicFilterSheet
 import com.thesozluk.app.ui.components.ShareEntryImageSheet
@@ -151,6 +153,8 @@ fun TopicDetailScreen(
     navController: NavController,
     startPage: Int = 1,
     openComposer: Boolean = false,
+    /** An entry to scroll to once it is loaded (opened from "rastgele") */
+    focusEntry: String = "",
     /** In the tablet layout's right pane: closing clears the pane instead of leaving the screen */
     onClose: (() -> Unit)? = null,
     viewModel: TopicDetailViewModel = viewModel(
@@ -537,11 +541,21 @@ fun TopicDetailScreen(
                 TopicPhase.Empty -> MessageState(
                     icon = Icons.Rounded.SearchOff,
                     title = "burada bir şey yok",
-                    message = if (filter is TopicFilter.All) "böyle bir başlık yok ya da gösterilecek entry kalmamış."
-                    else "${filter.label} için entry bulunamadı.",
-                    action = if (filter is TopicFilter.All) null else ({
-                        FilledTonalButton(onClick = viewModel::showOlderEntries) { Text("tüm entry'leri göster") }
-                    })
+                    message = when {
+                        filter !is TopicFilter.All -> "${filter.label} için entry bulunamadı."
+                        canWrite -> "bu başlıkta henüz entry yok. ilk entry'yi sen yazabilirsin."
+                        else -> "böyle bir başlık yok ya da gösterilecek entry kalmamış."
+                    },
+                    action = when {
+                        filter !is TopicFilter.All -> ({
+                            FilledTonalButton(onClick = viewModel::showOlderEntries) { Text("tüm entry'leri göster") }
+                        })
+                        // An empty (or not yet opened) topic: the first entry opens it
+                        canWrite -> ({
+                            Button(onClick = { showComposer = true }) { Text("ilk entry'yi yaz") }
+                        })
+                        else -> null
+                    }
                 )
                 // Pulling down at the top reloads the pages on screen (new entries, votes). The
                 // list itself moves down with the finger and the loading animation sits in the gap
@@ -557,9 +571,19 @@ fun TopicDetailScreen(
                     // would cover its page marker with the animation
                     enabled = firstPage == 1
                 ) { pullOffset ->
+                // Opened for one entry: bring it into view once its page has loaded
+                var focused by rememberSaveable(focusEntry) { mutableStateOf(focusEntry.isBlank()) }
+                LaunchedEffect(rows) {
+                    if (focused) return@LaunchedEffect
+                    val index = rows.indexOfFirst { it.key == "entry:$focusEntry" }
+                    if (index >= 0) {
+                        focused = true
+                        listState.scrollToItem(index)
+                    }
+                }
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().then(pullOffset),
+                    modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = topInset, bottom = 128.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {

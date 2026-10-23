@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.glassSource
 import com.thesozluk.app.ui.components.ShareEntryImageSheet
 import com.thesozluk.app.settings.EntryBookmarks
 import com.thesozluk.app.ui.components.RevealPullToRefresh
@@ -273,7 +274,7 @@ fun AuthorScreen(
                 ) { pullOffset ->
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().then(pullOffset),
+                    modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = floatingTopBarInset(compact = true), bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {

@@ -21,6 +21,9 @@ class EksiViewModelFactory(private val application: Application) : ViewModelProv
             modelClass.isAssignableFrom(HomeViewModel::class.java) -> {
                 HomeViewModel(repository) as T
             }
+            modelClass.isAssignableFrom(RandomViewModel::class.java) -> {
+                RandomViewModel(repository) as T
+            }
             modelClass.isAssignableFrom(SearchViewModel::class.java) -> {
                 SearchViewModel(repository) as T
             }

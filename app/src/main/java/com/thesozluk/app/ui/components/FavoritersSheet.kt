@@ -64,6 +64,7 @@ fun FavoritersSheet(
     // to settle at a half state and shrink once the list replaced the loading indicator
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        SheetBlur.BlurBehind()
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 12.dp)

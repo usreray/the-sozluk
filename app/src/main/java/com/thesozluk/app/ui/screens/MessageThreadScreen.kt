@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.glassSource
 import androidx.compose.foundation.layout.height
 import com.thesozluk.app.ui.components.shimmer
 import com.thesozluk.app.ui.components.rememberAvatarUrl
@@ -223,7 +224,7 @@ fun MessageThreadScreen(
                 )
                 else -> LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().glassSource(),
                     contentPadding = PaddingValues(
                         start = 12.dp,
                         end = 12.dp,

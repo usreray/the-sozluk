@@ -1,5 +1,13 @@
 package com.thesozluk.app
 
+import androidx.compose.runtime.getValue
+import com.thesozluk.app.ui.components.SheetBlur
+import androidx.compose.ui.draw.blur
+import androidx.compose.animation.core.animateDpAsState
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import androidx.compose.material.icons.outlined.Casino
+import androidx.compose.material.icons.rounded.Casino
 import com.thesozluk.app.ui.navigation.openEksiLink
 import com.thesozluk.app.ui.components.EksiLink
 import com.thesozluk.app.ui.components.eksiLinkFor
@@ -138,6 +146,7 @@ class MainActivity : ComponentActivity() {
 private val topLevelDestinations = listOf(
     NavDestination(Screen.Home.route, "akış", Icons.Rounded.Home, Icons.Outlined.Home),
     NavDestination(Screen.Search.route, "ara", Icons.Rounded.Search, Icons.Rounded.Search),
+    NavDestination(Screen.Random.route, "rastgele", Icons.Rounded.Casino, Icons.Outlined.Casino),
     NavDestination(Screen.Profile.route, "profil", Icons.Rounded.Person, Icons.Outlined.Person)
 )
 
@@ -197,13 +206,48 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
         }
         pendingOpen.value = null
     }
+    // A newer release on GitHub: offered once, at most twice a day (settings: hakkında)
+    LaunchedEffect(Unit) {
+        if (AppSettings.checkUpdates.value) com.thesozluk.app.settings.AppUpdates.check(context)
+    }
+    com.thesozluk.app.settings.AppUpdates.available.value?.let { release ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { com.thesozluk.app.settings.AppUpdates.dismiss(context) },
+            title = { androidx.compose.material3.Text("yeni sürüm var") },
+            text = {
+                androidx.compose.material3.Text(
+                    "${release.name} yayımlandı. şu an kullandığın sürüm ${com.thesozluk.app.settings.AppUpdates.installedVersion(context)}."
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    runCatching { uriHandler.openUri(release.url) }
+                    com.thesozluk.app.settings.AppUpdates.dismiss(context)
+                }) { androidx.compose.material3.Text("indir") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { com.thesozluk.app.settings.AppUpdates.dismiss(context) }) {
+                    androidx.compose.material3.Text("sonra")
+                }
+            }
+        )
+    }
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     // Reading, profiles, settings and login are full screen; the bar belongs to the tabs
     val showBar = topLevelDestinations.any { it.route == currentRoute }
 
-    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        CompositionLocalProvider(LocalBottomBarInset provides if (showBar) FloatingNavBarInset else 0.dp) {
-            Navigation(navController)
+    // The pages under the nav bar, blurred into it; the whole app softens while a sheet is open
+    val navGlass = rememberHazeState()
+    val sheetBlur by animateDpAsState(
+        if (SheetBlur.count > 0 && AppSettings.blurEffects.value) 6.dp else 0.dp,
+        animationSpec = if (com.thesozluk.app.ui.components.motionReduced()) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(),
+        label = "sheetBlur"
+    )
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).blur(sheetBlur)) {
+        Box(Modifier.fillMaxSize().hazeSource(navGlass)) {
+            CompositionLocalProvider(LocalBottomBarInset provides if (showBar) FloatingNavBarInset else 0.dp) {
+                Navigation(navController)
+            }
         }
         // Edge to edge: content scrolls under the status bar, so the bar gets a soft scrim of the
         // surface color that keeps the clock and icons readable (not over full-screen images)
@@ -223,6 +267,7 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
             modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp)
         ) {
             FloatingNavBar(
+                glassState = navGlass,
                 destinations = topLevelDestinations,
                 selectedRoute = currentRoute,
                 onSelect = { destination ->

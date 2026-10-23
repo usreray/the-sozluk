@@ -162,8 +162,9 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
                 _firstPage.value = loadedPage
                 _lastPage.value = loadedPage
                 _totalPages.value = result.totalPages
-                // A jumped-to page opens at its own start (its page marker)
-                scrollState.scrollToItem(0)
+                // A jumped-to page opens at its own start (its page marker). An empty topic has no
+                // list on screen, and scrolling a list that isn't laid out waits for it forever
+                if (result.entries.isNotEmpty()) scrollState.scrollToItem(0)
                 prefetchAfter(loadedPage)
             } catch (e: CancellationException) {
                 throw e

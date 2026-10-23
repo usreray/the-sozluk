@@ -99,6 +99,7 @@ Uygulamanın son sürümüne ait APK dosyası [Releases](https://github.com/usre
 
 ## Gizlilik
 
-- Uygulama yalnızca eksisozluk.com ile iletişim kurar; herhangi bir analiz, reklam veya izleme bileşeni içermez.
+- Uygulama içerik için yalnızca eksisozluk.com ile iletişim kurar; herhangi bir analiz, reklam veya izleme bileşeni içermez.
+- Yeni sürüm kontrolü için GitHub'a bağlanılır; bu kontrol ayarlardan kapatılabilir.
 - Oturum bilgileri yalnızca cihazda saklanır.
 - Okuma geçmişi, taslaklar ve kaydedilen içerikler cihaz dışına aktarılmaz.

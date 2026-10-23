@@ -1,5 +1,15 @@
 package com.thesozluk.app.ui.components
 
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.rounded.Casino
+import androidx.compose.material.icons.outlined.Casino
+import androidx.compose.material.icons.Icons
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandHorizontally
@@ -50,12 +60,16 @@ fun FloatingNavBar(
     destinations: List<NavDestination>,
     selectedRoute: String?,
     onSelect: (NavDestination) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** The app content behind the bar, blurred into it */
+    glassState: dev.chrisbanes.haze.HazeState? = null
 ) {
+    val glass = glassState != null && com.thesozluk.app.settings.AppSettings.blurEffects.value
+    val colors = FloatingToolbarDefaults.standardFloatingToolbarColors()
     HorizontalFloatingToolbar(
         expanded = true,
-        modifier = modifier,
-        colors = FloatingToolbarDefaults.standardFloatingToolbarColors()
+        modifier = modifier.glass(CircleShape, glassState),
+        colors = if (glass) colors.copy(toolbarContainerColor = colors.toolbarContainerColor.copy(alpha = 0.62f)) else colors
     ) {
         destinations.forEach { destination ->
             NavPill(destination, selected = destination.route == selectedRoute) { onSelect(destination) }
@@ -65,6 +79,29 @@ fun FloatingNavBar(
 
 @Composable
 private fun NavPill(destination: NavDestination, selected: Boolean, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val scope = rememberCoroutineScope()
+    // Each tap gives the icon a small move: the dice rolls a full turn, the others wiggle
+    val turn = remember { Animatable(0f) }
+    val pop = remember { Animatable(1f) }
+    val reduced = motionReduced()
+    val play: () -> Unit = play@{
+        if (reduced) return@play
+        scope.launch {
+            if (destination.icon == Icons.Outlined.Casino || destination.selectedIcon == Icons.Rounded.Casino) {
+                turn.snapTo(0f)
+                turn.animateTo(360f, spring(dampingRatio = 0.55f, stiffness = 180f))
+                turn.snapTo(0f)
+            } else {
+                turn.snapTo(-14f)
+                turn.animateTo(0f, spring(dampingRatio = 0.3f, stiffness = 500f))
+            }
+        }
+        scope.launch {
+            pop.snapTo(0.7f)
+            pop.animateTo(1f, spring(dampingRatio = 0.35f, stiffness = 600f))
+        }
+    }
     val container by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
         label = "navPill"
@@ -74,11 +111,12 @@ private fun NavPill(destination: NavDestination, selected: Boolean, onClick: () 
         label = "navPillContent"
     )
     Surface(
-        onClick = onClick,
+        onClick = { play(); onClick() },
         shape = CircleShape,
         color = container,
         contentColor = content,
-        modifier = Modifier.height(48.dp)
+        interactionSource = interaction,
+        modifier = Modifier.height(48.dp).pressBounce(interaction, pressedScale = 0.9f)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -87,7 +125,11 @@ private fun NavPill(destination: NavDestination, selected: Boolean, onClick: () 
             Icon(
                 imageVector = if (selected) destination.selectedIcon else destination.icon,
                 contentDescription = destination.label,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp).graphicsLayer {
+                    rotationZ = turn.value
+                    scaleX = pop.value
+                    scaleY = pop.value
+                }
             )
             AnimatedVisibility(
                 visible = selected,

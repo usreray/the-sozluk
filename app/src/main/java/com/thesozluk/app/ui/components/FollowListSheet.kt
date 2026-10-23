@@ -61,6 +61,7 @@ fun FollowListSheet(
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        SheetBlur.BlurBehind()
         Column(modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLargeEmphasized)
             val list = users

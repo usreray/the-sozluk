@@ -50,11 +50,15 @@ enum class ContrastChoice(val label: String, val level: Double) {
 }
 
 /** Typeface for entry text. */
-enum class ReadingFont(val label: String, val family: FontFamily) {
+enum class ReadingFont(val label: String, private val base: FontFamily) {
     Default("varsayılan", FontFamily.Default),
     Serif("tırnaklı", FontFamily.Serif),
     Sans("yalın", FontFamily.SansSerif),
-    Mono("daktilo", FontFamily.Monospace)
+    Mono("daktilo", FontFamily.Monospace),
+    /** A font file the user picked (see CustomFont) */
+    Custom("kendi", FontFamily.Default);
+
+    val family: FontFamily get() = if (this == Custom) CustomFont.family.value ?: FontFamily.Default else base
 }
 
 /** Appearance preferences, kept in SharedPreferences and exposed as Compose state. */
@@ -71,6 +75,15 @@ object AppSettings {
     /** Pure black surfaces in dark mode (saves battery on OLED screens) */
     private val _pureBlack = mutableStateOf(false)
     val pureBlack: State<Boolean> = _pureBlack
+
+    // Frosted bars, blurred spoilers and a soft blur behind sheets
+    private val _blurEffects = mutableStateOf(true)
+    val blurEffects: State<Boolean> = _blurEffects
+
+    fun setBlurEffects(enabled: Boolean) {
+        _blurEffects.value = enabled
+        prefs.edit().putBoolean("blurEffects", enabled).apply()
+    }
 
     private val _seed = mutableStateOf(SeedColor.Brand)
     val seed: State<SeedColor> = _seed
@@ -138,6 +151,43 @@ object AppSettings {
     private val _openTabsTwoColumn = mutableStateOf(false)
     val openTabsTwoColumn: State<Boolean> = _openTabsTwoColumn
 
+    // The reading font for the whole interface, not only entries
+    private val _fontEverywhere = mutableStateOf(false)
+    val fontEverywhere: State<Boolean> = _fontEverywhere
+
+    fun setFontEverywhere(enabled: Boolean) {
+        _fontEverywhere.value = enabled
+        prefs.edit().putBoolean("fontEverywhere", enabled).apply()
+    }
+
+    // Heavier text across the app, like the system's bold text
+    private val _boldText = mutableStateOf(false)
+    val boldText: State<Boolean> = _boldText
+
+    fun setBoldText(enabled: Boolean) {
+        _boldText.value = enabled
+        prefs.edit().putBoolean("boldText", enabled).apply()
+    }
+
+    // Fewer animations: no springs or wiggles, quicker plain transitions (the system's
+    // "remove animations" turns this on as well, see motionReduced)
+    private val _reduceMotion = mutableStateOf(false)
+    val reduceMotion: State<Boolean> = _reduceMotion
+
+    fun setReduceMotion(enabled: Boolean) {
+        _reduceMotion.value = enabled
+        prefs.edit().putBoolean("reduceMotion", enabled).apply()
+    }
+
+    // Look for a newer release on GitHub (see AppUpdates)
+    private val _checkUpdates = mutableStateOf(true)
+    val checkUpdates: State<Boolean> = _checkUpdates
+
+    fun setCheckUpdates(enabled: Boolean) {
+        _checkUpdates.value = enabled
+        prefs.edit().putBoolean("checkUpdates", enabled).apply()
+    }
+
     fun setReadingFont(font: ReadingFont) {
         _readingFont.value = font
         prefs.edit().putInt("readingFont", font.ordinal).apply()
@@ -171,6 +221,11 @@ object AppSettings {
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         _readingFont.value = ReadingFont.entries.getOrElse(prefs.getInt("readingFont", 0)) { ReadingFont.Default }
+        _fontEverywhere.value = prefs.getBoolean("fontEverywhere", false)
+        _reduceMotion.value = prefs.getBoolean("reduceMotion", false)
+        _checkUpdates.value = prefs.getBoolean("checkUpdates", true)
+        CustomFont.init(context.applicationContext)
+        _boldText.value = prefs.getBoolean("boldText", false)
         _lineSpacing.floatValue = prefs.getFloat("lineSpacing", 1f)
         _entryPadding.floatValue = prefs.getFloat("entryPadding", 20f)
         _historyEnabled.value = prefs.getBoolean("historyEnabled", true)
@@ -192,6 +247,7 @@ object AppSettings {
         // The logo's purple by default; wallpaper colors are a choice in settings
         _dynamicColor.value = prefs.getBoolean("dynamicColor", false)
         _pureBlack.value = prefs.getBoolean("pureBlack", false)
+        _blurEffects.value = prefs.getBoolean("blurEffects", true)
         _textScale.floatValue = prefs.getFloat("textScale", 1f)
         _seed.value = SeedColor.entries.getOrElse(prefs.getInt("seed", SeedColor.Brand.ordinal)) { SeedColor.Brand }
         _palette.value = PaletteChoice.entries.getOrElse(prefs.getInt("palette", 0)) { PaletteChoice.TonalSpot }

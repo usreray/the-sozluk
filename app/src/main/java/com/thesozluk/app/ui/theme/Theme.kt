@@ -91,8 +91,13 @@ fun TheSozlukTheme(content: @Composable () -> Unit) {
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         // Springy, slightly overshooting motion for every M3 component
-        motionScheme = MotionScheme.expressive(),
-        typography = scaledTypography(AppSettings.textScale.value),
+        // Plain, quicker motion when animations are reduced
+        motionScheme = if (com.thesozluk.app.ui.components.motionReduced()) MotionScheme.standard() else MotionScheme.expressive(),
+        typography = scaledTypography(
+            AppSettings.textScale.value,
+            family = AppSettings.readingFont.value.family.takeIf { AppSettings.fontEverywhere.value },
+            bold = AppSettings.boldText.value
+        ),
         content = content
     )
 }

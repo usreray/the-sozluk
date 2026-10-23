@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.glassSource
 import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -112,7 +113,7 @@ fun LibraryScreen(
     ) { padding ->
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().glassSource(),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = padding.calculateTopPadding(), bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {

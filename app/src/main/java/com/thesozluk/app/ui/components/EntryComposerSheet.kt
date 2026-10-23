@@ -148,6 +148,7 @@ fun EntryComposerSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        SheetBlur.BlurBehind()
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)

@@ -63,6 +63,7 @@ fun ShareEntryImageSheet(entry: Entry, topicTitle: String, onDismiss: () -> Unit
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        SheetBlur.BlurBehind()
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),

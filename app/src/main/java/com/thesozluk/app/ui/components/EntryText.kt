@@ -1,5 +1,8 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
@@ -100,7 +103,8 @@ fun rememberEntryText(
     )
     val coverColor = MaterialTheme.colorScheme.onSurfaceVariant
     val showLinkAddresses = AppSettings.showLinkAddresses.value
-    return remember(html, plain, linkStyle, showLinkAddresses, spoilersHidden, onToggleSpoilers != null, coverColor) {
+    val blur = AppSettings.blurEffects.value
+    return remember(html, plain, linkStyle, showLinkAddresses, spoilersHidden, onToggleSpoilers != null, coverColor, blur) {
         if (html.isBlank()) AnnotatedString(plain)
         else buildAnnotatedString {
             // The site indents lines after <br>; drop that so paragraphs start flush
@@ -119,7 +123,11 @@ fun rememberEntryText(
                 val end = text.indexOfLast { !it.isWhitespace() } + 1
                 append(text.substring(0, start))
                 withLink(LinkAnnotation.Clickable("spoiler-reveal") { onToggleSpoilers?.invoke() }) {
-                    withStyle(SpanStyle(color = coverColor, background = coverColor)) {
+                    // Blurred words when blur is on (transparent letters with a soft shadow), a bar otherwise
+                    withStyle(
+                        if (blur) SpanStyle(color = Color.Transparent, shadow = Shadow(coverColor, Offset.Zero, blurRadius = 22f))
+                        else SpanStyle(color = coverColor, background = coverColor)
+                    ) {
                         append(text.substring(start, end))
                     }
                 }

@@ -173,7 +173,9 @@ object HtmlParser {
                         entriesLoaded = true,
                         redirectedUrl = redirectedPath,
                         totalPages = totalPages,
-                        currentPage = page,
+                        // ?focusto= pages answer with the page the entry is on; the pager says which
+                        currentPage = topicContainer.selectFirst(".pager[data-currentpage]")
+                                ?.attr("data-currentpage")?.toIntOrNull()?.takeIf { it >= 1 } ?: page,
                         olderEntriesCount = olderCount,
                         entryForm = findEntryForm(document),
                         deleteForm = findDeleteForm(document),

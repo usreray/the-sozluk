@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.glassSource
 import androidx.compose.foundation.Image
 import com.thesozluk.app.ui.components.BrandIcons
 import androidx.compose.material.icons.rounded.CloudDone
@@ -123,7 +124,7 @@ fun ProfileScreen(
         // Edge to edge: the list starts below the bar but scrolls under it and the status bar
         LazyColumn(
             state = viewModel.scrollState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().glassSource(),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,

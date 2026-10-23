@@ -71,6 +71,7 @@ fun AdvancedSearchSheet(initialKeywords: String, onSearch: (path: String, name: 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        SheetBlur.BlurBehind()
         Column(
             modifier = Modifier
                 .fillMaxWidth()

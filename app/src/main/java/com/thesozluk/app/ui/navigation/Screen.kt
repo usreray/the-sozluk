@@ -6,6 +6,7 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
     object Search : Screen("search")
     object Profile : Screen("profile")
+    object Random : Screen("random")
     object Login : Screen("login")
     object Settings : Screen("settings") {
         const val pattern = "settings?section={section}"
@@ -39,10 +40,11 @@ sealed class Screen(val route: String) {
         fun createRoute(nick: String): String = "author?nick=${Uri.encode(nick.trim().removePrefix("@"))}"
     }
     object TopicDetail : Screen("topic_detail") {
-        const val pattern = "topic_detail?title={title}&url={url}&page={page}&compose={compose}"
+        const val pattern = "topic_detail?title={title}&url={url}&page={page}&compose={compose}&focus={focus}"
 
         // Uri.encode keeps '/', '?' and spaces intact through Navigation's argument decoding
-        fun createRoute(title: String, url: String, page: Int = 1, compose: Boolean = false): String =
-            "topic_detail?title=${Uri.encode(title)}&url=${Uri.encode(url)}&page=$page&compose=$compose"
+        /** [focus]: an entry id to scroll to once its page is on screen */
+        fun createRoute(title: String, url: String, page: Int = 1, compose: Boolean = false, focus: String = ""): String =
+            "topic_detail?title=${Uri.encode(title)}&url=${Uri.encode(url)}&page=$page&compose=$compose&focus=${Uri.encode(focus)}"
     }
 }

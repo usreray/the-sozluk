@@ -21,6 +21,12 @@ import java.net.URLEncoder
 /** ekşi answered 404: no such topic (e.g. a search with no match). */
 class TopicNotFoundException : IOException("böyle bir başlık yok")
 
+/** The page came back but without the parts the app reads: the site's layout probably changed. */
+class SiteChangedException : IOException(
+    "sayfa okunamadı; ekşi sözlük sitesini değiştirmiş olabilir. uygulamanın güncellenmesi gerekebilir; " +
+        "sürerse ayarlar → hakkında → sorun bildir."
+)
+
 object EksiNetworkDataSource {
     private const val BASE_URL = EksiSession.BASE_URL
     private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"
@@ -122,7 +128,7 @@ object EksiNetworkDataSource {
             else -> false
         }
         if (topics.isEmpty() && !emptyPersonalList && document.selectFirst(".topic-list, #content-body, #partial-index") == null) {
-            throw IOException("başlık listesi okunamadı")
+            throw SiteChangedException()
         }
 
         return@withContext topics
@@ -150,12 +156,22 @@ object EksiNetworkDataSource {
         val connection = applyCommonConnectionSettings(session.newRequest("$BASE_URL$searchUrl"))
         val response = connection.execute()
 
-        if (response.statusCode() == 404) throw TopicNotFoundException()
+        if (response.statusCode() == 404) {
+            // A topic with no entries yet answers 404, but for logged-in users the page still
+            // carries the entry form that opens it with the first entry
+            val empty = HtmlParser.parseTopicDetail(response.parse(), query, page, searchUrl, BASE_URL)
+            if (empty.entryForm?.textFieldName == null) throw TopicNotFoundException()
+            return@withContext empty.copy(entries = emptyList(), entriesLoaded = true)
+        }
         if (response.statusCode() != 200) {
             throw IOException("başlık yüklenemedi (HTTP ${response.statusCode()})")
         }
 
         val document = response.parse()
+        // A topic page always has its heading and entry list; neither means the layout changed
+        if (document.selectFirst("#title") == null && document.selectFirst("#entry-item-list") == null) {
+            throw SiteChangedException()
+        }
         return@withContext HtmlParser.parseTopicDetail(document, query, page, searchUrl, BASE_URL)
     }
     

@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.SheetBlur
+import com.thesozluk.app.ui.components.glassSource
 import com.thesozluk.app.settings.AppSettings
 import com.thesozluk.app.ui.components.RevealPullToRefresh
 import androidx.compose.animation.core.animate
@@ -187,7 +189,7 @@ fun MessagesScreen(
                     }
                     LazyColumn(
                         state = threadListState,
-                        modifier = Modifier.fillMaxSize().then(pullOffset),
+                        modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top + 4.dp, bottom = 96.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
@@ -290,6 +292,7 @@ fun NewMessageSheet(initialTo: String, isSending: Boolean, onSend: (String, Stri
     var to by rememberSaveable { mutableStateOf(initialTo) }
     var text by rememberSaveable { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        SheetBlur.BlurBehind()
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)

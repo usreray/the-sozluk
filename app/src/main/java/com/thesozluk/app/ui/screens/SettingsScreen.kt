@@ -1,5 +1,12 @@
 package com.thesozluk.app.ui.screens
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalUriHandler
+import com.thesozluk.app.settings.AppUpdates
+import com.thesozluk.app.settings.CustomFont
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import com.thesozluk.app.ui.components.glassSource
 import android.content.Intent
 import android.content.pm.verify.domain.DomainVerificationManager
 import android.content.pm.verify.domain.DomainVerificationUserState
@@ -160,7 +167,7 @@ fun SettingsScreen(navController: NavController, section: String? = null) {
         // Edge to edge: the list starts below the bar but scrolls under it and the status bar
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().glassSource(),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
@@ -246,8 +253,12 @@ private fun CategoryRow(section: SettingsSection, summary: String, shape: Shape,
 private fun LazyListScope.appearance() {
     item { SectionTitle(
         "tema",
-        changed = AppSettings.themeMode.value != ThemeMode.System || AppSettings.pureBlack.value,
-        onReset = { AppSettings.setThemeMode(ThemeMode.System); AppSettings.setPureBlack(false) }
+        changed = AppSettings.themeMode.value != ThemeMode.System || AppSettings.pureBlack.value ||
+            !AppSettings.blurEffects.value || AppSettings.reduceMotion.value,
+        onReset = {
+            AppSettings.setThemeMode(ThemeMode.System); AppSettings.setPureBlack(false)
+            AppSettings.setBlurEffects(true); AppSettings.setReduceMotion(false)
+        }
     ) }
     item {
         val themeMode by AppSettings.themeMode
@@ -297,6 +308,27 @@ private fun LazyListScope.appearance() {
             enabled = isAppInDarkTheme(),
             shape = segmentedShape(2, 3),
             onCheckedChange = AppSettings::setPureBlack
+        )
+    }
+    item { Spacer(Modifier.height(8.dp)) }
+    item {
+        SwitchRow(
+            title = "bulanık efektler",
+            subtitle = "buzlu cam çubuklar, bulanık spoiler, pencerelerin arkası",
+            checked = AppSettings.blurEffects.value,
+            enabled = true,
+            shape = segmentedShape(0, 2),
+            onCheckedChange = AppSettings::setBlurEffects
+        )
+    }
+    item {
+        SwitchRow(
+            title = "hareketi azalt",
+            subtitle = "yaylı animasyonlar ve simge hareketleri kapanır. telefonda animasyonlar kapalıysa kendiliğinden açılır",
+            checked = AppSettings.reduceMotion.value,
+            enabled = true,
+            shape = segmentedShape(1, 2),
+            onCheckedChange = AppSettings::setReduceMotion
         )
     }
     item { SectionTitle(
@@ -381,10 +413,12 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
     item { SectionTitle(
         "metin",
         changed = AppSettings.textScale.value != 1f || AppSettings.readingFont.value != ReadingFont.Default ||
-            AppSettings.lineSpacing.value != 1f || AppSettings.entryPadding.value != 20f,
+            AppSettings.lineSpacing.value != 1f || AppSettings.entryPadding.value != 20f ||
+            AppSettings.fontEverywhere.value || AppSettings.boldText.value,
         onReset = {
             AppSettings.setTextScale(1f); AppSettings.setReadingFont(ReadingFont.Default)
             AppSettings.setLineSpacing(1f); AppSettings.setEntryPadding(20f)
+            AppSettings.setFontEverywhere(false); AppSettings.setBoldText(false)
         }
     ) }
     item {
@@ -402,18 +436,75 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("yazı tipi", style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
-                    ReadingFont.entries.forEachIndexed { index, font ->
+                    val fonts = ReadingFont.entries.filter { it != ReadingFont.Custom || CustomFont.family.value != null }
+                    fonts.forEachIndexed { index, font ->
                         ToggleButton(
                             checked = AppSettings.readingFont.value == font,
                             onCheckedChange = { AppSettings.setReadingFont(font) },
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(horizontal = 4.dp),
-                            shapes = connectedShapes(index, ReadingFont.entries.size)
+                            shapes = connectedShapes(index, fonts.size)
                         ) { Text(font.label, fontFamily = font.family, maxLines = 1, softWrap = false) }
                     }
                 }
             }
         }
+    }
+    item {
+        // A .ttf / .otf from the phone becomes the "kendi" font
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val pickFont = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) scope.launch {
+                if (CustomFont.set(context, uri)) AppSettings.setReadingFont(ReadingFont.Custom)
+                else Toast.makeText(context, "bu dosya okunabilen bir yazı tipi değil", Toast.LENGTH_LONG).show()
+            }
+        }
+        val hasCustom = CustomFont.family.value != null
+        Surface(shape = segmentedShape(1, 4), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("kendi yazı tipin", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        if (hasCustom) "seçildi; listede \"kendi\" olarak duruyor" else "telefondaki bir .ttf ya da .otf dosyası",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (hasCustom) {
+                    TextButton(onClick = {
+                        if (AppSettings.readingFont.value == ReadingFont.Custom) AppSettings.setReadingFont(ReadingFont.Default)
+                        CustomFont.clear(context)
+                    }) { Text("kaldır") }
+                }
+                TextButton(onClick = { pickFont.launch(arrayOf("font/*", "application/x-font-ttf", "application/x-font-otf", "application/octet-stream")) }) {
+                    Text(if (hasCustom) "değiştir" else "dosya seç")
+                }
+            }
+        }
+    }
+    item {
+        SwitchRow(
+            title = "yazı tipini her yerde kullan",
+            subtitle = "seçtiğin yazı tipini sadece entry'lerde değil, menülerde ve başlıklarda da kullan",
+            checked = AppSettings.fontEverywhere.value,
+            enabled = true,
+            shape = segmentedShape(1, 4),
+            onCheckedChange = AppSettings::setFontEverywhere
+        )
+    }
+    item {
+        SwitchRow(
+            title = "kalın yazı",
+            subtitle = "uygulamadaki bütün yazılar daha kalın",
+            checked = AppSettings.boldText.value,
+            enabled = true,
+            shape = segmentedShape(1, 4),
+            onCheckedChange = AppSettings::setBoldText
+        )
     }
     item {
         SliderRow(
@@ -874,6 +965,67 @@ private fun LazyListScope.about() {
                 Text(
                     "ekşi sözlük'ün resmi uygulaması değildir; içerik eksisozluk.com'dan okunur, hesabınla yapılan her işlem site üzerinden gider.",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+    item { SectionTitle(
+        "güncelleme ve destek",
+        changed = !AppSettings.checkUpdates.value,
+        onReset = { AppSettings.setCheckUpdates(true) }
+    ) }
+    item {
+        SwitchRow(
+            title = "güncellemeleri kontrol et",
+            subtitle = "yeni sürüm çıkınca haber ver; bunun için github'a bağlanılır",
+            checked = AppSettings.checkUpdates.value,
+            enabled = true,
+            shape = segmentedShape(0, 3),
+            onCheckedChange = AppSettings::setCheckUpdates
+        )
+    }
+    item {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        var checking by remember { mutableStateOf(false) }
+        Surface(
+            onClick = {
+                if (!checking) scope.launch {
+                    checking = true
+                    val release = AppUpdates.check(context, force = true)
+                    checking = false
+                    if (release == null) Toast.makeText(context, "en güncel sürümü kullanıyorsun", Toast.LENGTH_SHORT).show()
+                }
+            },
+            shape = segmentedShape(1, 3),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Text("şimdi kontrol et", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (checking) "bakılıyor…" else "kullandığın sürüm ${appVersion()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+    item {
+        val context = LocalContext.current
+        val uriHandler = LocalUriHandler.current
+        Surface(
+            onClick = { runCatching { uriHandler.openUri(AppUpdates.issueUrl(context)) } },
+            shape = segmentedShape(2, 3),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Text("sorun bildir", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "github'da bir hata kaydı açılır; sürüm ve cihaz bilgisi hazır gelir, göndermeden önce görürsün",
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }

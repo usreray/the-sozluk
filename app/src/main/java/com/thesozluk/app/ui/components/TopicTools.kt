@@ -253,6 +253,7 @@ fun TopicFilterSheet(current: TopicFilter, isLoggedIn: Boolean, nick: String?, o
         }
     }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        SheetBlur.BlurBehind()
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)

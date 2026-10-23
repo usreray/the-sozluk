@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.glassSource
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import com.thesozluk.app.ui.components.RevealPullToRefresh
@@ -129,7 +130,7 @@ fun ChannelsScreen(
                     else -> RevealPullToRefresh(isRefreshing = state.isLoading, onRefresh = viewModel::retry, top = 0.dp) { pullOffset ->
                         LazyColumn(
                             state = listState,
-                            modifier = Modifier.fillMaxSize().then(pullOffset),
+                            modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                             verticalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
