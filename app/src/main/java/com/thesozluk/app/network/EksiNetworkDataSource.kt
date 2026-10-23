@@ -491,6 +491,12 @@ object EksiNetworkDataSource {
      * The file behind an uploaded image. Entries link to a /img/<code> page that only wraps the
      * picture (img#image, also in og:image); cdn addresses are already the file.
      */
+    /** Entry ids of uploaded pictures, read from their pages by [resolveImageUrl]. */
+    private val imageEntries = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** The entry an uploaded picture was posted in, once its page has been read. */
+    fun entryOfImage(ref: String): String? = imageEntries[ref]
+
     suspend fun resolveImageUrl(ref: String): String = withContext(Dispatchers.IO) {
         if (ref.startsWith("http") && !ref.contains("eksisozluk.com/img/")) return@withContext ref
         val path = if (ref.startsWith("http")) ref.substringAfter("eksisozluk.com") else ref
@@ -499,6 +505,11 @@ object EksiNetworkDataSource {
             .execute()
         if (response.statusCode() != 200) throw IOException("görsel bulunamadı (HTTP ${response.statusCode()})")
         val document = response.parse()
+        // The picture page links the entry it was posted in ("entry'ye git")
+        document.selectFirst("a[href^=/entry/]")?.attr("href")
+            ?.removePrefix("/entry/")?.substringBefore('/')?.substringBefore('?')
+            ?.takeIf { id -> id.all(Char::isDigit) && id.isNotEmpty() }
+            ?.let { imageEntries[ref] = it }
         val src = document.selectFirst("img#image")?.attr("src")?.ifBlank { null }
             ?: document.selectFirst("meta[property=og:image]")?.attr("content")?.ifBlank { null }
             ?: throw IOException("görsel bulunamadı")

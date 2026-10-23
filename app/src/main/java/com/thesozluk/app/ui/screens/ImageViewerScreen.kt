@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.navigation.Screen
+import androidx.compose.material.icons.automirrored.rounded.Article
 import android.content.Intent
 import android.content.ContentValues
 import android.provider.MediaStore
@@ -134,6 +136,15 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
             modifier = Modifier.align(Alignment.TopCenter),
             // Same icon color as the back button
             actions = if (current == null) null else ({
+                // The entry this picture was posted in (known once its page was read)
+                val entryId = refs.getOrNull(pager.currentPage)?.let { EksiNetworkDataSource.entryOfImage(it) }
+                if (entryId != null) {
+                    IconButton(onClick = {
+                        navController.navigate(Screen.TopicDetail.createRoute("#$entryId", "/entry/$entryId"))
+                    }) {
+                        Icon(Icons.AutoMirrored.Rounded.Article, contentDescription = "entry'ye git")
+                    }
+                }
                 IconButton(onClick = {
                     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, current)
                     context.startActivity(Intent.createChooser(send, null))
