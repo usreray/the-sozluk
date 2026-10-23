@@ -207,6 +207,42 @@ class TopicDetailViewModel(private val repository: EksiRepository) : ViewModel()
         }
     }
 
+    private val _checkingNew = mutableStateOf(false)
+    val checkingNew: State<Boolean> = _checkingNew
+
+    /**
+     * Pulled up at the end of the topic: the last page again, with any entries written since,
+     * and on to the next page if the topic grew one.
+     */
+    fun checkForNewEntries() {
+        val topic = _selectedTopic.value ?: return
+        if (!topic.entriesLoaded || _isLoading.value || _isLoadingNext.value || _checkingNew.value) return
+        val page = _lastPage.value
+        _checkingNew.value = true
+        viewModelScope.launch {
+            try {
+                val result = request(topic, page)
+                val current = _selectedTopic.value ?: return@launch
+                val known = current.entries.map { it.entryId }.toSet()
+                val fresh = result.entries.withPage(page).filterNot { it.entryId in known }
+                _selectedTopic.value = merge(current, result).copy(entries = current.entries + fresh)
+                _totalPages.value = maxOf(result.totalPages, page)
+                if (_totalPages.value > page) {
+                    _checkingNew.value = false
+                    loadNext()
+                } else {
+                    _message.value = if (fresh.isEmpty()) "yeni entry yok" else "${fresh.size} yeni entry"
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = "yeni entry'lere bakılamadı"
+            } finally {
+                _checkingNew.value = false
+            }
+        }
+    }
+
     /** Prepends the page before the first loaded one (after jumping into the middle). */
     fun loadPrevious() {
         val topic = _selectedTopic.value ?: return

@@ -238,6 +238,11 @@ fun EntryCard(
                     Text(if (isExpanded) "daha az göster" else "devamını oku")
                 }
             }
+            EntryImagePreviews(
+                html = entry.contentHtml,
+                onOpen = { ref -> actions.onLink(EksiLink.Image(ref)) },
+                modifier = Modifier.padding(top = 8.dp, end = 12.dp)
+            )
 
             Spacer(Modifier.size(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -385,8 +385,9 @@ private fun LazyListScope.appearance() {
                             onCheckedChange = { AppSettings.setContrast(choice) },
                             modifier = Modifier.weight(1f),
                             enabled = !dynamicColor,
+                            contentPadding = PaddingValues(horizontal = 4.dp),
                             shapes = connectedShapes(index, ContrastChoice.entries.size)
-                        ) { Text(choice.label) }
+                        ) { Text(choice.label, maxLines = 1, softWrap = false) }
                     }
                 }
             }
@@ -530,15 +531,22 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
         "entry'ler",
         changed = AppSettings.showEntryNumbers.value || !AppSettings.showAvatars.value ||
             AppSettings.showLinkAddresses.value || !AppSettings.hideSpoilers.value ||
-            AppSettings.dimReadTopics.value,
+            AppSettings.dimReadTopics.value || AppSettings.inlineImages.value,
         onReset = {
             AppSettings.setShowEntryNumbers(false); AppSettings.setShowAvatars(true)
             AppSettings.setShowLinkAddresses(false); AppSettings.setHideSpoilers(true)
-            AppSettings.setDimReadTopics(false)
+            AppSettings.setDimReadTopics(false); AppSettings.setInlineImages(false)
         }
     ) }
     item {
         SwitchRow("entry sıra numarası", "her entry'nin başlıktaki sırası (#12)", AppSettings.showEntryNumbers.value, true, segmentedShape(0, 5), AppSettings::setShowEntryNumbers)
+    }
+    item {
+        SwitchRow(
+            "entry'lerde görselleri göster",
+            "entry'deki görseller metnin altında önizleme olarak açılır",
+            AppSettings.inlineImages.value, true, segmentedShape(1, 5), AppSettings::setInlineImages
+        )
     }
     item {
         SwitchRow("profil resimleri", "entry'lerde yazarın resmini göster", AppSettings.showAvatars.value, true, segmentedShape(1, 5), AppSettings::setShowAvatars)
@@ -555,12 +563,21 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
     item { SectionTitle(
         "ekran",
         changed = !AppSettings.marqueeTitles.value || !AppSettings.hideBarsOnScroll.value ||
-            AppSettings.keepScreenOn.value || !AppSettings.rememberOpenTabs.value,
+            AppSettings.keepScreenOn.value || !AppSettings.rememberOpenTabs.value || AppSettings.swipeTopics.value,
         onReset = {
+            AppSettings.setSwipeTopics(false)
             AppSettings.setMarqueeTitles(true); AppSettings.setHideBarsOnScroll(true); AppSettings.setKeepScreenOn(false)
             AppSettings.setRememberOpenTabs(true); TopicTabs.setPersistenceEnabled(true)
         }
     ) }
+    item {
+        SwitchRow(
+            "başlıklar arasında kaydır",
+            "bir başlıkta sağa ya da sola kaydırınca listedeki önceki ya da sonraki başlık açılır",
+            AppSettings.swipeTopics.value, true, segmentedShape(0, 1), AppSettings::setSwipeTopics
+        )
+    }
+    item { Spacer(Modifier.height(8.dp)) }
     item {
         SwitchRow("uzun başlıkları kaydır", "üst bara sığmayan başlık sağdan sola aksın; basılı tutunca tamamı görünür", AppSettings.marqueeTitles.value, true, segmentedShape(0, 4), AppSettings::setMarqueeTitles)
     }

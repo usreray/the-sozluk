@@ -1,5 +1,21 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.foundation.shape.CircleShape
+import com.thesozluk.app.ui.components.glassActive
+import com.thesozluk.app.ui.components.glass
+import com.thesozluk.app.ui.navigation.TopicSequence
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import com.thesozluk.app.ui.components.glassSource
 import androidx.compose.material3.Button
 import com.thesozluk.app.ui.components.ImageActions
@@ -528,8 +544,75 @@ fun TopicDetailScreen(
     // Room under the floating header so the first row starts below it
     val topInset = floatingTopBarInset()
 
+    // Pulling up past the end of the topic (last page): counted while the list can't scroll
+    // further, and a check for new entries on release once it went far enough
+    val checkingNew by viewModel.checkingNew
+    var endPull by remember { mutableFloatStateOf(0f) }
+    val pullDistance = with(LocalDensity.current) { 96.dp.toPx() }
+    val endPullConnection = remember(lastPage, totalPages) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && available.y < 0f && lastPage >= totalPages && !listState.canScrollForward) {
+                    endPull = (endPull - available.y / pullDistance).coerceAtMost(1.5f)
+                } else if (available.y > 0f || consumed.y > 0f) {
+                    endPull = 0f
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (endPull >= 1f) viewModel.checkForNewEntries()
+                endPull = 0f
+                return Velocity.Zero
+            }
+        }
+    }
+
     // A surface at the root sets the background and the default text color (no Scaffold here)
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+    // Sideways swipe (when on in settings): the page follows the finger, and past a third of the
+    // width the next or previous topic of the list opens in its place. The screen edges stay
+    // for the back gesture.
+    val swipeOffset = remember { Animatable(0f) }
+    val swipeScope = rememberCoroutineScope()
+    val swipeEnabled = AppSettings.swipeTopics.value && onClose == null
+    val swipeModifier = if (!swipeEnabled) Modifier else Modifier.pointerInput(url) {
+        val edge = 32.dp.toPx()
+        var active = false
+        detectHorizontalDragGestures(
+            onDragStart = { start -> active = start.x > edge && start.x < size.width - edge },
+            onDragEnd = {
+                val step = when {
+                    swipeOffset.value < -size.width / 3f -> 1
+                    swipeOffset.value > size.width / 3f -> -1
+                    else -> 0
+                }
+                val target = if (step != 0) TopicSequence.neighbour(url, step) else null
+                swipeScope.launch {
+                    if (target != null) {
+                        swipeOffset.animateTo(if (step > 0) -size.width.toFloat() else size.width.toFloat(), tween(160))
+                        navController.navigate(Screen.TopicDetail.createRoute(target.first, target.second)) {
+                            popUpTo(Screen.TopicDetail.pattern) { inclusive = true }
+                        }
+                    } else {
+                        swipeOffset.animateTo(0f, spring())
+                    }
+                }
+                active = false
+            },
+            onDragCancel = { swipeScope.launch { swipeOffset.animateTo(0f, spring()) }; active = false }
+        ) { change, amount ->
+            if (!active) return@detectHorizontalDragGestures
+            change.consume()
+            // Resists where there is no topic to go to
+            val step = if (swipeOffset.value + amount < 0) 1 else -1
+            val factor = if (TopicSequence.neighbour(url, step) != null) 1f else 0.25f
+            swipeScope.launch { swipeOffset.snapTo(swipeOffset.value + amount * factor) }
+        }
+    }
+    Surface(
+        modifier = Modifier.fillMaxSize().then(swipeModifier).graphicsLayer { translationX = swipeOffset.value },
+        color = MaterialTheme.colorScheme.surface
+    ) {
     Box(modifier = Modifier.fillMaxSize()) {
         Crossfade(targetState = phase, label = "topicPhase") { current ->
             when (current) {
@@ -583,7 +666,7 @@ fun TopicDetailScreen(
                 }
                 LazyColumn(
                     state = listState,
-                    modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
+                    modifier = Modifier.fillMaxSize().then(pullOffset).glassSource().nestedScroll(endPullConnection),
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = topInset, bottom = 128.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -605,11 +688,11 @@ fun TopicDetailScreen(
                             )
                             TopicRow.Footer -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                 when {
-                                    isLoadingNext -> LoadingIndicator()
+                                    isLoadingNext || checkingNew -> LoadingIndicator()
                                     lastPage >= totalPages -> Text(
-                                        "başlığın sonu",
+                                        if (endPull > 0f) "bırak, yeni entry'lere bakılsın" else "başlığın sonu · yeni entry'ler için yukarı çek",
                                         style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (endPull >= 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -889,7 +972,12 @@ private fun BottomToolbar(
             FloatingActionButton(onClick = onWrite) { Icon(Icons.Rounded.Edit, contentDescription = "entry gir") }
             return@AnimatedVisibility
         }
-        val colors = FloatingToolbarDefaults.standardFloatingToolbarColors()
+        // Frosted like the top bar when blur is on: the page shows through, blurred
+        val glass = glassActive()
+        val colors = FloatingToolbarDefaults.standardFloatingToolbarColors().let {
+            if (glass) it.copy(toolbarContainerColor = it.toolbarContainerColor.copy(alpha = 0.62f)) else it
+        }
+        val glassModifier = Modifier.glass(CircleShape)
         val pageControls: @Composable () -> Unit = {
             IconButton(onClick = onPrevious, enabled = currentPage > 1) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "önceki sayfa")
@@ -906,17 +994,15 @@ private fun BottomToolbar(
             }
         }
         if (canWrite) {
-            HorizontalFloatingToolbar(
-                expanded = true,
-                floatingActionButton = {
-                    FloatingToolbarDefaults.StandardFloatingActionButton(onClick = onWrite) {
-                        Icon(Icons.Rounded.Edit, contentDescription = "entry gir")
-                    }
-                },
-                colors = colors
-            ) { pageControls() }
+            // The pages pill and the write button side by side (the glass is clipped to the pill)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HorizontalFloatingToolbar(expanded = true, colors = colors, modifier = glassModifier) { pageControls() }
+                FloatingToolbarDefaults.StandardFloatingActionButton(onClick = onWrite) {
+                    Icon(Icons.Rounded.Edit, contentDescription = "entry gir")
+                }
+            }
         } else {
-            HorizontalFloatingToolbar(expanded = true, colors = colors) { pageControls() }
+            HorizontalFloatingToolbar(expanded = true, colors = colors, modifier = glassModifier) { pageControls() }
         }
     }
 }

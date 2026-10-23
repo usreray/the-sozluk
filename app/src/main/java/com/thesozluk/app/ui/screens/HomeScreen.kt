@@ -441,10 +441,12 @@ private fun CategoryPage(
                                         HomeCategory.Caylaklar -> "a=caylaklar"
                                         else -> null
                                     }
-                                    val url = if (filter != null) {
-                                        topic.url + if ('?' in topic.url) "&$filter" else "?$filter"
-                                    } else topic.url
-                                    onTopicClick(topic.title, url, category == HomeCategory.Kenar)
+                                    fun linkOf(url: String) = if (filter != null) {
+                                        url + if ('?' in url) "&$filter" else "?$filter"
+                                    } else url
+                                    // The list the topic came from, for swiping to its neighbours
+                                    com.thesozluk.app.ui.navigation.TopicSequence.set(topics.map { it.title to linkOf(it.url) })
+                                    onTopicClick(topic.title, linkOf(topic.url), category == HomeCategory.Kenar)
                                 },
                                 modifier = Modifier.animateItem()
                             )

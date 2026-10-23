@@ -188,6 +188,24 @@ object AppSettings {
         prefs.edit().putBoolean("checkUpdates", enabled).apply()
     }
 
+    // Pictures in entries shown as previews under the text (off by default)
+    private val _inlineImages = mutableStateOf(false)
+    val inlineImages: State<Boolean> = _inlineImages
+
+    fun setInlineImages(enabled: Boolean) {
+        _inlineImages.value = enabled
+        prefs.edit().putBoolean("inlineImages", enabled).apply()
+    }
+
+    // Sideways swipe in a topic moves to the next / previous topic of the list it came from
+    private val _swipeTopics = mutableStateOf(false)
+    val swipeTopics: State<Boolean> = _swipeTopics
+
+    fun setSwipeTopics(enabled: Boolean) {
+        _swipeTopics.value = enabled
+        prefs.edit().putBoolean("swipeTopics", enabled).apply()
+    }
+
     fun setReadingFont(font: ReadingFont) {
         _readingFont.value = font
         prefs.edit().putInt("readingFont", font.ordinal).apply()
@@ -223,6 +241,8 @@ object AppSettings {
         _readingFont.value = ReadingFont.entries.getOrElse(prefs.getInt("readingFont", 0)) { ReadingFont.Default }
         _fontEverywhere.value = prefs.getBoolean("fontEverywhere", false)
         _reduceMotion.value = prefs.getBoolean("reduceMotion", false)
+        _inlineImages.value = prefs.getBoolean("inlineImages", false)
+        _swipeTopics.value = prefs.getBoolean("swipeTopics", false)
         _checkUpdates.value = prefs.getBoolean("checkUpdates", true)
         CustomFont.init(context.applicationContext)
         _boldText.value = prefs.getBoolean("boldText", false)
