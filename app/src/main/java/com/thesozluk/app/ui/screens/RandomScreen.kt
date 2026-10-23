@@ -1,5 +1,15 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.filterNotNull
+import androidx.compose.runtime.snapshotFlow
 import com.thesozluk.app.ui.components.pressBounce
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.animation.animateContentSize
@@ -124,9 +134,47 @@ fun RandomScreen(
     }
     // The chat is laid out from the bottom, so new messages push the older ones up without the
     // list jumping; after reading further up, a new one brings the view back down
-    LaunchedEffect(picks.size, isLoading) {
-        if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
+    LaunchedEffect(isLoading) {
+        if (isLoading && (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0)) {
             listState.animateScrollToItem(0)
+        }
+    }
+    // A new entry taller than the screen would show its end (the chat is anchored at the bottom);
+    // bring its beginning into view instead, so it reads from the top
+    // Once per entry: coming back to the tab keeps where the reader was
+    var aligned by rememberSaveable { mutableStateOf<String?>(null) }
+    val density = LocalDensity.current
+    LaunchedEffect(picks.lastOrNull()?.entry?.entryId) {
+        val newest = picks.lastOrNull()?.entry?.entryId ?: return@LaunchedEffect
+        if (newest == aligned) return@LaunchedEffect
+        aligned = newest
+        // Wait until the loading row (the first visit's spinner or the typing bubble) is gone and
+        // the entry sits at the bottom, so its size and position are final
+        val item = snapshotFlow {
+            if (viewModel.isLoading.value) null
+            else listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == newest && it.index == 0 }
+        }.filterNotNull().first()
+        val info = listState.layoutInfo
+        val room = info.viewportSize.height - info.beforeContentPadding - info.afterContentPadding
+        // Some room above it too, so the author's name and the bubble's top edge are in view
+        val margin = with(density) { 24.dp.roundToPx() }
+        if (item.size + margin > room) listState.animateScrollToItem(0, item.size - room + margin)
+        else listState.animateScrollToItem(0)
+    }
+    // The chat is anchored at the bottom, so a bubble that grows ("devamını oku") would push its
+    // start up and off the screen. Follow its size while it animates and scroll by the change, so
+    // the text stays where the reader was and simply continues below.
+    val keepTopOf: (String) -> Unit = { key ->
+        scope.launch {
+            var previous = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }?.size ?: return@launch
+            repeat(45) {
+                withFrameNanos { }
+                val size = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }?.size ?: return@launch
+                if (size != previous) {
+                    listState.scrollBy((size - previous).toFloat())
+                    previous = size
+                }
+            }
         }
     }
     LaunchedEffect(message) {
@@ -178,15 +226,16 @@ fun RandomScreen(
                     )
                 }
             }
+            // Scrolls sideways when large text makes the chips wider than the screen
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(horizontal = 20.dp)
+                modifier = Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp)
             ) {
                 RandomMode.entries.forEach { item ->
                     FilterChip(
                         selected = mode == item,
                         onClick = { if (mode != item) { mode = item; viewModel.next(item) } },
-                        label = { Text(item.label) },
+                        label = { Text(item.label, maxLines = 1, softWrap = false) },
                         leadingIcon = {
                             Icon(
                                 when (item) {
@@ -245,6 +294,7 @@ fun RandomScreen(
                         onAuthor = { navController.navigate(Screen.Author.createRoute(pick.entry.author)) },
                         onLink = { link -> navController.openEksiLink(link, uriHandler) },
                         onTopic = { openTopic(pick) },
+                        onResize = { keepTopOf(pick.entry.entryId) },
                         isOpening = opening == pick.entry.entryId,
                         onFavorite = { if (isLoggedIn) viewModel.toggleFavorite(pick.entry) else showLoginDialog = true },
                         onBookmark = {
@@ -264,8 +314,19 @@ fun RandomScreen(
             onClick = { if (!isLoading) viewModel.next(mode) },
             interactionSource = fabInteraction,
             icon = {
-                if (isLoading) LoadingIndicator(Modifier.size(24.dp))
-                else Icon(Icons.Rounded.Casino, contentDescription = null)
+                // While fetching, the dice keeps rolling (the same dice as on the tab)
+                val roll = rememberInfiniteTransition(label = "dice")
+                val turn by roll.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(tween(700, easing = FastOutSlowInEasing)),
+                    label = "diceTurn"
+                )
+                Icon(
+                    Icons.Rounded.Casino,
+                    contentDescription = null,
+                    modifier = Modifier.graphicsLayer { rotationZ = if (isLoading) turn else 0f }
+                )
             },
             text = { Text("başka getir") },
             modifier = Modifier
@@ -289,6 +350,8 @@ private fun EntryBubble(
     onAuthor: () -> Unit,
     onLink: (com.thesozluk.app.ui.components.EksiLink) -> Unit,
     onTopic: () -> Unit,
+    /** "devamını oku" / "daha az": the bubble is about to change height */
+    onResize: () -> Unit,
     isOpening: Boolean,
     onFavorite: () -> Unit,
     onBookmark: () -> Unit,
@@ -313,16 +376,21 @@ private fun EntryBubble(
         }
         Column(Modifier.padding(start = 10.dp).widthIn(max = 520.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 12.dp)) {
+                // A long nick gives way (ends with …) so the date always shows in full
                 Text(
                     entry.author,
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.clickable(onClick = onAuthor)
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false).clickable(onClick = onAuthor)
                 )
                 Text(
                     "  ·  ${entry.date.substringBefore(" ")}",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
             Box {
@@ -346,7 +414,10 @@ private fun EntryBubble(
                                 if (expanded) "daha az" else "devamını oku",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(top = 6.dp).clickable { expanded = !expanded }
+                                modifier = Modifier.padding(top = 6.dp).clickable {
+                                    expanded = !expanded
+                                    onResize()
+                                }
                             )
                         }
                     }
