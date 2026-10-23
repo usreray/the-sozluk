@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -60,7 +61,13 @@ fun FollowListSheet(
     }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Dragging the handle up gives the list the whole screen
+    var full by rememberSaveable { mutableStateOf(false) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = { ExpandingSheetHandle(full, { full = it }, onDismiss) }
+    ) {
         SheetBlur.BlurBehind()
         Column(modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLargeEmphasized)
@@ -74,7 +81,7 @@ fun FollowListSheet(
                 )
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().height(480.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth().then(if (full) Modifier.weight(1f) else Modifier.height(480.dp)), contentAlignment = Alignment.Center) {
             val list = users
             when {
                 error != null -> Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))

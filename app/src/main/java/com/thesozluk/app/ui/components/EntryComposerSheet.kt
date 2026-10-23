@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
@@ -146,11 +147,18 @@ fun EntryComposerSheet(
         )
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Dragging the handle up gives the writing the whole screen: the text box takes the room
+    var full by rememberSaveable { mutableStateOf(false) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = { ExpandingSheetHandle(full, { full = it }, onDismiss) }
+    ) {
         SheetBlur.BlurBehind()
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(),
+            modifier = Modifier.fillMaxWidth().then(if (full) Modifier.weight(1f) else Modifier)
+                .padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(heading, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -183,7 +191,7 @@ fun EntryComposerSheet(
                     },
                     placeholder = { Text("ne düşünüyorsun?") },
                     enabled = !isSubmitting,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp).then(if (full) Modifier.weight(1f) else Modifier),
                     minLines = 6
                 )
                 // Wraps the selection (or inserts at the cursor) in ekşi's markup

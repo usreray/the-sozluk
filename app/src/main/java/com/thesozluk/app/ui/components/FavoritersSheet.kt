@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.foundation.clickable
@@ -63,7 +64,13 @@ fun FavoritersSheet(
     // Fully open from the start and one fixed height for loading and list alike: the sheet used
     // to settle at a half state and shrink once the list replaced the loading indicator
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    // Dragging the handle up gives the list the whole screen
+    var full by rememberSaveable { mutableStateOf(false) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = { ExpandingSheetHandle(full, { full = it }, onDismiss) }
+    ) {
         SheetBlur.BlurBehind()
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -93,7 +100,7 @@ fun FavoritersSheet(
                 shapes = ButtonGroupDefaults.connectedTrailingButtonShapes()
             ) { Text("çaylaklar") }
         }
-        Box(modifier = Modifier.fillMaxWidth().height(420.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth().then(if (full) Modifier.weight(1f) else Modifier.height(420.dp)), contentAlignment = Alignment.Center) {
             val list = nicks
             when {
                 error != null -> Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))
