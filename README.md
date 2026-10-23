@@ -47,15 +47,23 @@
 - Daha önce okunan başlıkların listelerde soluk gösterilmesi
 - Gündem widget'ı
 
+### Rastgele
+- Entry'lerin bir sohbet akışı gibi geldiği rastgele sekmesi
+- Üç mod: şükela (debe ve gündemin en beğenilenleri), derinlerden (sözlüğün herhangi bir köşesi) ve karışık
+- Dokunulan entry'nin kendi başlığında, bulunduğu sayfada açılması
+
 ### Başlık okuma
 - Kaydırdıkça otomatik yüklenen sayfalar, sonraki sayfanın önceden yüklenmesi ve istenen sayfaya doğrudan geçiş
+- Başlığın sonunda yukarı çekerek yeni entry'leri kontrol etme
+- İsteğe bağlı olarak sağa ve sola kaydırarak listedeki önceki ve sonraki başlığa geçme
 - Başlık filtreleri: şükela, bugünün şükelaları, görseller, linkler, ekşi şeyler, benimkiler, takip ettiklerim ve çaylaklar
 - Başlık içinde kelime ve yazar araması, yazarın o başlıktaki entry'lerini listeleme
 - Başlığı takip etme, başlığı açan yazarın bilgileri ve tarihte bugün için yıl seçimi
 - Sekmeler: Birden fazla başlığı tarayıcıdaki gibi sekmelerde açık tutma, sekmeler arasında geçiş; açık sekmelerin uygulama kapansa da hatırlanması ve isteğe bağlı iki sütunlu sekme görünümü
 - Spoiler gizleme: Spoiler içeren bölümler kapalı gelir, dokunulduğunda açılır
 - Bkz, gizli bkz ve bağlantıların uygulama içinde açılması; istenirse bağlantı adreslerinin metnin yanında gösterilmesi
-- Yakınlaştırılabilir tam ekran görsel görüntüleyici ve görsel indirme
+- Yakınlaştırılabilir tam ekran görsel görüntüleyici, görsel indirme ve görselin paylaşıldığı entry'ye gitme
+- İsteğe bağlı olarak entry'lerdeki görsellerin metnin altında önizlenmesi
 - Entry sıra numaraları, yazar profil resimleri, uzun başlıkların kayan yazıyla gösterilmesi
 - Okurken ekranın kararmasını engelleme, kaydırırken üst ve alt çubukların gizlenmesi
 
@@ -87,12 +95,15 @@
 ### Görünüm
 - Material 3 Expressive tasarım dili
 - Açık, koyu ve tam siyah (OLED) tema; hazır renk paletleri, duvar kâğıdından renk alma ve kontrast ayarı
-- Yazı tipi, yazı boyutu, satır aralığı ve kenar boşluğu ayarları
+- Buzlu cam görünümünde çubuklar, bulanık spoiler ve pencerelerin arkasında bulanıklık (kapatılabilir)
+- Tahmine dayalı geri hareketi ve hareketi azaltma seçeneği
+- Yazı tipi, yazı boyutu, satır aralığı ve kenar boşluğu ayarları; kalın yazı, yazı tipini tüm uygulamada kullanma ve kendi yazı tipini ekleme
 
 ### Sistem
 - eksisozluk.com bağlantılarının doğrudan uygulamada açılması
 - Uygulama simgesi kısayolları: ara, mesajlar, olay
 - Tablet ve yatay ekranlarda iki bölmeli görünüm
+- Uygulama içinden yeni sürüm kontrolü ve tek dokunuşla hata bildirimi
 
 ## Kurulum
 
