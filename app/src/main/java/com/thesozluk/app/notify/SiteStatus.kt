@@ -144,6 +144,8 @@ object Notifier {
         )
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
+            // The palette chosen in settings (wallpaper colors aren't known in the background)
+            .setColor(notificationColor(context))
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -155,6 +157,13 @@ object Notifier {
         } catch (e: SecurityException) {
             // Permission revoked between the check and the call
         }
+    }
+
+    private fun notificationColor(context: Context): Int {
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val seed = com.thesozluk.app.settings.SeedColor.entries
+            .getOrElse(prefs.getInt("seed", com.thesozluk.app.settings.SeedColor.Brand.ordinal)) { com.thesozluk.app.settings.SeedColor.Brand }
+        return seed.argb.toInt()
     }
 
     private fun createChannel(context: Context) {
