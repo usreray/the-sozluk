@@ -11,7 +11,8 @@
 <p align="center">
   <a href="https://github.com/usreray/the-sozluk/releases/latest">İndir</a> ·
   <a href="#özellikler">Özellikler</a> ·
-  <a href="#ekran-görüntüleri">Ekran görüntüleri</a>
+  <a href="#ekran-görüntüleri">Ekran görüntüleri</a> ·
+  <a href="https://buymeacoffee.com/usreray">Destek ol</a>
 </p>
 
 ---
@@ -103,3 +104,9 @@ Uygulamanın son sürümüne ait APK dosyası [Releases](https://github.com/usre
 - Yeni sürüm kontrolü için GitHub'a bağlanılır; bu kontrol ayarlardan kapatılabilir.
 - Oturum bilgileri yalnızca cihazda saklanır.
 - Okuma geçmişi, taslaklar ve kaydedilen içerikler cihaz dışına aktarılmaz.
+
+## Destek
+
+Projeyi beğendiyseniz geliştirilmesine [Buy Me a Coffee](https://buymeacoffee.com/usreray) üzerinden destek olabilirsiniz.
+
+<a href="https://buymeacoffee.com/usreray"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-destek%20ol-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"></a>
