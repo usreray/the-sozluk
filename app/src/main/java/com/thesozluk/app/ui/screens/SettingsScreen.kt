@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.ui.graphics.toArgb
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalUriHandler
 import com.thesozluk.app.settings.AppUpdates
@@ -993,6 +994,23 @@ private fun LazyListScope.about() {
         onReset = { AppSettings.setCheckUpdates(true) }
     ) }
     item {
+        Surface(
+            onClick = { com.thesozluk.app.settings.WhatsNew.show() },
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        ) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Text("neler yeni", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "sürüm ${appVersion()} ile gelenler",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+    item {
         SwitchRow(
             title = "güncellemeleri kontrol et",
             subtitle = "yeni sürüm çıkınca haber ver; bunun için github'a bağlanılır",
@@ -1032,8 +1050,10 @@ private fun LazyListScope.about() {
     item {
         val context = LocalContext.current
         val uriHandler = LocalUriHandler.current
+        val surfaceColor = MaterialTheme.colorScheme.surface.toArgb()
         Surface(
-            onClick = { runCatching { uriHandler.openUri(AppUpdates.issueUrl(context)) } },
+            // In a browser tab: the GitHub app drops the prefilled text of a new issue
+            onClick = { com.thesozluk.app.ui.navigation.openInAppTab(context, AppUpdates.issueUrl(context), surfaceColor) },
             shape = segmentedShape(2, 3),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
             modifier = Modifier.fillMaxWidth()

@@ -1,5 +1,7 @@
 package com.thesozluk.app
 
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.getValue
 import com.thesozluk.app.ui.components.SheetBlur
 import androidx.compose.ui.draw.blur
@@ -108,7 +110,13 @@ class MainActivity : ComponentActivity() {
                 onDispose {}
             }
             TheSozlukTheme {
-                MainScreen(pendingOpen)
+                // Outside links: the app that owns them, else a browser tab over the app
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val barColor = androidx.compose.material3.MaterialTheme.colorScheme.surface.toArgb()
+                val links = remember(barColor) { com.thesozluk.app.ui.navigation.ExternalLinkHandler(context, barColor) }
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalUriHandler provides links) {
+                    MainScreen(pendingOpen)
+                }
             }
         }
     }
@@ -208,9 +216,14 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
     }
     // A newer release on GitHub: offered once, at most twice a day (settings: hakkında)
     LaunchedEffect(Unit) {
+        // After an update: this version's notes first (once), the update check after that
+        com.thesozluk.app.settings.WhatsNew.check(context)
         if (AppSettings.checkUpdates.value) com.thesozluk.app.settings.AppUpdates.check(context)
     }
-    com.thesozluk.app.settings.AppUpdates.available.value?.let { release ->
+    com.thesozluk.app.settings.WhatsNew.pending.value?.let { notes ->
+        com.thesozluk.app.ui.components.WhatsNewSheet(notes, onDismiss = com.thesozluk.app.settings.WhatsNew::dismiss)
+    }
+    com.thesozluk.app.settings.AppUpdates.available.value?.takeIf { com.thesozluk.app.settings.WhatsNew.pending.value == null }?.let { release ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { com.thesozluk.app.settings.AppUpdates.dismiss(context) },
             title = { androidx.compose.material3.Text("yeni sürüm var") },
