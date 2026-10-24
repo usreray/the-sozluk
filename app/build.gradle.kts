@@ -21,8 +21,8 @@ android {
         applicationId = "com.thesozluk.app"
         minSdk = 31
         targetSdk = 35
-        versionCode = 22
-        versionName = "3.1"
+        versionCode = 23
+        versionName = "3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -87,6 +87,7 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     implementation(libs.haze)
     implementation(libs.haze.blur)
+    implementation(libs.androidx.browser)
     // Material color algorithm: full M3 schemes (incl. Expressive) from a seed color
     implementation(libs.material.kolor)
     // Google's color algorithm (HCT, dynamic schemes) to build palettes from a seed color
