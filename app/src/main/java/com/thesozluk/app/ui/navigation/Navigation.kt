@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.navigation
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.ExitTransition
 import com.thesozluk.app.ui.screens.LibraryScreen
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -52,12 +54,12 @@ fun Navigation(navController: NavHostController) {
         },
         // Going back (the back gesture plays this with the finger): the page below is already in
         // place, and the leaving page moves itself off in BackSwipe; the host only keeps it drawn
-        popEnterTransition = {
-            if (betweenTabs()) tabEnter()
-            else EnterTransition.None
-        },
+        // Between tabs (back from profil to akış, by gesture or tab): the leaving tab sinks back and
+        // fades evenly over the whole move, so the gesture can follow it, while the tab below
+        // rises into place (BackSwipe's reveal). No delays: a seeked delay reads as a stall.
+        popEnterTransition = { EnterTransition.None },
         popExitTransition = {
-            if (betweenTabs()) fadeOut(tween(90))
+            if (betweenTabs()) fadeOut(tween(300, easing = LinearEasing)) + scaleOut(tween(300, easing = LinearEasing), targetScale = 0.9f)
             else ExitTransition.KeepUntilTransitionsFinished
         }
     ) {
