@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.FilterChip
@@ -73,6 +74,8 @@ sealed interface TopicMenuAction {
     data object SearchAuthor : TopicMenuAction
     data object Creator : TopicMenuAction
     data object Share : TopicMenuAction
+    /** Looks the topic's title up on Google in the browser */
+    data object SearchWeb : TopicMenuAction
     data object SaveOffline : TopicMenuAction
     data object DeleteOffline : TopicMenuAction
 }
@@ -108,6 +111,7 @@ fun TopicMenu(
                 FilterItem("başlıkta ara", Icons.Rounded.Search, current is TopicFilter.Find) { pick(TopicMenuAction.SearchInTopic) }
                 FilterItem("yazara göre", Icons.Rounded.AlternateEmail, current is TopicFilter.Author) { pick(TopicMenuAction.SearchAuthor) }
                 FilterItem("başlığı açan", Icons.Rounded.Info, false) { pick(TopicMenuAction.Creator) }
+                FilterItem("google'da ara", Icons.Rounded.TravelExplore, false) { pick(TopicMenuAction.SearchWeb) }
                 FilterItem("paylaş", Icons.Rounded.Share, false) { pick(TopicMenuAction.Share) }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 when (offlineState) {

@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.shape.CircleShape
 import com.thesozluk.app.ui.components.glassActive
 import com.thesozluk.app.ui.components.glass
@@ -191,6 +192,7 @@ fun TopicDetailScreen(
     val isLoggedIn by EksiSession.isLoggedIn
     val listState = viewModel.scrollState
     val uriHandler = LocalUriHandler.current
+    val surfaceColor = MaterialTheme.colorScheme.surface
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -437,6 +439,13 @@ fun TopicDetailScreen(
             TopicMenuAction.Filters -> showFilters = true
             TopicMenuAction.Creator -> showCreator = true
             TopicMenuAction.Share -> topic?.let { shareTopic(context, it) }
+            TopicMenuAction.SearchWeb -> {
+                val query = java.net.URLEncoder.encode(topic?.title?.ifBlank { null } ?: displayTitle, "UTF-8")
+                // Always the in-app tab (the Google app would take the search out of the app)
+                com.thesozluk.app.ui.navigation.openInAppTab(
+                    context, "https://www.google.com/search?q=$query", surfaceColor.toArgb()
+                )
+            }
             TopicMenuAction.SaveOffline -> topic?.let {
                 val path = it.topicPath.ifBlank { it.url }
                 OfflineStore.download(it.title, path)
@@ -997,7 +1006,8 @@ private fun BottomToolbar(
             // The pages pill and the write button side by side (the glass is clipped to the pill)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 HorizontalFloatingToolbar(expanded = true, colors = colors, modifier = glassModifier) { pageControls() }
-                FloatingToolbarDefaults.StandardFloatingActionButton(onClick = onWrite) {
+                // A plain FAB: the toolbar's own FAB fills all the room it gets outside a toolbar
+                FloatingActionButton(onClick = onWrite) {
                     Icon(Icons.Rounded.Edit, contentDescription = "entry gir")
                 }
             }
