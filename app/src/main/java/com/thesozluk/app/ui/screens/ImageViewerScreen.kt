@@ -83,6 +83,7 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
     val density = LocalDensity.current
     val closeDistance = with(density) { 140.dp.toPx() }
     val scope = rememberCoroutineScope()
+    var chromeVisible by remember { mutableStateOf(true) }
     var zoomed by remember { mutableStateOf(false) }
 
     val background = (1f - abs(dismiss.value) / (closeDistance * 2.5f)).coerceIn(0.3f, 1f)
@@ -123,7 +124,9 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
             ZoomableImage(
                 url = urls[pageRef],
                 error = errors[pageRef],
-                onZoomChange = { if (page == pager.currentPage) zoomed = it }
+                onZoomChange = { if (page == pager.currentPage) zoomed = it },
+                // One tap hides the bar for an unobstructed look, another brings it back
+                onTap = { chromeVisible = !chromeVisible }
             )
         }
 
@@ -133,6 +136,7 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
         FloatingTopBar(
             title = if (refs.size > 1) "${pager.currentPage + 1} / ${refs.size}" else null,
             onBack = { navController.popBackStack() },
+            visible = chromeVisible,
             modifier = Modifier.align(Alignment.TopCenter),
             // Same icon color as the back button
             actions = if (current == null) null else ({
@@ -196,7 +200,7 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
 /** One image: pinch to zoom, pan while zoomed, double tap to toggle 2.5x. */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ZoomableImage(url: String?, error: String?, onZoomChange: (Boolean) -> Unit) {
+private fun ZoomableImage(url: String?, error: String?, onZoomChange: (Boolean) -> Unit, onTap: () -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var loadFailed by remember { mutableStateOf(false) }
@@ -221,7 +225,7 @@ private fun ZoomableImage(url: String?, error: String?, onZoomChange: (Boolean) 
                 modifier = Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
-                        detectTapGestures(onDoubleTap = { setScale(if (scale > 1f) 1f else 2.5f) })
+                        detectTapGestures(onTap = { onTap() }, onDoubleTap = { setScale(if (scale > 1f) 1f else 2.5f) })
                     }
                     // Panning only while zoomed, so swipes go to the pager and drag-to-close
                     .transformable(transform, canPan = { scale > 1f })
