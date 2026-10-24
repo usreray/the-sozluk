@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.foundation.background
@@ -146,22 +147,44 @@ fun EntryComposerSheet(
             onDismiss = { addingLink = false }
         )
     }
+    // Opens over the whole screen right away (writing wants the room); dragging down closes it.
+    // The send buttons sit at the top, next to the heading.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // Dragging the handle up gives the writing the whole screen: the text box takes the room
-    var full by rememberSaveable { mutableStateOf(false) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        dragHandle = { ExpandingSheetHandle(full, { full = it }, onDismiss) }
-    ) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Column(
-            modifier = Modifier.fillMaxWidth().then(if (full) Modifier.weight(1f) else Modifier)
+            modifier = Modifier.fillMaxWidth().weight(1f)
                 .padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(heading, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    heading,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                if (onSaveToSite != null) {
+                    OutlinedButton(
+                        onClick = { onSaveToSite(value.text.trim()) },
+                        enabled = value.text.isNotBlank() && !isSubmitting && !uploading,
+                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                    ) {
+                        if (isSavingDraft) LoadingIndicator(modifier = Modifier.size(20.dp))
+                        else Text("kenara kaydet")
+                    }
+                }
+                Button(
+                    onClick = { onSubmit(value.text.trim()) },
+                    enabled = value.text.isNotBlank() && !isSubmitting && !uploading,
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
+                ) {
+                    if (isSubmitting && !isSavingDraft) LoadingIndicator(modifier = Modifier.size(20.dp))
+                    else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("gönder", modifier = Modifier.padding(start = 8.dp))
+                }
+            }
             Text(topicTitle, style = MaterialTheme.typography.titleLargeEmphasized)
             if (initialText.isNotEmpty()) {
                 Text(
@@ -180,21 +203,12 @@ fun EntryComposerSheet(
                     )
                 }
             }
+            // Writing and preview take whatever room the sheet gives them
             if (previewing) {
-                EntryPreview(value.text)
+                EntryPreview(value.text, Modifier.weight(1f))
             } else {
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = {
-                        if (it.text != value.text) onTextChange?.invoke(it.text)
-                        value = it
-                    },
-                    placeholder = { Text("ne düşünüyorsun?") },
-                    enabled = !isSubmitting,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp).then(if (full) Modifier.weight(1f) else Modifier),
-                    minLines = 6
-                )
-                // Wraps the selection (or inserts at the cursor) in ekşi's markup
+                // Wraps the selection (or inserts at the cursor) in ekşi's markup; above the box so it shows
+                // while the sheet is only half open
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -224,6 +238,16 @@ fun EntryComposerSheet(
                         )
                     }
                 }
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = {
+                        if (it.text != value.text) onTextChange?.invoke(it.text)
+                        value = it
+                    },
+                    placeholder = { Text("ne düşünüyorsun?") },
+                    enabled = !isSubmitting,
+                    modifier = Modifier.fillMaxWidth().weight(1f).heightIn(min = 120.dp)
+                )
                 // Pictures still in the text, each with a way to take it back out
                 val shown = uploaded.filter { (image, _) -> value.text.contains(image.link) }
                 if (shown.isNotEmpty()) {
@@ -252,43 +276,18 @@ fun EntryComposerSheet(
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (onSaveToSite != null) {
-                    OutlinedButton(
-                        onClick = { onSaveToSite(value.text.trim()) },
-                        enabled = value.text.isNotBlank() && !isSubmitting && !uploading,
-                        contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-                    ) {
-                        if (isSavingDraft) LoadingIndicator(modifier = Modifier.size(20.dp))
-                        else Text("kenara kaydet")
-                    }
-                }
-                Button(
-                    onClick = { onSubmit(value.text.trim()) },
-                    enabled = value.text.isNotBlank() && !isSubmitting && !uploading,
-                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding
-                ) {
-                    if (isSubmitting && !isSavingDraft) LoadingIndicator(modifier = Modifier.size(20.dp))
-                    else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Text("gönder", modifier = Modifier.padding(start = 8.dp))
-                }
-            }
         }
     }
 }
 
 /** The entry as it will look once sent: bkz, hede and links in color, spoilers marked. */
 @Composable
-private fun EntryPreview(raw: String) {
+private fun EntryPreview(raw: String, modifier: Modifier = Modifier) {
     val html = remember(raw) { entryMarkupToHtml(raw) }
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 360.dp)
+        modifier = modifier.fillMaxWidth()
     ) {
         Box(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
             if (raw.isBlank()) {

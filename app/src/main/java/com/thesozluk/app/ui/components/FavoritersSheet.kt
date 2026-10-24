@@ -63,14 +63,10 @@ fun FavoritersSheet(
 
     // Fully open from the start and one fixed height for loading and list alike: the sheet used
     // to settle at a half state and shrink once the list replaced the loading indicator
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // Dragging the handle up gives the list the whole screen
-    var full by rememberSaveable { mutableStateOf(false) }
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        dragHandle = { ExpandingSheetHandle(full, { full = it }, onDismiss) }
-    ) {
+    // Opens half way; dragging it (anywhere, or the handle) up gives the list the whole screen,
+    // down closes it: the sheet's own states, so one thing moves it and it stays smooth
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -100,7 +96,7 @@ fun FavoritersSheet(
                 shapes = ButtonGroupDefaults.connectedTrailingButtonShapes()
             ) { Text("çaylaklar") }
         }
-        Box(modifier = Modifier.fillMaxWidth().then(if (full) Modifier.weight(1f) else Modifier.height(420.dp)), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             val list = nicks
             when {
                 error != null -> Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))

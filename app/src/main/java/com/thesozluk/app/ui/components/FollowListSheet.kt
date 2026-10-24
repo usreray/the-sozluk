@@ -60,14 +60,10 @@ fun FollowListSheet(
         }
     }
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // Dragging the handle up gives the list the whole screen
-    var full by rememberSaveable { mutableStateOf(false) }
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        dragHandle = { ExpandingSheetHandle(full, { full = it }, onDismiss) }
-    ) {
+    // Opens half way; dragging it (anywhere, or the handle) up gives the list the whole screen,
+    // down closes it: the sheet's own states, so one thing moves it and it stays smooth
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Column(modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLargeEmphasized)
@@ -81,7 +77,7 @@ fun FollowListSheet(
                 )
             }
         }
-        Box(modifier = Modifier.fillMaxWidth().then(if (full) Modifier.weight(1f) else Modifier.height(480.dp)), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             val list = users
             when {
                 error != null -> Text(error.orEmpty(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp))
