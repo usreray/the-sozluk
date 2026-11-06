@@ -258,6 +258,7 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
         animationSpec = if (com.thesozluk.app.ui.components.motionReduced()) androidx.compose.animation.core.snap() else androidx.compose.animation.core.spring(),
         label = "sheetBlur"
     )
+    Box(Modifier.fillMaxSize()) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).blur(sheetBlur)) {
         // Scrolling a tab slims the floating bar to its icons; a new tab starts with labels
         LaunchedEffect(currentRoute) { com.thesozluk.app.ui.components.NavBarScroll.expand() }
@@ -303,5 +304,10 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
                 }
             )
         }
+    }
+    // A long-pressed entry, lifted over the blurred app
+    com.thesozluk.app.ui.components.EntryPeekOverlay(glassState = navGlass)
+    // ⋮ menus opened as glass (liquid glass), over the app
+    com.thesozluk.app.ui.components.GlassMenuHost(glassState = navGlass)
     }
 }

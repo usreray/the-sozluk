@@ -1,5 +1,11 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.material3.ripple
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.BookmarkRemove
@@ -148,7 +154,9 @@ fun EntryCard(
     /** False where the entry is always shown in full */
     showExpandToggle: Boolean = true,
     /** The full-screen reader allows selecting text; list cards do not. */
-    textSelectable: Boolean = false
+    textSelectable: Boolean = false,
+    /** Long-press lifts the card into [EntryPeek]; off for the lifted copy itself */
+    peekable: Boolean = true
 ) {
     var overflows by remember(entry.entryId) { mutableStateOf(false) }
     val showAvatars by AppSettings.showAvatars
@@ -179,13 +187,55 @@ fun EntryCard(
         )
     }
 
+    // The user's own entries: the site's flags say so, or the nick matches
+    val own = entry.author.isNotBlank() && entry.author.equals(EksiSession.nick.value, ignoreCase = true)
+    val menu = rememberEntryMenuItems(
+        entry = entry,
+        onAuthorInTopic = actions.onAuthorInTopic?.let { show -> { show(entry) } },
+        onEdit = if (("edit" in entry.flags || own) && actions.onEdit != null) ({ actions.onEdit(entry) }) else null,
+        onBookmark = actions.onBookmark?.let { { it(entry) } },
+        onShareImage = actions.onShareImage?.let { { it(entry) } },
+        onDelete = if ((entry.canDelete || own) && actions.onDelete != null) ({ confirmDelete = true }) else null
+    )
+    // Where the card sits on screen, for the preview to rise from
+    val bounds = remember { arrayOf(Rect.Zero) }
+    val canPeek = peekable && !textSelectable && entry.entryId.isNotEmpty()
+    val press = remember { MutableInteractionSource() }
+    val lifted = canPeek && EntryPeek.isLifted(entry.entryId)
+
     Surface(
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = modifier
             .fillMaxWidth()
+            .then(if (canPeek) Modifier.onGloballyPositioned { bounds[0] = it.boundsInRoot() } else Modifier)
+            // Lifted into the preview: the copy up there stands in for it
+            .graphicsLayer { alpha = if (lifted) 0f else 1f }
+            .then(if (canPeek) Modifier.pressBounce(press, pressedScale = 0.97f) else Modifier)
             .clip(RoundedCornerShape(28.dp))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                when {
+                    canPeek -> Modifier.combinedClickable(
+                        interactionSource = press,
+                        indication = if (onClick != null) ripple() else null,
+                        hapticFeedbackEnabled = false,
+                        onClick = onClick ?: {},
+                        onLongClick = {
+                            EntryPeek.open(
+                                EntryPeek.Peek(
+                                    entry = entry,
+                                    number = number,
+                                    actions = actions,
+                                    bounds = bounds[0],
+                                    menu = peekMenu(entry, actions, menu)
+                                )
+                            )
+                        }
+                    )
+                    onClick != null -> Modifier.clickable(onClick = onClick)
+                    else -> Modifier
+                }
+            )
     ) {
         Column(modifier = Modifier.padding(start = AppSettings.entryPadding.value.dp, end = 8.dp, top = 16.dp, bottom = 8.dp)) {
             if (entry.topicTitle.isNotBlank() && actions.onOpenTopic != null) {
@@ -266,18 +316,8 @@ fun EntryCard(
                         )
                     }
                 }
-                val comments = actions.comments?.invoke(entry)
                 Spacer(Modifier.weight(1f))
-                // The user's own entries: the site's flags say so, or the nick matches
-                val own = entry.author.isNotBlank() && entry.author.equals(EksiSession.nick.value, ignoreCase = true)
-                EntryMenu(
-                    entry = entry,
-                    onAuthorInTopic = actions.onAuthorInTopic?.let { show -> { show(entry) } },
-                    onEdit = if (("edit" in entry.flags || own) && actions.onEdit != null) ({ actions.onEdit(entry) }) else null,
-                    onBookmark = actions.onBookmark?.let { { it(entry) } },
-                    onShareImage = actions.onShareImage?.let { { it(entry) } },
-                    onDelete = if ((entry.canDelete || own) && actions.onDelete != null) ({ confirmDelete = true }) else null
-                )
+                EntryMenu(menu)
             }
             // Author on a line of its own below the actions, so a long nick and the full date
             // (with an edit time) have the card's whole width
@@ -526,20 +566,58 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** The entry's actions, in menu order: sharing and copying, then the reader's own, then deleting. */
 @Composable
-private fun EntryMenu(
+private fun rememberEntryMenuItems(
     entry: Entry,
     onAuthorInTopic: (() -> Unit)?,
     onEdit: (() -> Unit)?,
     onDelete: (() -> Unit)?,
-    onBookmark: (() -> Unit)? = null,
-    onShareImage: (() -> Unit)? = null
-) {
-    var open by remember { mutableStateOf(false) }
+    onBookmark: (() -> Unit)?,
+    onShareImage: (() -> Unit)?
+): List<EntryMenuItem> {
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
     val scope = rememberCoroutineScope()
+    val link = "${EksiSession.BASE_URL}/entry/${entry.entryId}"
+    val saved = EntryBookmarks.isSaved(entry.entryId)
+    return buildList {
+        if (entry.entryId.isNotEmpty()) add(EntryMenuItem("paylaş", Icons.Rounded.Share) {
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link)
+            context.startActivity(Intent.createChooser(send, null))
+        })
+        add(EntryMenuItem("metni kopyala", Icons.Rounded.ContentCopy) {
+            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", entry.content))) }
+        })
+        if (entry.entryId.isNotEmpty()) add(EntryMenuItem("linki kopyala", Icons.Rounded.Link) {
+            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", link))) }
+        })
+        if (onAuthorInTopic != null) add(EntryMenuItem("${entry.author} · bu başlıktakiler", Icons.Rounded.FilterList, onClick = onAuthorInTopic))
+        if (onBookmark != null) add(EntryMenuItem(
+            if (saved) "kayıttan çıkar" else "entry'yi kaydet",
+            if (saved) Icons.Rounded.BookmarkRemove else Icons.Rounded.BookmarkAdd,
+            onClick = onBookmark
+        ))
+        if (onShareImage != null) add(EntryMenuItem("görsel olarak paylaş", Icons.Rounded.Image, onClick = onShareImage))
+        if (onEdit != null) add(EntryMenuItem("düzelt", Icons.Rounded.Edit, onClick = onEdit))
+        if (onDelete != null) add(EntryMenuItem("sil", Icons.Rounded.Delete, destructive = true, onClick = onDelete))
+    }
+}
+
+/** The preview's menu: favoriting and the author first, since the card up there can't be tapped. */
+private fun peekMenu(entry: Entry, actions: EntryActions, menu: List<EntryMenuItem>): List<EntryMenuItem> = buildList {
+    add(EntryMenuItem(
+        if (entry.isFavorited) "favoriden çıkar" else "favorile",
+        if (entry.isFavorited) FavoriteIcons.DropFilled else FavoriteIcons.Drop
+    ) { actions.onToggleFavorite(entry) })
+    if (entry.author.isNotBlank()) add(EntryMenuItem(entry.author, Icons.Rounded.Person) { actions.onAuthor(entry.author) })
+    addAll(menu)
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun EntryMenu(items: List<EntryMenuItem>) {
+    var open by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
             Icon(Icons.Rounded.MoreVert, contentDescription = "diğer", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -567,68 +645,6 @@ private fun EntryMenu(
                         scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", entry.content))) }
                     }
                 )
-                if (entry.entryId.isNotEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text("linki kopyala") },
-                        leadingIcon = { Icon(Icons.Rounded.Link, contentDescription = null) },
-                        onClick = {
-                            open = false
-                            val link = "${EksiSession.BASE_URL}/entry/${entry.entryId}"
-                            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", link))) }
-                        }
-                    )
-                }
-                if (onAuthorInTopic != null) {
-                    DropdownMenuItem(
-                        text = { Text("${entry.author} · bu başlıktakiler") },
-                        leadingIcon = { Icon(Icons.Rounded.FilterList, contentDescription = null) },
-                        onClick = {
-                            open = false
-                            onAuthorInTopic()
-                        }
-                    )
-                }
-                if (onBookmark != null) {
-                    val saved = EntryBookmarks.isSaved(entry.entryId)
-                    DropdownMenuItem(
-                        text = { Text(if (saved) "kayıttan çıkar" else "entry'yi kaydet") },
-                        leadingIcon = { Icon(if (saved) Icons.Rounded.BookmarkRemove else Icons.Rounded.BookmarkAdd, contentDescription = null) },
-                        onClick = {
-                            open = false
-                            onBookmark()
-                        }
-                    )
-                }
-                if (onShareImage != null) {
-                    DropdownMenuItem(
-                        text = { Text("görsel olarak paylaş") },
-                        leadingIcon = { Icon(Icons.Rounded.Image, contentDescription = null) },
-                        onClick = {
-                            open = false
-                            onShareImage()
-                        }
-                    )
-                }
-                if (onEdit != null) {
-                    DropdownMenuItem(
-                        text = { Text("düzelt") },
-                        leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                        onClick = {
-                            open = false
-                            onEdit()
-                        }
-                    )
-                }
-                if (onDelete != null) {
-                    DropdownMenuItem(
-                        text = { Text("sil", color = MaterialTheme.colorScheme.error) },
-                        leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-                        onClick = {
-                            open = false
-                            onDelete()
-                        }
-                    )
-                }
             }
         }
     }
