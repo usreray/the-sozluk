@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.FloatingPromptHost
+import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.components.SheetBlur
 import com.thesozluk.app.ui.components.glassSource
 import com.thesozluk.app.settings.AppSettings
@@ -54,8 +56,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
@@ -103,14 +103,14 @@ fun MessagesScreen(
     val error by viewModel.error
     val message by viewModel.message
     val isSending by viewModel.isSending
-    val snackbar = remember { SnackbarHostState() }
+    val prompt = remember { PromptState() }
     // Opened from a profile's "mesaj" button: start a message to that nick
     var composing by rememberSaveable { mutableStateOf(composeTo.isNotEmpty()) }
 
     LaunchedEffect(isLoggedIn) { if (isLoggedIn && box == null) viewModel.loadBox() }
     LaunchedEffect(message) {
         message?.let {
-            snackbar.showSnackbar(it)
+            prompt.show(it)
             viewModel.consumeMessage()
         }
     }
@@ -144,7 +144,7 @@ fun MessagesScreen(
         animate(headerOffset, 0f) { value, _ -> headerOffset = value }
     }
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { FloatingPromptHost(prompt, Modifier.navigationBarsPadding()) },
         floatingActionButton = {
             if (isLoggedIn) {
                 ExtendedFloatingActionButton(

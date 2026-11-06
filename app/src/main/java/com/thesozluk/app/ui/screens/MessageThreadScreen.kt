@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.FloatingPromptHost
+import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.components.glassSource
 import androidx.compose.foundation.layout.height
 import com.thesozluk.app.ui.components.shimmer
@@ -49,8 +51,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -95,7 +95,7 @@ fun MessageThreadScreen(
     val threadError by viewModel.threadError
     val isSending by viewModel.isSending
     val message by viewModel.message
-    val snackbar = remember { SnackbarHostState() }
+    val prompt = remember { PromptState() }
     val listState = rememberLazyListState()
     val uriHandler = LocalUriHandler.current
     var reply by rememberSaveable { mutableStateOf("") }
@@ -106,7 +106,7 @@ fun MessageThreadScreen(
     LaunchedEffect(threadId) { viewModel.openThread(threadId) }
     LaunchedEffect(message) {
         message?.let {
-            snackbar.showSnackbar(it)
+            prompt.show(it)
             viewModel.consumeMessage()
         }
     }
@@ -131,7 +131,7 @@ fun MessageThreadScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { FloatingPromptHost(prompt, Modifier.navigationBarsPadding()) },
         topBar = {
             FloatingTopBar(
                 title = otherNick,

@@ -1,9 +1,13 @@
 package com.thesozluk.app.ui.screens
 
 import com.thesozluk.app.ui.components.NavBarPreview
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.runtime.CompositionLocalProvider
+import com.thesozluk.app.ui.components.LocalPrompt
+import com.thesozluk.app.ui.components.FloatingPromptHost
+import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.settings.NavBarStyle
 import androidx.compose.ui.graphics.toArgb
-import android.widget.Toast
 import androidx.compose.ui.platform.LocalUriHandler
 import com.thesozluk.app.settings.AppUpdates
 import com.thesozluk.app.settings.CustomFont
@@ -157,8 +161,11 @@ fun SettingsScreen(navController: NavController, section: String? = null) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val scrolled by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    val prompt = remember { PromptState() }
 
+    CompositionLocalProvider(LocalPrompt provides prompt) {
     Scaffold(
+        snackbarHost = { FloatingPromptHost(prompt, Modifier.navigationBarsPadding()) },
         topBar = {
             FloatingTopBar(
                 title = if (scrolled) title else null,
@@ -195,6 +202,7 @@ fun SettingsScreen(navController: NavController, section: String? = null) {
                 SettingsSection.About -> about()
             }
         }
+    }
     }
 }
 
@@ -491,10 +499,11 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
         // A .ttf / .otf from the phone becomes the "kendi" font
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
+        val prompt = LocalPrompt.current
         val pickFont = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) scope.launch {
                 if (CustomFont.set(context, uri)) AppSettings.setReadingFont(ReadingFont.Custom)
-                else Toast.makeText(context, "bu dosya okunabilen bir yazı tipi değil", Toast.LENGTH_LONG).show()
+                else prompt?.show("bu dosya okunabilen bir yazı tipi değil")
             }
         }
         val hasCustom = CustomFont.family.value != null
@@ -1058,6 +1067,7 @@ private fun LazyListScope.about() {
     item {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
+        val prompt = LocalPrompt.current
         var checking by remember { mutableStateOf(false) }
         Surface(
             onClick = {
@@ -1065,7 +1075,7 @@ private fun LazyListScope.about() {
                     checking = true
                     val release = AppUpdates.check(context, force = true)
                     checking = false
-                    if (release == null) Toast.makeText(context, "en güncel sürümü kullanıyorsun", Toast.LENGTH_SHORT).show()
+                    if (release == null) prompt?.show("en güncel sürümü kullanıyorsun")
                 }
             },
             shape = segmentedShape(1, 3),

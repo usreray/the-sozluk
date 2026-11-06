@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.FloatingPromptHost
+import com.thesozluk.app.ui.components.PromptState
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.animation.core.tween
@@ -57,8 +59,6 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -122,7 +122,7 @@ fun RandomScreen(
     val isLoggedIn by EksiSession.isLoggedIn
     val uriHandler = LocalUriHandler.current
     val listState = rememberLazyListState()
-    val snackbar = remember { SnackbarHostState() }
+    val prompt = remember { PromptState() }
     val scope = rememberCoroutineScope()
     var showLoginDialog by remember { mutableStateOf(false) }
     var shareImageOf by remember { mutableStateOf<RandomPick?>(null) }
@@ -178,7 +178,7 @@ fun RandomScreen(
         }
     }
     LaunchedEffect(message) {
-        message?.let { snackbar.showSnackbar(it); viewModel.clearMessage() }
+        message?.let { prompt.show(it); viewModel.clearMessage() }
     }
     if (showLoginDialog) {
         LoginRequiredDialog(
@@ -301,7 +301,7 @@ fun RandomScreen(
                             if (EntryBookmarks.isSaved(pick.entry.entryId)) EntryBookmarks.remove(pick.entry.entryId)
                             else EntryBookmarks.save(pick.entry, pick.topicTitle, pick.topicPath)
                             scope.launch {
-                                snackbar.showSnackbar(if (EntryBookmarks.isSaved(pick.entry.entryId)) "entry kaydedildi" else "kayıttan çıkarıldı")
+                                prompt.show(if (EntryBookmarks.isSaved(pick.entry.entryId)) "entry kaydedildi" else "kayıttan çıkarıldı")
                             }
                         },
                         onShareImage = { shareImageOf = pick }
@@ -334,8 +334,9 @@ fun RandomScreen(
                 .padding(end = 16.dp, bottom = 16.dp + LocalBottomBarInset.current)
                 .pressBounce(fabInteraction, pressedScale = 0.9f)
         )
-        SnackbarHost(
-            snackbar,
+        }
+        FloatingPromptHost(
+            prompt,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp + LocalBottomBarInset.current)
         )
     }

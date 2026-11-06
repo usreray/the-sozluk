@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.FloatingPromptHost
+import com.thesozluk.app.ui.components.PromptState
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.shape.CircleShape
 import com.thesozluk.app.ui.components.glassActive
@@ -87,8 +89,6 @@ import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -193,7 +193,7 @@ fun TopicDetailScreen(
     val listState = viewModel.scrollState
     val uriHandler = LocalUriHandler.current
     val surfaceColor = MaterialTheme.colorScheme.surface
-    val snackbar = remember { SnackbarHostState() }
+    val notes = remember { PromptState() }
     val scope = rememberCoroutineScope()
 
     var showPagePicker by rememberSaveable { mutableStateOf(false) }
@@ -233,7 +233,7 @@ fun TopicDetailScreen(
     }
     LaunchedEffect(message) {
         message?.let {
-            snackbar.showSnackbar(it)
+            notes.show(it)
             viewModel.consumeMessage()
         }
     }
@@ -380,10 +380,10 @@ fun TopicDetailScreen(
         onBookmark = { entry ->
             if (EntryBookmarks.isSaved(entry.entryId)) {
                 EntryBookmarks.remove(entry.entryId)
-                scope.launch { snackbar.showSnackbar("kayıttan çıkarıldı") }
+                scope.launch { notes.show("kayıttan çıkarıldı") }
             } else {
                 EntryBookmarks.save(entry, displayTitle, topic?.topicPath?.ifBlank { null } ?: topic?.url.orEmpty())
-                scope.launch { snackbar.showSnackbar("entry kaydedildi; profilde \"kaydedilen entry'ler\"de") }
+                scope.launch { notes.show("entry kaydedildi; profilde \"kaydedilen entry'ler\"de") }
             }
         },
         onShareImage = { entry -> shareImageOf = entry },
@@ -394,7 +394,7 @@ fun TopicDetailScreen(
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    snackbar.showSnackbar(e.message ?: "düzeltme sayfası açılamadı")
+                    notes.show(e.message ?: "düzeltme sayfası açılamadı")
                 }
             }
         }
@@ -451,11 +451,11 @@ fun TopicDetailScreen(
                 OfflineStore.download(it.title, path)
                 // An offline copy also goes to the saved topics
                 if (!it.isSaved) viewModel.saveTopic(visiblePage)
-                scope.launch { snackbar.showSnackbar("indirme başladı; ilerlemesi ⋮ menüsünde ve profilde") }
+                scope.launch { notes.show("indirme başladı; ilerlemesi ⋮ menüsünde ve profilde") }
             }
             TopicMenuAction.DeleteOffline -> topic?.let {
                 OfflineStore.delete(it.topicPath.ifBlank { it.url })
-                scope.launch { snackbar.showSnackbar("çevrimdışı kopya silindi") }
+                scope.launch { notes.show("çevrimdışı kopya silindi") }
             }
             else -> prompt = action
         }
@@ -824,7 +824,7 @@ fun TopicDetailScreen(
             }
         )
 
-        SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 88.dp))
+        FloatingPromptHost(notes, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 88.dp))
     }
     }
 }

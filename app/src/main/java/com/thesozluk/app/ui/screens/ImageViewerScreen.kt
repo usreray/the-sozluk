@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.FloatingPromptHost
+import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.navigation.Screen
 import androidx.compose.material.icons.automirrored.rounded.Article
 import android.content.Intent
@@ -55,7 +57,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
-import android.widget.Toast
 
 /**
  * Images opened from a list (an author's uploads): the viewer pages through them left and right.
@@ -83,6 +84,7 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
     val density = LocalDensity.current
     val closeDistance = with(density) { 140.dp.toPx() }
     val scope = rememberCoroutineScope()
+    val prompt = remember { PromptState() }
     var chromeVisible by remember { mutableStateOf(true) }
     var zoomed by remember { mutableStateOf(false) }
 
@@ -184,7 +186,7 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
                                 }
                             }
                         }.isSuccess
-                        Toast.makeText(context, if (saved) "görsel indirildi" else "görsel indirilemedi", Toast.LENGTH_SHORT).show()
+                        prompt.show(if (saved) "görsel indirildi" else "görsel indirilemedi")
                     }
                 }) {
                     Icon(Icons.Rounded.Download, contentDescription = "cihaza indir")
@@ -194,6 +196,7 @@ fun ImageViewerScreen(ref: String, navController: NavController) {
                 }
             })
         )
+        FloatingPromptHost(prompt, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 80.dp))
     }
 }
 

@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.FloatingPromptHost
+import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.components.glassSource
 import com.thesozluk.app.ui.components.ShareEntryImageSheet
 import com.thesozluk.app.settings.EntryBookmarks
@@ -67,8 +69,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -142,13 +142,13 @@ fun AuthorScreen(
     val tabState = viewModel.tab(selectedTab)
     val listState = rememberLazyListState()
     val uriHandler = LocalUriHandler.current
-    val snackbar = remember { SnackbarHostState() }
+    val prompt = remember { PromptState() }
 
     LaunchedEffect(nick) { viewModel.load(nick) }
     LaunchedEffect(profile, selectedTab) { if (profile != null) viewModel.ensureTabLoaded(selectedTab) }
     LaunchedEffect(message) {
         message?.let {
-            snackbar.showSnackbar(it)
+            prompt.show(it)
             viewModel.consumeMessage()
         }
     }
@@ -215,7 +215,7 @@ fun AuthorScreen(
         onBookmark = { entry ->
             if (EntryBookmarks.isSaved(entry.entryId)) EntryBookmarks.remove(entry.entryId)
             else EntryBookmarks.save(entry, entry.topicTitle, entry.topicUrl)
-            scope.launch { snackbar.showSnackbar(if (EntryBookmarks.isSaved(entry.entryId)) "entry kaydedildi" else "kayıttan çıkarıldı") }
+            scope.launch { prompt.show(if (EntryBookmarks.isSaved(entry.entryId)) "entry kaydedildi" else "kayıttan çıkarıldı") }
         },
         onShareImage = { entry -> shareImageOf = entry },
         // Own profile: the user's entries can be edited and deleted from here too
@@ -227,7 +227,7 @@ fun AuthorScreen(
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    snackbar.showSnackbar(e.message ?: "düzeltme sayfası açılamadı")
+                    prompt.show(e.message ?: "düzeltme sayfası açılamadı")
                 }
             }
         }) else null
@@ -402,7 +402,7 @@ fun AuthorScreen(
                 dismissButton = { TextButton(onClick = { pendingRelation = null }) { Text("vazgeç") } }
             )
         }
-        SnackbarHost(snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+        FloatingPromptHost(prompt, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
     }
     }
 }
