@@ -61,6 +61,12 @@ enum class ReadingFont(val label: String, private val base: FontFamily) {
     val family: FontFamily get() = if (this == Custom) CustomFont.family.value ?: FontFamily.Default else base
 }
 
+/** The floating bottom bar: with labels that slim away on scroll, or icons only. */
+enum class NavBarStyle(val label: String) {
+    Floating("yüzen"),
+    Compact("kompakt")
+}
+
 /** Appearance preferences, kept in SharedPreferences and exposed as Compose state. */
 object AppSettings {
     private const val PREFS = "app_settings"
@@ -206,6 +212,23 @@ object AppSettings {
         prefs.edit().putBoolean("swipeTopics", enabled).apply()
     }
 
+    // Bottom bar: style and the light on the glass rim
+    private val _navBarStyle = mutableStateOf(NavBarStyle.Floating)
+    val navBarStyle: State<NavBarStyle> = _navBarStyle
+    // "sıvı cam": every floating surface gets the nav bar's glass, rim light and all
+    private val _liquidGlass = mutableStateOf(false)
+    val liquidGlass: State<Boolean> = _liquidGlass
+
+    fun setNavBarStyle(style: NavBarStyle) {
+        _navBarStyle.value = style
+        prefs.edit().putInt("navBarStyle", style.ordinal).apply()
+    }
+
+    fun setLiquidGlass(enabled: Boolean) {
+        _liquidGlass.value = enabled
+        prefs.edit().putBoolean("liquidGlassAll", enabled).apply()
+    }
+
     fun setReadingFont(font: ReadingFont) {
         _readingFont.value = font
         prefs.edit().putInt("readingFont", font.ordinal).apply()
@@ -241,6 +264,8 @@ object AppSettings {
         _readingFont.value = ReadingFont.entries.getOrElse(prefs.getInt("readingFont", 0)) { ReadingFont.Default }
         _fontEverywhere.value = prefs.getBoolean("fontEverywhere", false)
         _reduceMotion.value = prefs.getBoolean("reduceMotion", false)
+        _navBarStyle.value = NavBarStyle.entries.getOrElse(prefs.getInt("navBarStyle", 0)) { NavBarStyle.Floating }
+        _liquidGlass.value = prefs.getBoolean("liquidGlassAll", false)
         _inlineImages.value = prefs.getBoolean("inlineImages", false)
         _swipeTopics.value = prefs.getBoolean("swipeTopics", false)
         _checkUpdates.value = prefs.getBoolean("checkUpdates", true)

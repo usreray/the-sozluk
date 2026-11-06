@@ -1,5 +1,7 @@
 package com.thesozluk.app
 
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.runtime.getValue
@@ -257,7 +259,12 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
         label = "sheetBlur"
     )
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).blur(sheetBlur)) {
-        Box(Modifier.fillMaxSize().hazeSource(navGlass)) {
+        // Scrolling a tab slims the floating bar to its icons; a new tab starts with labels
+        LaunchedEffect(currentRoute) { com.thesozluk.app.ui.components.NavBarScroll.expand() }
+        Box(
+            Modifier.fillMaxSize().hazeSource(navGlass)
+                .nestedScroll(com.thesozluk.app.ui.components.NavBarScroll.connection)
+        ) {
             CompositionLocalProvider(LocalBottomBarInset provides if (showBar) FloatingNavBarInset else 0.dp) {
                 Navigation(navController)
             }
@@ -277,7 +284,7 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
             visible = showBar,
             enter = slideInVertically { it } + fadeIn(),
             exit = slideOutVertically { it } + fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 16.dp)
+            modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             FloatingNavBar(
                 glassState = navGlass,

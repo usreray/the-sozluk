@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.NavBarPreview
+import com.thesozluk.app.settings.NavBarStyle
 import androidx.compose.ui.graphics.toArgb
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalUriHandler
@@ -331,6 +333,39 @@ private fun LazyListScope.appearance() {
             shape = segmentedShape(1, 2),
             onCheckedChange = AppSettings::setReduceMotion
         )
+    }
+    item { SectionTitle(
+        "alt çubuk",
+        changed = AppSettings.navBarStyle.value != NavBarStyle.Floating,
+        onReset = { AppSettings.setNavBarStyle(NavBarStyle.Floating) }
+    ) }
+    item {
+        Surface(shape = segmentedShape(0, 1), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(0, 1))) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("tarz", style = MaterialTheme.typography.titleMedium)
+                // The bar as it will look, to try out right here
+                NavBarPreview(Modifier.padding(vertical = 6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+                    NavBarStyle.entries.forEachIndexed { index, style ->
+                        ToggleButton(
+                            checked = AppSettings.navBarStyle.value == style,
+                            onCheckedChange = { AppSettings.setNavBarStyle(style) },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            shapes = connectedShapes(index, NavBarStyle.entries.size)
+                        ) { Text(style.label, maxLines = 1, softWrap = false) }
+                    }
+                }
+                Text(
+                    when (AppSettings.navBarStyle.value) {
+                        NavBarStyle.Floating -> "yazılı simgeler; aşağı kaydırınca sadeleşir. çubukta parmağını kaydırarak sekme değiştirebilirsin."
+                        NavBarStyle.Compact -> "sadece simgeler, daha küçük bir çubuk."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
     item { SectionTitle(
         "renkler",
