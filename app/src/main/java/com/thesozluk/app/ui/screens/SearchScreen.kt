@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -256,7 +257,7 @@ private fun SearchHistoryList(history: List<String>, onSelect: (String) -> Unit,
                     onClick = { onSelect(item) },
                     shape = segmentedShape(index, history.size),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().cardEdge(segmentedShape(index, history.size))
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, end = 8.dp)) {
                         Icon(Icons.Rounded.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -335,7 +336,7 @@ private fun SuggestionList(
                     onClick = { onSelectAuthor(nick) },
                     shape = segmentedShape(index, authors.size),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth().animateItem()
+                    modifier = Modifier.fillMaxWidth().animateItem().cardEdge(segmentedShape(index, authors.size))
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

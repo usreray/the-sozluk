@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.thesozluk.app.ui.components.FloatingPromptHost
 import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.components.SheetBlur
@@ -251,7 +253,7 @@ private fun ThreadRow(thread: MessageThread, index: Int, count: Int, onClick: ()
         onClick = onClick,
         shape = segmentedShape(index, count),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth().cardEdge(segmentedShape(index, count))
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             AuthorAvatar(thread.nick, size = 44, avatarUrl = rememberAvatarUrl(thread.nick))

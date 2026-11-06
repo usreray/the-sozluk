@@ -1,5 +1,12 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.AppMenuItem
+import com.thesozluk.app.ui.components.AppMenu
+import androidx.compose.material3.FloatingActionButtonDefaults
+import com.thesozluk.app.ui.components.glassSource
+import com.thesozluk.app.ui.components.glassActive
+import com.thesozluk.app.ui.components.LiquidGlassBehind
+import com.thesozluk.app.ui.components.liquidGlass
 import com.thesozluk.app.ui.components.FloatingPromptHost
 import com.thesozluk.app.ui.components.PromptState
 import androidx.compose.foundation.gestures.scrollBy
@@ -252,7 +259,7 @@ fun RandomScreen(
             }
             LazyColumn(
                 state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth().glassSource(),
                 contentPadding = PaddingValues(
                     start = 12.dp,
                     end = 12.dp,
@@ -310,7 +317,18 @@ fun RandomScreen(
             }
         }
         val fabInteraction = remember { MutableInteractionSource() }
+        val liquid = liquidGlass() && glassActive()
+        LiquidGlassBehind(
+            FloatingActionButtonDefaults.extendedFabShape,
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 16.dp + LocalBottomBarInset.current)
+                .pressBounce(fabInteraction, pressedScale = 0.9f)
+        ) {
         ExtendedFloatingActionButton(
+            containerColor = if (liquid) androidx.compose.ui.graphics.Color.Transparent else FloatingActionButtonDefaults.containerColor,
+            contentColor = if (liquid) MaterialTheme.colorScheme.primary else androidx.compose.material3.contentColorFor(FloatingActionButtonDefaults.containerColor),
+            elevation = if (liquid) FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp) else FloatingActionButtonDefaults.elevation(),
             onClick = { if (!isLoading) viewModel.next(mode) },
             interactionSource = fabInteraction,
             icon = {
@@ -328,11 +346,7 @@ fun RandomScreen(
                     modifier = Modifier.graphicsLayer { rotationZ = if (isLoading) turn else 0f }
                 )
             },
-            text = { Text("başka getir") },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 16.dp + LocalBottomBarInset.current)
-                .pressBounce(fabInteraction, pressedScale = 0.9f)
+            text = { Text("başka getir") }
         )
         }
         FloatingPromptHost(
@@ -426,18 +440,18 @@ private fun EntryBubble(
                 if (isOpening) {
                     LoadingIndicator(Modifier.align(Alignment.Center).size(40.dp))
                 }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("başlığı aç") }, onClick = { menu = false; onTopic() })
-                    DropdownMenuItem(text = { Text("metni kopyala") }, onClick = { menu = false; clipboard.setText(AnnotatedString(entry.content)) })
-                    DropdownMenuItem(
-                        text = { Text("linki kopyala") },
+                AppMenu(expanded = menu, onDismissRequest = { menu = false }, grouped = false) {
+                    AppMenuItem(text = "başlığı aç", onClick = { menu = false; onTopic() })
+                    AppMenuItem(text = "metni kopyala", onClick = { menu = false; clipboard.setText(AnnotatedString(entry.content)) })
+                    AppMenuItem(
+                        text = "linki kopyala",
                         onClick = { menu = false; clipboard.setText(AnnotatedString("https://eksisozluk.com/entry/${entry.entryId}")) }
                     )
-                    DropdownMenuItem(
-                        text = { Text(if (EntryBookmarks.isSaved(entry.entryId)) "kayıttan çıkar" else "kaydet") },
+                    AppMenuItem(
+                        text = if (EntryBookmarks.isSaved(entry.entryId)) "kayıttan çıkar" else "kaydet",
                         onClick = { menu = false; onBookmark() }
                     )
-                    DropdownMenuItem(text = { Text("görsel olarak paylaş") }, onClick = { menu = false; onShareImage() })
+                    AppMenuItem(text = "görsel olarak paylaş", onClick = { menu = false; onShareImage() })
                 }
             }
             // The topic it belongs to, its favorites and where it came from

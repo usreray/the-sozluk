@@ -48,7 +48,7 @@ fun TopicRow(
         onClick = onClick,
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth().cardEdge(shape)
     ) {
         Row(
             modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 16.dp),

@@ -1,5 +1,8 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
+import com.thesozluk.app.ui.components.AppMenuItem
+import com.thesozluk.app.ui.components.AppMenu
 import com.thesozluk.app.ui.components.FloatingPromptHost
 import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.components.glassSource
@@ -449,7 +452,8 @@ private fun ProfileHeader(
                         Surface(
                             onClick = { showAllBadges = false; openBadge = badge },
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.cardEdge(RoundedCornerShape(12.dp))
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
                                 AsyncImage(
@@ -715,23 +719,16 @@ private fun RelationMenu(
         IconButton(onClick = { open = true }) {
             Icon(Icons.Rounded.MoreVert, contentDescription = "diğer")
         }
-        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
-                relations.forEach { action ->
-                    DropdownMenuItem(
-                        text = { Text(if (action.isAdded) action.removeLabel else action.label) },
-                        leadingIcon = {
-                            Icon(
-                                if (action.isAdded) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.Block,
-                                contentDescription = null
-                            )
-                        },
-                        onClick = {
-                            open = false
-                            onPick(action)
-                        }
-                    )
-                }
+        AppMenu(expanded = open, onDismissRequest = { open = false }) {
+            relations.forEach { action ->
+                AppMenuItem(
+                    text = if (action.isAdded) action.removeLabel else action.label,
+                    icon = if (action.isAdded) Icons.AutoMirrored.Rounded.Undo else Icons.Rounded.Block,
+                    onClick = {
+                        open = false
+                        onPick(action)
+                    }
+                )
             }
         }
     }

@@ -213,6 +213,8 @@ fun EntryCard(
             .graphicsLayer { alpha = if (lifted) 0f else 1f }
             .then(if (canPeek) Modifier.pressBounce(press, pressedScale = 0.97f) else Modifier)
             .clip(RoundedCornerShape(28.dp))
+            // Liquid glass: the bars' fine light line along the card's top edge
+            .then(if (liquidGlass()) Modifier.glassEdge(RoundedCornerShape(28.dp)) else Modifier)
             .then(
                 when {
                     canPeek -> Modifier.combinedClickable(
@@ -622,27 +624,16 @@ private fun EntryMenu(items: List<EntryMenuItem>) {
         IconButton(onClick = { open = true }) {
             Icon(Icons.Rounded.MoreVert, contentDescription = "diğer", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
-                if (entry.entryId.isNotEmpty()) {
-                    DropdownMenuItem(
-                        text = { Text("paylaş") },
-                        leadingIcon = { Icon(Icons.Rounded.Share, contentDescription = null) },
-                        onClick = {
-                            open = false
-                            val send = Intent(Intent.ACTION_SEND)
-                                .setType("text/plain")
-                                .putExtra(Intent.EXTRA_TEXT, "${EksiSession.BASE_URL}/entry/${entry.entryId}")
-                            context.startActivity(Intent.createChooser(send, null))
-                        }
-                    )
-                }
-                DropdownMenuItem(
-                    text = { Text("metni kopyala") },
-                    leadingIcon = { Icon(Icons.Rounded.ContentCopy, contentDescription = null) },
+        AppMenu(expanded = open, onDismissRequest = { open = false }) {
+            items.forEach { item ->
+                AppMenuItem(
+                    text = item.label,
+                    icon = item.icon,
+                    color = if (item.destructive) MaterialTheme.colorScheme.error else Color.Unspecified,
+                    iconTint = if (item.destructive) MaterialTheme.colorScheme.error else Color.Unspecified,
                     onClick = {
                         open = false
-                        scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", entry.content))) }
+                        item.onClick()
                     }
                 )
             }

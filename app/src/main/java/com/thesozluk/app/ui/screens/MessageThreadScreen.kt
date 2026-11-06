@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.AppMenuItem
+import com.thesozluk.app.ui.components.AppMenu
 import com.thesozluk.app.ui.components.FloatingPromptHost
 import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.components.glassSource
@@ -149,18 +151,20 @@ fun MessageThreadScreen(
                 actions = if (thread?.threadForm == null) null else ({
                         Box {
                             IconButton(onClick = { menuOpen = true }) { Icon(Icons.Rounded.MoreVert, contentDescription = "diğer") }
-                            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("arşivle") },
-                                    leadingIcon = { Icon(Icons.Rounded.Archive, contentDescription = null) },
+                            AppMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, grouped = false) {
+                                AppMenuItem(
+                                    text = "arşivle",
+                                    icon = Icons.Rounded.Archive,
                                     onClick = {
                                         menuOpen = false
                                         viewModel.threadAction("archive") { navController.popBackStack() }
                                     }
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("sil", color = MaterialTheme.colorScheme.error) },
-                                    leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                AppMenuItem(
+                                    text = "sil",
+                                    icon = Icons.Rounded.Delete,
+                                    color = MaterialTheme.colorScheme.error,
+                                    iconTint = MaterialTheme.colorScheme.error,
                                     onClick = {
                                         menuOpen = false
                                         confirmDelete = true

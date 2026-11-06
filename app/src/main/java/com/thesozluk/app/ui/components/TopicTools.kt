@@ -99,8 +99,8 @@ fun TopicMenu(
         IconButton(onClick = { open = true }) {
             Icon(Icons.Rounded.MoreVert, contentDescription = "başlık menüsü", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        DropdownMenuPopup(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuGroup(shapes = MenuDefaults.groupShapes()) {
+        AppMenu(expanded = open, onDismissRequest = { open = false }) {
+            run {
                 // All filters live in their own sheet (as chips) so the menu stays short; the
                 // row shows the one that is on
                 FilterItem(
@@ -129,16 +129,11 @@ fun TopicMenu(
 
 @Composable
 private fun FilterItem(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) {
-    DropdownMenuItem(
-        text = {
-            Text(
-                label,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-            )
-        },
-        leadingIcon = {
-            Icon(icon, contentDescription = null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-        },
+    AppMenuItem(
+        text = label,
+        icon = icon,
+        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        iconTint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
         onClick = onClick
     )
 }

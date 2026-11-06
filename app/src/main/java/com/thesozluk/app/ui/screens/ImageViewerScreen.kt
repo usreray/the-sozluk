@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.thesozluk.app.ui.components.FloatingPromptHost
 import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.navigation.Screen

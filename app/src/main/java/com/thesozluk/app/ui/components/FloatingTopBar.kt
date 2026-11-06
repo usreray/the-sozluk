@@ -199,17 +199,8 @@ fun FloatingSurface(
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    // Over glass the surface is see-through and the blurred page shows in it; no shadow then,
-    // it would show through as a dark rim
-    val glass = glassActive()
-    val color = MaterialTheme.colorScheme.surfaceContainerHigh.let { if (glass) it.copy(alpha = 0.62f) else it }
-    val elevation = if (glass) 0.dp else 6.dp
-    val surfaceModifier = modifier.glass(shape)
-    if (onClick != null) {
-        Surface(onClick = onClick, shape = shape, color = color, shadowElevation = elevation, modifier = surfaceModifier, content = content)
-    } else {
-        Surface(shape = shape, color = color, shadowElevation = elevation, modifier = surfaceModifier, content = content)
-    }
+    // Liquid glass: the nav bar's glass under it; otherwise frosted, without a shadow over glass
+    GlassSurface(shape = shape, modifier = modifier, onClick = onClick, content = content)
 }
 
 /**

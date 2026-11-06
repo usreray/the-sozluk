@@ -1,5 +1,10 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.ToggleButtonDefaults
+import com.thesozluk.app.ui.components.cardEdge
+import com.thesozluk.app.ui.components.glassSource
 import androidx.compose.runtime.key
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material3.VerticalDivider
@@ -292,21 +297,33 @@ fun HomeScreen(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CategoryButtons(categories: List<HomeCategory>, selected: Int, onSelect: (Int) -> Unit) {
+    // The buttons' invisible touch margin (48dp around a 40dp button) is given back as padding,
+    // so the liquid glass line sits on the button's own edge rather than above it
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        CategoryButtonRow(categories, selected, onSelect)
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CategoryButtonRow(categories: List<HomeCategory>, selected: Int, onSelect: (Int) -> Unit) {
     if (categories.size <= 3) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
         ) {
             categories.forEachIndexed { index, category ->
+                val shapes = when (index) {
+                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    categories.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                }
                 ToggleButton(
                     checked = index == selected,
                     onCheckedChange = { onSelect(index) },
-                    modifier = Modifier.weight(1f),
-                    shapes = when (index) {
-                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        categories.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                    }
+                    // Liquid glass: the cards' light line along the top
+                    modifier = Modifier.weight(1f).cardEdge(if (index == selected) shapes.checkedShape else shapes.shape),
+                    shapes = shapes
                 ) {
                     Text(category.label)
                 }
@@ -319,12 +336,17 @@ private fun CategoryButtons(categories: List<HomeCategory>, selected: Int, onSel
     LaunchedEffect(selected) { rowState.animateScrollToItem(maxOf(0, selected - 1)) }
     LazyRow(
         state = rowState,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         itemsIndexed(categories, key = { _, category -> category.name }) { index, category ->
-            ToggleButton(checked = index == selected, onCheckedChange = { onSelect(index) }) {
+            // The light line follows the button's own shape: a pill, or a rounded square when chosen
+            ToggleButton(
+                checked = index == selected,
+                onCheckedChange = { onSelect(index) },
+                modifier = Modifier.cardEdge(if (index == selected) ToggleButtonDefaults.checkedShape else ToggleButtonDefaults.shape)
+            ) {
                 Text(category.label)
             }
         }
@@ -422,7 +444,7 @@ private fun CategoryPage(
                 ) { pullOffset ->
                     LazyColumn(
                         state = listState,
-                        modifier = Modifier.fillMaxSize().then(pullOffset),
+                        modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 4.dp, bottom = 24.dp + LocalBottomBarInset.current),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {

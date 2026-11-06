@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.glassSource
 import androidx.compose.foundation.Image
 import com.thesozluk.app.ui.components.BrandIcons
@@ -160,7 +161,8 @@ fun ProfileScreen(
                         Surface(
                             onClick = { navController.navigate(Screen.Library.createRoute(kind)) },
                             shape = segmentedShape(index, rows.size),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier.cardEdge(segmentedShape(index, rows.size))
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -175,7 +177,7 @@ fun ProfileScreen(
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.padding(top = 20.dp)
+                    modifier = Modifier.padding(top = 20.dp).cardEdge(RoundedCornerShape(24.dp))
                 ) {
                     Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("geliştirici", style = MaterialTheme.typography.titleMedium)

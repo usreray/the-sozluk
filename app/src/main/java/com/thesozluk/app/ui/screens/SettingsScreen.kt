@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.NavBarPreview
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.CompositionLocalProvider
@@ -239,7 +240,7 @@ private fun summaryOf(section: SettingsSection): String = when (section) {
 
 @Composable
 private fun CategoryRow(section: SettingsSection, summary: String, shape: Shape, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(onClick = onClick, shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(shape)) {
         ListItem(
             leadingContent = {
                 Box(
@@ -273,7 +274,7 @@ private fun LazyListScope.appearance() {
     ) }
     item {
         val themeMode by AppSettings.themeMode
-        Surface(shape = segmentedShape(0, 3), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = segmentedShape(0, 3), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(0, 3))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
                     ThemeMode.entries.forEachIndexed { index, mode ->
@@ -328,8 +329,20 @@ private fun LazyListScope.appearance() {
             subtitle = "buzlu cam çubuklar, bulanık spoiler, pencerelerin arkası",
             checked = AppSettings.blurEffects.value,
             enabled = true,
-            shape = segmentedShape(0, 2),
+            shape = segmentedShape(0, 3),
             onCheckedChange = AppSettings::setBlurEffects
+        )
+    }
+    item {
+        SwitchRow(
+            title = "sıvı cam",
+            subtitle = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU)
+                "üst çubuklar, düğmeler, menüler ve bildirimler alt çubuk gibi cam olur; kenarları arkalarından geçen renkleri yansıtır"
+            else "üst çubuklar, düğmeler, menüler ve bildirimler alt çubuk gibi cam olur (kenar ışığı android 13 ve üstünde)",
+            checked = AppSettings.liquidGlass.value,
+            enabled = AppSettings.blurEffects.value,
+            shape = segmentedShape(1, 3),
+            onCheckedChange = AppSettings::setLiquidGlass
         )
     }
     item {
@@ -338,7 +351,7 @@ private fun LazyListScope.appearance() {
             subtitle = "yaylı animasyonlar ve simge hareketleri kapanır. telefonda animasyonlar kapalıysa kendiliğinden açılır",
             checked = AppSettings.reduceMotion.value,
             enabled = true,
-            shape = segmentedShape(1, 2),
+            shape = segmentedShape(2, 3),
             onCheckedChange = AppSettings::setReduceMotion
         )
     }
@@ -386,7 +399,7 @@ private fun LazyListScope.appearance() {
     ) }
     item {
         val dynamicColor by AppSettings.dynamicColor
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text(
                     if (dynamicColor) "bir renk seçince duvar kâğıdı renkleri kapanır" else "palet",
@@ -446,7 +459,7 @@ private fun LazyListScope.appearance() {
 private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) {
     // Live preview of an entry with the choices below
     item {
-        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(28.dp))) {
             Text(
                 "bilgi bir kitaptır, kafa kâğıttır, ekşi ise sözlüktür. (bkz: önizleme)\n\naşağıdaki ayarlar entry'lerin nasıl görüneceğini değiştirir.",
                 style = entryBodyStyle(),
@@ -477,7 +490,7 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
         )
     }
     item {
-        Surface(shape = segmentedShape(1, 4), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = segmentedShape(1, 4), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(1, 4))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("yazı tipi", style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
@@ -507,7 +520,7 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
             }
         }
         val hasCustom = CustomFont.family.value != null
-        Surface(shape = segmentedShape(1, 4), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = segmentedShape(1, 4), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(1, 4))) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)
@@ -655,7 +668,7 @@ private fun LazyListScope.homeLists() {
     ) }
     item {
         val hiddenTabs by AppSettings.hiddenTabs
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     "olay, takip, son, kenar ve çaylaklar giriş yapınca görünür",
@@ -740,7 +753,7 @@ private fun LazyListScope.content() {
     item {
         val blockedWords by AppSettings.blockedWords
         var adding by remember { mutableStateOf(false) }
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     "bu kelimeleri içeren başlıklar listelerde gösterilmez",
@@ -849,7 +862,7 @@ private fun LazyListScope.data(navController: NavController) {
         val openBackup = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             restoreUri = uri
         }
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     "ayarlar, arama ve okuma geçmişi, kaydedilen entry'ler ve cihazdaki taslaklar yedeklenir. " +
@@ -902,7 +915,7 @@ private fun LazyListScope.data(navController: NavController) {
             val who = nick
             if (uri != null && who != null) EntryBackup.start(context, who, uri)
         }
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("kendi entry'lerini yedekle", style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -986,7 +999,7 @@ private fun LazyListScope.links() {
             onDispose { owner.lifecycle.removeObserver(observer) }
         }
         val enabled = remember(refresh) { linksEnabled(context) }
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("ekşi linklerini uygulamada aç", style = MaterialTheme.typography.titleMedium)
                 Text(
@@ -1019,7 +1032,7 @@ private fun linksEnabled(context: android.content.Context): Boolean {
 
 private fun LazyListScope.about() {
     item {
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("the sözlük", style = MaterialTheme.typography.headlineSmallEmphasized, color = MaterialTheme.colorScheme.primary)
                 Text("sürüm ${appVersion()}", style = MaterialTheme.typography.bodyMedium)
@@ -1042,7 +1055,7 @@ private fun LazyListScope.about() {
             onClick = { com.thesozluk.app.settings.WhatsNew.show() },
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).cardEdge(RoundedCornerShape(24.dp))
         ) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 Text("neler yeni", style = MaterialTheme.typography.titleMedium)
@@ -1080,7 +1093,7 @@ private fun LazyListScope.about() {
             },
             shape = segmentedShape(1, 3),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().cardEdge(segmentedShape(1, 3))
         ) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 Text("şimdi kontrol et", style = MaterialTheme.typography.titleMedium)
@@ -1101,7 +1114,7 @@ private fun LazyListScope.about() {
             onClick = { com.thesozluk.app.ui.navigation.openInAppTab(context, AppUpdates.issueUrl(context), surfaceColor) },
             shape = segmentedShape(2, 3),
             color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().cardEdge(segmentedShape(2, 3))
         ) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 Text("sorun bildir", style = MaterialTheme.typography.titleMedium)
@@ -1186,7 +1199,8 @@ private fun SwitchRow(
     Surface(
         onClick = { if (enabled) onCheckedChange(!checked) },
         shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        modifier = Modifier.cardEdge(shape)
     ) {
         ListItem(
             headlineContent = { Text(title) },
@@ -1199,7 +1213,7 @@ private fun SwitchRow(
 
 @Composable
 private fun NavRow(title: String, subtitle: String, shape: Shape, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(onClick = onClick, shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(shape)) {
         ListItem(
             headlineContent = { Text(title) },
             supportingContent = { Text(subtitle) },
@@ -1211,7 +1225,7 @@ private fun NavRow(title: String, subtitle: String, shape: Shape, onClick: () ->
 
 @Composable
 private fun ActionRow(title: String, subtitle: String, button: String, enabled: Boolean, shape: Shape, onClick: () -> Unit) {
-    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(shape)) {
         ListItem(
             headlineContent = { Text(title) },
             supportingContent = { Text(subtitle) },
@@ -1223,7 +1237,7 @@ private fun ActionRow(title: String, subtitle: String, button: String, enabled: 
 
 @Composable
 private fun SliderRow(title: String, value: Float, range: ClosedFloatingPointRange<Float>, steps: Int, shape: Shape, onChange: (Float) -> Unit) {
-    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Surface(shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(shape)) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Slider(value = value, onValueChange = onChange, valueRange = range, steps = steps)

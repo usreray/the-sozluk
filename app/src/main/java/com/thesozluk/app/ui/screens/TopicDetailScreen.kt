@@ -1,5 +1,8 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.material3.FloatingActionButtonDefaults
+import com.thesozluk.app.ui.components.LiquidGlassBehind
+import com.thesozluk.app.ui.components.liquidGlass
 import com.thesozluk.app.ui.components.FloatingPromptHost
 import com.thesozluk.app.ui.components.PromptState
 import androidx.compose.ui.graphics.toArgb
@@ -977,16 +980,33 @@ private fun BottomToolbar(
         exit = slideOutVertically { it } + fadeOut(),
         modifier = modifier.navigationBarsPadding().padding(bottom = 16.dp)
     ) {
+        // Liquid glass: the write button and the pages pill sit on the nav bar's glass, see-through
+        // and flat (a shadow would show through the glass as a dark rim)
+        val liquid = liquidGlass() && glassActive()
+        val writeButton: @Composable () -> Unit = {
+            LiquidGlassBehind(FloatingActionButtonDefaults.shape) {
+                FloatingActionButton(
+                    onClick = onWrite,
+                    containerColor = if (liquid) androidx.compose.ui.graphics.Color.Transparent else FloatingActionButtonDefaults.containerColor,
+                    contentColor = if (liquid) MaterialTheme.colorScheme.primary else androidx.compose.material3.contentColorFor(FloatingActionButtonDefaults.containerColor),
+                    elevation = if (liquid) FloatingActionButtonDefaults.elevation(0.dp, 0.dp, 0.dp, 0.dp) else FloatingActionButtonDefaults.elevation()
+                ) { Icon(Icons.Rounded.Edit, contentDescription = "entry gir") }
+            }
+        }
         if (totalPages <= 1) {
-            FloatingActionButton(onClick = onWrite) { Icon(Icons.Rounded.Edit, contentDescription = "entry gir") }
+            writeButton()
             return@AnimatedVisibility
         }
         // Frosted like the top bar when blur is on: the page shows through, blurred
         val glass = glassActive()
         val colors = FloatingToolbarDefaults.standardFloatingToolbarColors().let {
-            if (glass) it.copy(toolbarContainerColor = it.toolbarContainerColor.copy(alpha = 0.62f)) else it
+            when {
+                liquid -> it.copy(toolbarContainerColor = androidx.compose.ui.graphics.Color.Transparent)
+                glass -> it.copy(toolbarContainerColor = it.toolbarContainerColor.copy(alpha = 0.62f))
+                else -> it
+            }
         }
-        val glassModifier = Modifier.glass(CircleShape)
+        val glassModifier = if (liquid) Modifier else Modifier.glass(CircleShape)
         val pageControls: @Composable () -> Unit = {
             IconButton(onClick = onPrevious, enabled = currentPage > 1) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "önceki sayfa")
@@ -1002,17 +1022,25 @@ private fun BottomToolbar(
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "sonraki sayfa")
             }
         }
+        val pages: @Composable () -> Unit = {
+            LiquidGlassBehind(CircleShape) {
+                HorizontalFloatingToolbar(
+                    expanded = true,
+                    colors = colors,
+                    modifier = glassModifier,
+                    expandedShadowElevation = if (liquid) 0.dp else FloatingToolbarDefaults.ContainerExpandedElevation
+                ) { pageControls() }
+            }
+        }
         if (canWrite) {
             // The pages pill and the write button side by side (the glass is clipped to the pill)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HorizontalFloatingToolbar(expanded = true, colors = colors, modifier = glassModifier) { pageControls() }
+                pages()
                 // A plain FAB: the toolbar's own FAB fills all the room it gets outside a toolbar
-                FloatingActionButton(onClick = onWrite) {
-                    Icon(Icons.Rounded.Edit, contentDescription = "entry gir")
-                }
+                writeButton()
             }
         } else {
-            HorizontalFloatingToolbar(expanded = true, colors = colors, modifier = glassModifier) { pageControls() }
+            pages()
         }
     }
 }

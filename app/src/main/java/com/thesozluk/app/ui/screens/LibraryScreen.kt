@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.glassSource
 import android.app.Application
 import androidx.compose.foundation.layout.Arrangement
@@ -192,7 +193,7 @@ fun LibraryScreen(
                             onClick = { navController.navigate(Screen.TopicDetail.createRoute(draft.title, draft.url)) },
                             shape = segmentedShape(index, drafts.size),
                             color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().cardEdge(segmentedShape(index, drafts.size))
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)) {
                                 Column(modifier = Modifier.weight(1f)) {
@@ -261,7 +262,7 @@ private fun Row2(
     progress: Float? = null,
     trailing: @Composable () -> Unit
 ) {
-    Surface(onClick = onClick, shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
+    Surface(onClick = onClick, shape = shape, color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth().cardEdge(shape)) {
         Column(modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -288,7 +289,7 @@ private fun SavedEntryCard(item: SavedEntry, navController: NavController, modif
         onClick = { navController.navigate(Screen.TopicDetail.createRoute(entry.topicTitle.ifBlank { "#${entry.entryId}" }, "/entry/${entry.entryId}")) },
         shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth().cardEdge(RoundedCornerShape(28.dp))
     ) {
         Column(modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (entry.topicTitle.isNotBlank()) {
