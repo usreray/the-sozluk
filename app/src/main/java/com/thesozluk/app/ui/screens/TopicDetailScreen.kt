@@ -700,11 +700,17 @@ fun TopicDetailScreen(
                             )
                             TopicRow.Footer -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                 when {
-                                    isLoadingNext || checkingNew -> LoadingIndicator()
-                                    lastPage >= totalPages -> Text(
-                                        if (endPull > 0f) "bırak, yeni entry'lere bakılsın" else "başlığın sonu · yeni entry'ler için yukarı çek",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = if (endPull >= 1f) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    isLoadingNext -> LoadingIndicator()
+                                    // End of the topic: like pull to refresh at the top, the
+                                    // loading shapes grow in as it is pulled up, and keep going
+                                    // while new entries are looked for
+                                    lastPage >= totalPages -> LoadingIndicator(
+                                        Modifier.graphicsLayer {
+                                            val fraction = if (checkingNew) 1f else endPull.coerceIn(0f, 1f)
+                                            alpha = fraction
+                                            scaleX = 0.6f + 0.4f * fraction
+                                            scaleY = 0.6f + 0.4f * fraction
+                                        }
                                     )
                                 }
                             }
