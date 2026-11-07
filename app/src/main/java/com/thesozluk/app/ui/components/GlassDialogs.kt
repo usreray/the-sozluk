@@ -94,13 +94,20 @@ fun AppBottomSheet(
 ) {
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
     val colors = androidx.compose.material3.MaterialTheme.colorScheme
+    // The sheet's window colors its bar icons from the sheet's content color, which is left
+    // at its default (dark) as the sheet's own surface is transparent; say it from the theme
+    val dark = com.thesozluk.app.ui.theme.isAppInDarkTheme()
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
         shape = androidx.compose.ui.graphics.RectangleShape,
         containerColor = Color.Transparent,
         tonalElevation = 0.dp,
-        dragHandle = null
+        dragHandle = null,
+        properties = androidx.compose.material3.ModalBottomSheetProperties(
+            isAppearanceLightStatusBars = !dark,
+            isAppearanceLightNavigationBars = !dark
+        )
     ) {
         androidx.compose.foundation.layout.Column(
             modifier = Modifier
