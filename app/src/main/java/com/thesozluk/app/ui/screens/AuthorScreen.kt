@@ -1,5 +1,31 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.AppAlertDialog
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.rounded.PersonOff
+import androidx.compose.material.icons.rounded.RestoreFromTrash
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Delete
 import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.AppMenuItem
 import com.thesozluk.app.ui.components.AppMenu
@@ -254,6 +280,41 @@ fun AuthorScreen(
         )
     }
 
+    // One's own profile: biography, picture and featured badges can be changed here
+    val pickContext = LocalContext.current
+    var cropping by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val pickPicture = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val bytes = runCatching { pickContext.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+        // The picked picture goes to the cropper first
+        cropping = bytes?.let { com.thesozluk.app.ui.components.decodeForCrop(it) }
+    }
+    cropping?.let { picture ->
+        com.thesozluk.app.ui.components.ProfilePhotoCropDialog(
+            bitmap = picture,
+            onCrop = { square ->
+                cropping = null
+                viewModel.setProfilePicture(square)
+            },
+            onDismiss = { cropping = null }
+        )
+    }
+    val ownProfileEditor = ProfileEditor(
+        isSaving = viewModel.isSavingProfile.value,
+        onSaveBiography = viewModel::saveBiography,
+        onPickPicture = {
+            pickPicture.launch(
+                androidx.activity.result.PickVisualMediaRequest(
+                    androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+                )
+            )
+        },
+        onRemovePicture = viewModel::removeProfilePicture,
+        onSaveBadges = viewModel::selectBadges
+    )
+
     // The nick moves into the floating bar once the big header has scrolled away
     val headerGone by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     // A surface at the root sets the background and the default text color (no Scaffold here)
@@ -298,7 +359,8 @@ fun AuthorScreen(
                             onAvatarClick = { url ->
                                 ImageGallery.refs = emptyList()
                                 navController.navigate(Screen.Image.createRoute(url))
-                            }
+                            },
+                            editor = if (nick.equals(EksiSession.nick.value, ignoreCase = true)) ownProfileEditor else null
                         )
                     }
                     item(key = "tabs") {
@@ -421,12 +483,24 @@ private fun ProfileHeader(
     onShowEntries: () -> Unit,
     onBioLink: (EksiLink) -> Unit,
     /** Opens the profile picture full screen */
-    onAvatarClick: (String) -> Unit
+    onAvatarClick: (String) -> Unit,
+    /** Set on one's own profile */
+    editor: ProfileEditor? = null
 ) {
+    var editingBio by remember { mutableStateOf(false) }
+    var avatarMenu by remember { mutableStateOf(false) }
+    if (editingBio && editor != null) {
+        BiographyDialog(
+            initial = profile.biography,
+            isSaving = editor.isSaving,
+            onSave = { text -> editor.onSaveBiography(text) { editingBio = false } },
+            onDismiss = { editingBio = false }
+        )
+    }
     var openBadge by remember { mutableStateOf<Badge?>(null) }
     var showAllBadges by remember { mutableStateOf(false) }
     openBadge?.let { badge ->
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { openBadge = null },
             icon = {
                 AsyncImage(model = badge.imageUrl, contentDescription = null, modifier = Modifier.size(56.dp))
@@ -436,8 +510,16 @@ private fun ProfileHeader(
             confirmButton = { TextButton(onClick = { openBadge = null }) { Text("tamam") } }
         )
     }
-    if (showAllBadges) {
-        AlertDialog(
+    if (showAllBadges && editor != null) {
+        FeaturedBadgesDialog(
+            profile = profile,
+            isSaving = editor.isSaving,
+            onOpenBadge = { openBadge = it },
+            onSave = { ids -> editor.onSaveBadges(ids) { showAllBadges = false } },
+            onDismiss = { showAllBadges = false }
+        )
+    } else if (showAllBadges) {
+        AppAlertDialog(
             onDismissRequest = { showAllBadges = false },
             title = { Text("bütün rozetler") },
             text = {
@@ -485,6 +567,7 @@ private fun ProfileHeader(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         val avatarShape = MaterialShapes.Cookie12Sided.toShape()
+        Box {
         if (profile.avatarUrl != null) {
             AsyncImage(
                 model = profile.avatarUrl,
@@ -498,13 +581,55 @@ private fun ProfileHeader(
         } else {
             AuthorAvatar(profile.nick, size = 112)
         }
+        if (editor != null) {
+            // A small camera button on the picture's corner: upload a new one or remove it
+            Box(Modifier.align(Alignment.BottomEnd)) {
+                Surface(
+                    onClick = { avatarMenu = true },
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (editor.isSaving) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        } else {
+                            Icon(Icons.Rounded.PhotoCamera, contentDescription = "profil fotoğrafını değiştir", modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                androidx.compose.material3.DropdownMenu(expanded = avatarMenu, onDismissRequest = { avatarMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text("yeni fotoğraf yükle") },
+                        leadingIcon = { Icon(Icons.Rounded.PhotoCamera, contentDescription = null) },
+                        enabled = !editor.isSaving,
+                        onClick = { avatarMenu = false; editor.onPickPicture() }
+                    )
+                    if (profile.avatarUrl != null) {
+                        DropdownMenuItem(
+                            text = { Text("fotoğrafı sil") },
+                            leadingIcon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
+                            enabled = !editor.isSaving,
+                            onClick = { avatarMenu = false; editor.onRemovePicture() }
+                        )
+                    }
+                }
+            }
+        }
+        }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(profile.nick, style = MaterialTheme.typography.headlineMediumEmphasized, textAlign = TextAlign.Center)
             if (profile.isRookie) {
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = MaterialTheme.colorScheme.secondaryContainer,
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier.padding(start = 8.dp).cardEdge(RoundedCornerShape(50))
                 ) {
                     Text(
                         "çaylak",
@@ -562,6 +687,12 @@ private fun ProfileHeader(
                 }
             }
         }
+        if (editor != null) {
+            androidx.compose.material3.FilledTonalButton(onClick = { editingBio = true }) {
+                Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.padding(end = 8.dp).size(18.dp))
+                Text(if (profile.biography.isBlank()) "biyografi ekle" else "biyografi düzenle")
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             StatTile("entry", profile.entryCount, Modifier.weight(1f), onShowEntries)
             StatTile("takipçi", profile.followerCount, Modifier.weight(1f)) { onShowFollows(false) }
@@ -608,13 +739,14 @@ private fun ProfileHeader(
                 )
             }
         }
-        if (profile.badges.isNotEmpty()) {
+        if (profile.badges.isNotEmpty() || (editor != null && profile.allBadges.isNotEmpty())) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(horizontal = 4.dp)) {
                 items(profile.badges, key = { it.name }) { badge ->
                     Surface(
                         onClick = { openBadge = badge },
                         shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.cardEdge(RoundedCornerShape(20.dp))
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -640,20 +772,26 @@ private fun ProfileHeader(
                     it.owned && it.name.trim().lowercase() !in featuredBadgeNames &&
                         (it.imageUrl.isBlank() || it.imageUrl !in featuredBadgeImages)
                 }
-                if (profile.allBadges.size > profile.badges.size) {
+                if (profile.allBadges.size > profile.badges.size || editor != null) {
                     item(key = "all-badges") {
                         Surface(
                             onClick = { showAllBadges = true },
                             shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            modifier = Modifier.cardEdge(RoundedCornerShape(20.dp))
                         ) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center,
                                 modifier = Modifier.width(88.dp).padding(10.dp).height(74.dp)
                             ) {
-                                Text("+$additionalOwnedBadges", style = MaterialTheme.typography.titleMedium)
-                                Text("tümü", style = MaterialTheme.typography.labelSmall)
+                                if (editor != null) {
+                                    Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(22.dp))
+                                    Text("düzenle", style = MaterialTheme.typography.labelSmall)
+                                } else {
+                                    Text("+$additionalOwnedBadges", style = MaterialTheme.typography.titleMedium)
+                                    Text("tümü", style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
                     }
@@ -732,4 +870,295 @@ private fun RelationMenu(
             }
         }
     }
+}
+
+/** What one's own profile page can change; the page shows its edit controls when this is given. */
+class ProfileEditor(
+    val isSaving: Boolean,
+    val onSaveBiography: (text: String, onSuccess: () -> Unit) -> Unit,
+    val onPickPicture: () -> Unit,
+    val onRemovePicture: () -> Unit,
+    val onSaveBadges: (ids: List<String>, onSuccess: () -> Unit) -> Unit
+)
+
+/** Writing the biography; the site's (bkz: ) style links work in it as in entries. */
+@Composable
+private fun BiographyDialog(initial: String, isSaving: Boolean, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by rememberSaveable { mutableStateOf(initial) }
+    AppAlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("biyografi") },
+        text = {
+            androidx.compose.material3.OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("kendinden bahset. (bkz: hede) gibi bağlantılar da olur") },
+                minLines = 4,
+                maxLines = 10,
+                enabled = !isSaving,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(text) }, enabled = !isSaving && text.isNotBlank() && text.trim() != initial.trim()) {
+                Text(if (isSaving) "kaydediliyor" else "kaydet")
+            }
+        },
+        dismissButton = {
+            Row {
+                if (initial.isNotBlank()) {
+                    TextButton(onClick = { onSave("") }, enabled = !isSaving) {
+                        Text("sil", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                TextButton(onClick = onDismiss, enabled = !isSaving) { Text("vazgeç") }
+            }
+        }
+    )
+}
+
+/** The site lets four badges stand on the profile, in the order they were chosen. */
+private const val MAX_FEATURED_BADGES = 4
+
+/**
+ * Like the site's badge page: the featured badges in slots at the top, all badges below. Hold a
+ * badge and drag it up onto a slot to put it there (the one in the slot goes back down); slots
+ * can be dragged onto each other to change the order. The site can't take a badge off the
+ * profile, so there are always as many slots as earned badges, up to four.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FeaturedBadgesDialog(
+    profile: AuthorProfile,
+    isSaving: Boolean,
+    onOpenBadge: (Badge) -> Unit,
+    onSave: (List<String>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val earned = remember(profile.allBadges) { profile.allBadges.filter { it.owned && it.id.isNotBlank() } }
+    val required = earned.size.coerceAtMost(MAX_FEATURED_BADGES)
+    // The featured ones by id; the profile page's list may lack ids, so match by name too
+    val initial = remember(profile) {
+        val featured = profile.badges.mapNotNull { badge ->
+            badge.id.ifBlank { null }
+                ?: earned.firstOrNull { it.name.trim().equals(badge.name.trim(), ignoreCase = true) }?.id
+        }.filter { id -> earned.any { it.id == id } }.distinct()
+        // Fill up to the slot count, as the site shows that many anyway
+        (featured + earned.map { it.id }.filter { it !in featured }).take(required)
+    }
+    val slots = remember(initial) { mutableStateListOf<String>().apply { addAll(initial) } }
+    val byId = remember(profile.allBadges) { profile.allBadges.associateBy { it.id } }
+    // Earned ones first, so they are at hand
+    val badges = remember(profile.allBadges) { profile.allBadges.sortedByDescending { it.owned } }
+
+    // Dragging: what is held, where the finger is, and where each slot sits (window coordinates)
+    var dragged by remember { mutableStateOf<Badge?>(null) }
+    var fromSlot by remember { mutableIntStateOf(-1) }
+    var finger by remember { mutableStateOf(Offset.Zero) }
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val slotBounds = remember { mutableStateMapOf<Int, Rect>() }
+    val hoveredSlot = slotBounds.entries.firstOrNull { dragged != null && it.value.contains(finger) }?.key
+    val haptics = LocalHapticFeedback.current
+
+    fun drop() {
+        val badge = dragged ?: return
+        // Read now, not from the composition the gesture started in
+        val target = slotBounds.entries.firstOrNull { it.value.contains(finger) }?.key
+        if (target != null) {
+            if (fromSlot >= 0) {
+                // Slot onto slot: swap them
+                val other = slots[target]
+                slots[target] = slots[fromSlot]
+                slots[fromSlot] = other
+            } else {
+                // From the list: takes the slot's place; if already featured elsewhere, they trade
+                val existing = slots.indexOf(badge.id)
+                if (existing >= 0) slots[existing] = slots[target]
+                slots[target] = badge.id
+            }
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+        }
+        dragged = null
+        fromSlot = -1
+    }
+
+    // Hold and drag; the start point is turned into window coordinates with the item's position
+    @Composable
+    fun Modifier.dragSource(badge: Badge, slot: Int): Modifier {
+        // Kept across recompositions, so the drag reads where the item is now (the list scrolls)
+        val itemOrigin = remember { arrayOf(Offset.Zero) }
+        return this
+            .onGloballyPositioned { itemOrigin[0] = it.positionInWindow() }
+            .pointerInput(badge.id, slot, isSaving) {
+                if (isSaving) return@pointerInput
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { at ->
+                        dragged = badge
+                        fromSlot = slot
+                        finger = itemOrigin[0] + at
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        finger += amount
+                    },
+                    onDragEnd = { drop() },
+                    onDragCancel = { dragged = null; fromSlot = -1 }
+                )
+            }
+    }
+
+    AppAlertDialog(
+        onDismissRequest = { if (!isSaving && dragged == null) onDismiss() },
+        title = { Text("rozetler") },
+        text = {
+            Box(Modifier.onGloballyPositioned { origin = it.positionInWindow() }) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (required == 0) {
+                        Text(
+                            "henüz kazandığın bir rozet yok",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text("öne çıkan rozetler", style = MaterialTheme.typography.titleSmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            slots.forEachIndexed { index, id ->
+                                val badge = byId[id]
+                                val hovered = hoveredSlot == index
+                                val scale by animateFloatAsState(if (hovered) 1.08f else 1f, label = "slotScale")
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (hovered) MaterialTheme.colorScheme.primaryContainer
+                                    else MaterialTheme.colorScheme.secondaryContainer,
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        2.dp,
+                                        if (hovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(0.85f)
+                                        .graphicsLayer { scaleX = scale; scaleY = scale }
+                                        .cardEdge(RoundedCornerShape(16.dp))
+                                        .onGloballyPositioned { slotBounds[index] = it.boundsInWindow() }
+                                        .then(if (badge != null) Modifier.dragSource(badge, index) else Modifier)
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center,
+                                        modifier = Modifier.padding(6.dp)
+                                    ) {
+                                        // The slot's place in the order
+                                        Text(
+                                            "${index + 1}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                                        )
+                                        AsyncImage(
+                                            model = badge?.imageUrl,
+                                            contentDescription = badge?.name,
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .alpha(if (dragged != null && fromSlot == index) 0.3f else 1f)
+                                        )
+                                        Text(
+                                            badge?.name.orEmpty(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            textAlign = TextAlign.Center,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Text(
+                            "öne çıkarmak istediğin rozeti basılı tutup yukarı, bir yerin üstüne sürükle",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    HorizontalDivider()
+                    Text("bütün rozetler", style = MaterialTheme.typography.titleSmall)
+                    LazyVerticalGrid(
+                        columns = GridCells.Adaptive(minSize = 80.dp),
+                        modifier = Modifier.heightIn(max = 320.dp),
+                        userScrollEnabled = dragged == null,
+                        contentPadding = PaddingValues(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        items(badges, key = { it.id.ifBlank { it.name } }) { badge ->
+                            val featured = badge.id in slots
+                            val canPick = badge.owned && badge.id.isNotBlank() && required > 0
+                            Surface(
+                                onClick = { onOpenBadge(badge) },
+                                color = if (featured) MaterialTheme.colorScheme.surfaceContainerHighest
+                                else MaterialTheme.colorScheme.surfaceContainerLow,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .cardEdge(RoundedCornerShape(12.dp))
+                                    .then(if (canPick) Modifier.dragSource(badge, -1) else Modifier)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
+                                    AsyncImage(
+                                        model = badge.imageUrl,
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .alpha(
+                                                when {
+                                                    !badge.owned -> 0.3f
+                                                    dragged?.id == badge.id && fromSlot < 0 -> 0.3f
+                                                    else -> 1f
+                                                }
+                                            )
+                                    )
+                                    Text(
+                                        badge.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        textAlign = TextAlign.Center,
+                                        minLines = 2,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(top = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                // The held badge, following the finger
+                dragged?.let { badge ->
+                    val size = 56.dp
+                    val half = with(LocalDensity.current) { (size / 2).toPx() }
+                    AsyncImage(
+                        model = badge.imageUrl,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .zIndex(10f)
+                            .graphicsLayer {
+                                translationX = finger.x - origin.x - half
+                                translationY = finger.y - origin.y - half
+                                scaleX = 1.15f
+                                scaleY = 1.15f
+                                shadowElevation = 12.dp.toPx()
+                                shape = CircleShape
+                            }
+                            .size(size)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(slots.toList()) },
+                enabled = !isSaving && slots.size == required && slots.toList() != initial
+            ) {
+                Text(if (isSaving) "kaydediliyor" else "kaydet")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !isSaving) { Text("vazgeç") } }
+    )
 }

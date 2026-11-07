@@ -380,6 +380,67 @@ object EksiNetworkDataSource {
         }
     }
 
+    /**
+     * A post like the site's own jQuery calls on the profile page: form fields in, and the reply
+     * judged by its status (and a bare "false"). Returns null on success, or the reason.
+     */
+    private suspend fun profilePost(path: String, fields: List<Pair<String, String>>, timeout: Int = 15000): String? =
+        withContext(Dispatchers.IO) {
+            try {
+                val request = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))
+                    .method(org.jsoup.Connection.Method.POST)
+                    .timeout(timeout)
+                    .ignoreContentType(true)
+                    .ignoreHttpErrors(true)
+                    // Sent from the profile page itself, as the site's script does
+                    .referrer(com.thesozluk.app.network.EksiSession.nick.value
+                        ?.let { "$BASE_URL/biri/${encodePath(it)}" } ?: "$BASE_URL/")
+                    .header("Origin", BASE_URL)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .header("Accept", "*/*")
+                    .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                    .header("Sec-Fetch-Dest", "empty")
+                    .header("Sec-Fetch-Mode", "cors")
+                // A page navigation's headers on an XHR can get it refused
+                request.request().removeHeader("Sec-Fetch-User")
+                request.request().removeHeader("Upgrade-Insecure-Requests")
+                if (fields.isEmpty()) request.requestBody("")
+                fields.forEach { (key, value) -> request.data(key, value) }
+                val response = request.execute()
+                val reply = response.body()
+                android.util.Log.d("EksiForm", "POST $path -> ${response.statusCode()} type=${response.contentType()} reply=${reply.take(200)}")
+                when {
+                    response.statusCode() == 403 && reply.contains("yetki", ignoreCase = true) ->
+                        "bu işlem için yetkin yok"
+                    response.statusCode() !in 200..299 -> "işlem başarısız (HTTP ${response.statusCode()})"
+                    response.body().trim().equals("false", ignoreCase = true) -> "işlem başarısız"
+                    else -> null
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                e.message ?: "işlem başarısız"
+            }
+        }
+
+    /** Saves the signed-in user's biography; an empty text deletes it, as the site's "biyografiyi sil". */
+    suspend fun saveBiography(text: String): String? =
+        profilePost("/set-profile-biography", if (text.isBlank()) emptyList() else listOf("content" to text))
+
+    /** The featured badges, in order; the site keeps the first four. */
+    suspend fun selectBadges(ids: List<String>): String? =
+        profilePost("/select-badges", ids.take(4).map { "selectBadge[]" to it })
+
+    /**
+     * A new profile picture, sent as the site's cropper does: a square picture as a data URL in
+     * the "base64" field.
+     */
+    suspend fun setProfilePicture(nick: String, dataUrl: String): String? =
+        profilePost("/biri/${encodePath(nick)}/profilepicture", listOf("base64" to dataUrl), timeout = 60000)
+
+    suspend fun removeProfilePicture(nick: String): String? =
+        profilePost("/biri/${encodePath(nick)}/removeprofilepicture", emptyList())
+
     private fun ajaxPost(path: String, data: Map<String, String>): Boolean {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))
             .method(org.jsoup.Connection.Method.POST)

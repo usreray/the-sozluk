@@ -495,7 +495,9 @@ object HtmlParser {
         }
 
         /** Each list item is one badge in this author's collection; data-owned distinguishes earned badges. */
-        fun parseAllBadges(document: Document): List<Badge> = document.select("li.badge-item-otheruser[data-owned]").mapNotNull { item ->
+        fun parseAllBadges(document: Document): List<Badge> =
+                // Others' pages mark items badge-item-otheruser; one's own page plain badge-item
+                document.select("li.badge-item-otheruser[data-owned], #user-badges li[data-owned], li.badge-item[data-owned]").mapNotNull { item ->
                 val image = item.selectFirst("img")
                 val badgeLink = item.selectFirst("a") ?: item
                 val name = badgeLink.attr("data-name")
@@ -514,6 +516,7 @@ object HtmlParser {
         private fun parseBadge(element: Element): Badge {
                 val image = element.selectFirst("img")
                 return Badge(
+                        id = element.attr("data-id").ifBlank { element.parent()?.attr("data-id").orEmpty() },
                         name = element.attr("data-name").ifBlank { image?.attr("alt").orEmpty() }.ifBlank { element.text().trim() },
                         description = element.attr("data-title").ifBlank { image?.attr("title").orEmpty() },
                         imageUrl = image?.attr("src").orEmpty().let { if (it.startsWith("//")) "https:$it" else it }

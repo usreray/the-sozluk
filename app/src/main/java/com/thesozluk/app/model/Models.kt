@@ -89,7 +89,9 @@ data class Badge(
     val description: String,
     val imageUrl: String,
     /** False for catalog badges the profile owner has not earned. */
-    val owned: Boolean = true
+    val owned: Boolean = true,
+    /** The site's badge id (data-id), used to choose the featured ones */
+    val id: String = ""
 )
 
 data class AuthorProfile(

@@ -89,6 +89,57 @@ class AuthorViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
+    // Editing one's own profile -------------------------------------------------------------
+
+    private val _isSavingProfile = mutableStateOf(false)
+    /** A biography, picture or badge change is on its way */
+    val isSavingProfile: State<Boolean> = _isSavingProfile
+
+    /** Runs a profile change, then reads the profile again so the page shows the result. */
+    private fun profileChange(done: String, onSuccess: () -> Unit = {}, change: suspend () -> String?) {
+        if (_isSavingProfile.value) return
+        _isSavingProfile.value = true
+        viewModelScope.launch {
+            try {
+                val error = change()
+                if (error == null) {
+                    runCatching { repository.getProfile(nick) }.getOrNull()?.let { _profile.value = it }
+                    onSuccess()
+                }
+                _message.value = error ?: done
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _message.value = e.message ?: "işlem başarısız"
+            } finally {
+                _isSavingProfile.value = false
+            }
+        }
+    }
+
+    fun saveBiography(text: String, onSuccess: () -> Unit) =
+        profileChange(if (text.isBlank()) "biyografi silindi" else "biyografi kaydedildi", onSuccess) {
+            repository.saveBiography(text.trim())
+        }
+
+    fun selectBadges(ids: List<String>, onSuccess: () -> Unit) =
+        profileChange("öne çıkan rozetler kaydedildi", onSuccess) { repository.selectBadges(ids) }
+
+    /** [picture]: the square chosen in the cropper; sent at 640 px like the site's cropper */
+    fun setProfilePicture(picture: android.graphics.Bitmap) = profileChange("fotoğraf kaydedildi") {
+        val dataUrl = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { pngDataUrl(picture) }
+        repository.setProfilePicture(nick, dataUrl)
+    }
+
+    fun removeProfilePicture() = profileChange("fotoğraf silindi") { repository.removeProfilePicture(nick) }
+
+    private fun pngDataUrl(picture: android.graphics.Bitmap): String {
+        val scaled = android.graphics.Bitmap.createScaledBitmap(picture, 640, 640, true)
+        val out = java.io.ByteArrayOutputStream()
+        scaled.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+        return "data:image/png;base64," + android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+    }
+
     fun retry() {
         val current = nick
         nick = ""

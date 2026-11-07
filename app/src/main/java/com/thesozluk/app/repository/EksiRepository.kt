@@ -56,6 +56,11 @@ class EksiRepository(
 
     suspend fun getProfile(nick: String): AuthorProfile = EksiNetworkDataSource.fetchProfile(nick)
 
+    suspend fun saveBiography(text: String): String? = EksiNetworkDataSource.saveBiography(text)
+    suspend fun selectBadges(ids: List<String>): String? = EksiNetworkDataSource.selectBadges(ids)
+    suspend fun setProfilePicture(nick: String, dataUrl: String): String? = EksiNetworkDataSource.setProfilePicture(nick, dataUrl)
+    suspend fun removeProfilePicture(nick: String): String? = EksiNetworkDataSource.removeProfilePicture(nick)
+
     suspend fun getEditForm(entryId: String): FormSpec = EksiNetworkDataSource.fetchEditForm(entryId)
 
     /** Saves an entry's new text with its "düzelt" form; null on success, otherwise the reason. */
