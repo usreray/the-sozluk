@@ -24,7 +24,7 @@ object WhatsNew {
                 "takip / engellenmiş" to "takip ettiklerin, engellediklerin, başlıklarını engellediklerin ve sessize aldıkların tek yerde; buradan kaldırabilirsin. takip listende takipten de çıkabilirsin.",
                 "şikayet et" to "başkasının entry menüsünde: ekşi'nin şikayet formu açılır.",
                 "yeni alt çubuk" to "hap parmağını izler: çubukta sürükleyerek sekme değiştir. aşağı kaydırınca yazılar sadeleşir; ayarlarda çubuğun önizlemesi var.",
-                "sıvı cam" to "isteğe bağlı: çubuklar, düğmeler, menüler, pencereler, alt sayfalar ve kartlar cam olur, kenarları arkadan geçen renkleri yansıtır. ayarlar → görünüm'de canlı önizlemesi var.",
+                "sıvı cam" to "çubuklar, düğmeler, menüler, pencereler, alt sayfalar ve kartlar cam olur, kenarları arkadan geçen renkleri yansıtır. varsayılan olarak açık; ayarlar → görünüm'de canlı önizlemesi var, oradan kapatılabilir.",
                 "yeni alt sayfalar" to "alt sayfalar ekranın kenarından ayrık, havada duran kartlar oldu; filtrele seçenekleri ikonlu satırlar halinde.",
                 "entry önizleme" to "bir entry'ye basılı tut: öne çıkar, favorile, paylaş, kaydet gibi eylemler altında açılır.",
                 "listeleri sırala" to "ana sayfadaki gündem, bugün, debe gibi listeleri ayarlar → ana sayfa'da sürükleyerek sırala.",

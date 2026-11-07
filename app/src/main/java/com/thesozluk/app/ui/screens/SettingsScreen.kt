@@ -352,10 +352,10 @@ private fun LazyListScope.appearance() {
     item { SectionTitle(
         "tema",
         changed = AppSettings.themeMode.value != ThemeMode.System || AppSettings.pureBlack.value ||
-            !AppSettings.blurEffects.value || AppSettings.liquidGlass.value || AppSettings.reduceMotion.value,
+            !AppSettings.blurEffects.value || !AppSettings.liquidGlass.value || AppSettings.reduceMotion.value,
         onReset = {
             AppSettings.setThemeMode(ThemeMode.System); AppSettings.setPureBlack(false)
-            AppSettings.setBlurEffects(true); AppSettings.setLiquidGlass(false); AppSettings.setReduceMotion(false)
+            AppSettings.setBlurEffects(true); AppSettings.setLiquidGlass(true); AppSettings.setReduceMotion(false)
         }
     ) }
     item {

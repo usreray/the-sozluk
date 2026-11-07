@@ -221,7 +221,7 @@ object AppSettings {
     private val _navBarStyle = mutableStateOf(NavBarStyle.Floating)
     val navBarStyle: State<NavBarStyle> = _navBarStyle
     // "sıvı cam": every floating surface gets the nav bar's glass, rim light and all
-    private val _liquidGlass = mutableStateOf(false)
+    private val _liquidGlass = mutableStateOf(true)
     val liquidGlass: State<Boolean> = _liquidGlass
 
     fun setNavBarStyle(style: NavBarStyle) {
@@ -270,7 +270,8 @@ object AppSettings {
         _fontEverywhere.value = prefs.getBoolean("fontEverywhere", false)
         _reduceMotion.value = prefs.getBoolean("reduceMotion", false)
         _navBarStyle.value = NavBarStyle.entries.getOrElse(prefs.getInt("navBarStyle", 0)) { NavBarStyle.Floating }
-        _liquidGlass.value = prefs.getBoolean("liquidGlassAll", false)
+        // On unless turned off
+        _liquidGlass.value = prefs.getBoolean("liquidGlassAll", true)
         _inlineImages.value = prefs.getBoolean("inlineImages", false)
         _swipeTopics.value = prefs.getBoolean("swipeTopics", false)
         _checkUpdates.value = prefs.getBoolean("checkUpdates", true)
