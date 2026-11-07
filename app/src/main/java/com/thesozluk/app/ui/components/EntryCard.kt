@@ -433,44 +433,23 @@ private fun CommentsSection(
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 modifier = Modifier.cardEdge(RoundedCornerShape(20.dp))
             ) {
-                Column(modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 2.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AuthorAvatar(
-                            comment.author,
-                            avatarUrl = comment.avatarUrl,
-                            size = 24,
-                            modifier = Modifier.clip(CircleShape).clickable { onAuthor(comment.author) }
-                        )
-                        Text(
-                            comment.author,
-                            style = MaterialTheme.typography.labelLargeEmphasized,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 8.dp).clickable { onAuthor(comment.author) }
-                        )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            comment.date,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(end = 10.dp)
-                        )
-                    }
+                // Laid out like an entry: the text, then the votes on the left and the author on the
+                // right (nick and date, then the avatar)
+                Column(modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 10.dp, top = 12.dp, bottom = 8.dp)) {
                     if (textSelectable) SelectionContainer {
                         Text(
                             rememberEntryText(comment.contentHtml, comment.content, onLink),
                             inlineContent = rememberEntryInlineContent(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 6.dp, end = 10.dp)
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     } else {
                         Text(
                             rememberEntryText(comment.contentHtml, comment.content, onLink),
                             inlineContent = rememberEntryInlineContent(),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 6.dp, end = 10.dp)
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
                         IconToggleButton(
                             checked = comment.isLiked,
                             onCheckedChange = { onVote(comment, if (comment.isLiked) 0 else 1) },
@@ -483,6 +462,39 @@ private fun CommentsSection(
                             modifier = Modifier.size(36.dp)
                         ) { Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "beğenme", modifier = Modifier.size(20.dp)) }
                         Text("${comment.downVotes}", style = MaterialTheme.typography.labelMedium)
+                        Spacer(Modifier.weight(1f))
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onAuthor(comment.author) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                comment.author,
+                                style = MaterialTheme.typography.labelLargeEmphasized,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                comment.date,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.End,
+                                maxLines = 1
+                            )
+                        }
+                        if (com.thesozluk.app.settings.AppSettings.showAvatars.value) {
+                            Spacer(Modifier.width(6.dp))
+                            AuthorAvatar(
+                                comment.author,
+                                avatarUrl = comment.avatarUrl,
+                                size = 32,
+                                modifier = Modifier.clip(CircleShape).clickable { onAuthor(comment.author) }
+                            )
+                        }
                     }
                 }
             }
