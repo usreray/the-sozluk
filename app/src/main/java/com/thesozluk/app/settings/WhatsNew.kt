@@ -85,6 +85,9 @@ object WhatsNew {
         prefs.edit().putString("seen", version).apply()
         // A fresh install has nothing to compare against
         if (seen == null && info.firstInstallTime == info.lastUpdateTime) return
+        // Nor one that gets the first-run guide: a reinstall can bring back an older "seen"
+        // from Android's backup, which made the notes show over the guide
+        if (com.thesozluk.app.ui.components.Onboarding.needed.value) return
         releases.firstOrNull { it.version == version }?.let { _pending.value = it }
     }
 
