@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.rounded.Person
@@ -173,15 +175,22 @@ private val PreviewDestinations = listOf(
 @Composable
 fun NavBarPreview(modifier: Modifier = Modifier) {
     var selected by remember { mutableIntStateOf(0) }
-    JellyBar(
-        destinations = PreviewDestinations,
-        selected = selected,
-        onSelect = { selected = it },
-        labelsAllowed = AppSettings.navBarStyle.value == NavBarStyle.Floating,
-        glassState = null,
-        modifier = modifier,
-        followScroll = false
-    )
+    // The real bar is glass over the page; the preview gets the card it sits on as its page,
+    // so it is drawn as the same glass, rim and all
+    val glassState = dev.chrisbanes.haze.rememberHazeState()
+    val cardColor = MaterialTheme.colorScheme.surfaceContainerLow
+    Box(modifier, contentAlignment = Alignment.Center) {
+        Box(Modifier.matchParentSize().glassSourceOf(glassState).background(cardColor))
+        JellyBar(
+            destinations = PreviewDestinations,
+            selected = selected,
+            onSelect = { selected = it },
+            labelsAllowed = AppSettings.navBarStyle.value == NavBarStyle.Floating,
+            glassState = glassState,
+            modifier = Modifier,
+            followScroll = false
+        )
+    }
 }
 
 /** A damped spring stepped by hand each frame, so many of them can share one clock. */

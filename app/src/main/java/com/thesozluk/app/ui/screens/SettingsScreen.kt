@@ -277,24 +277,97 @@ private fun CategoryRow(section: SettingsSection, summary: String, shape: Shape,
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun LazyListScope.appearance() {
     item { SectionTitle(
+        "renkler",
+        changed = AppSettings.dynamicColor.value || AppSettings.seed.value != SeedColor.Brand ||
+            AppSettings.palette.value != PaletteChoice.TonalSpot || AppSettings.contrast.value != ContrastChoice.Standard,
+        onReset = {
+            AppSettings.setDynamicColor(false); AppSettings.setSeed(SeedColor.Brand)
+            AppSettings.setPalette(PaletteChoice.TonalSpot); AppSettings.setContrast(ContrastChoice.Standard)
+        }
+    ) }
+    item {
+        val dynamicColor by AppSettings.dynamicColor
+        Surface(shape = segmentedShape(0, 2), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(0, 2))) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    if (dynamicColor) "bir renk seçince duvar kâğıdı renkleri kapanır" else "palet",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    SeedColor.ordered.forEach { seed ->
+                        SeedSwatch(
+                            seed = seed,
+                            selected = !dynamicColor && seed == AppSettings.seed.value,
+                            onClick = {
+                                AppSettings.setSeed(seed)
+                                AppSettings.setDynamicColor(false)
+                            }
+                        )
+                    }
+                }
+                Text("stil", style = MaterialTheme.typography.titleMedium)
+                ChipFlowRow {
+                    PaletteChoice.entries.forEach { choice ->
+                        FilterChip(
+                            modifier = Modifier.cardEdge(androidx.compose.material3.FilterChipDefaults.shape),
+                            selected = choice == AppSettings.palette.value,
+                            onClick = {
+                                AppSettings.setPalette(choice)
+                                AppSettings.setDynamicColor(false)
+                            },
+                            label = { Text(choice.label) }
+                        )
+                    }
+                }
+                Text("kontrast", style = MaterialTheme.typography.titleMedium)
+                ConnectedRow {
+                    ContrastChoice.entries.forEachIndexed { index, choice ->
+                        ToggleButton(
+                            checked = choice == AppSettings.contrast.value,
+                            onCheckedChange = { AppSettings.setContrast(choice) },
+                            modifier = Modifier.weight(1f).toggleEdge(index, ContrastChoice.entries.size, checked = choice == AppSettings.contrast.value),
+                            enabled = !dynamicColor,
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            shapes = connectedShapes(index, ContrastChoice.entries.size)
+                        ) { Text(choice.label, maxLines = 1, softWrap = false) }
+                    }
+                }
+            }
+        }
+    }
+    item {
+        SwitchRow(
+            title = "dinamik renk",
+            subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "renkleri duvar kâğıdından al" else "android 12 ve üstünde",
+            checked = AppSettings.dynamicColor.value,
+            enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
+            shape = segmentedShape(1, 2),
+            onCheckedChange = AppSettings::setDynamicColor
+        )
+    }
+    item { SectionTitle(
         "tema",
         changed = AppSettings.themeMode.value != ThemeMode.System || AppSettings.pureBlack.value ||
-            !AppSettings.blurEffects.value || AppSettings.reduceMotion.value,
+            !AppSettings.blurEffects.value || AppSettings.liquidGlass.value || AppSettings.reduceMotion.value,
         onReset = {
             AppSettings.setThemeMode(ThemeMode.System); AppSettings.setPureBlack(false)
-            AppSettings.setBlurEffects(true); AppSettings.setReduceMotion(false)
+            AppSettings.setBlurEffects(true); AppSettings.setLiquidGlass(false); AppSettings.setReduceMotion(false)
         }
     ) }
     item {
         val themeMode by AppSettings.themeMode
-        Surface(shape = segmentedShape(0, 3), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(0, 3))) {
+        Surface(shape = segmentedShape(0, 2), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(0, 2))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+                ConnectedRow {
                     ThemeMode.entries.forEachIndexed { index, mode ->
                         ToggleButton(
                             checked = themeMode == mode,
                             onCheckedChange = { AppSettings.setThemeMode(mode) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).toggleEdge(index, ThemeMode.entries.size, checked = themeMode == mode),
                             // Icon and label fit a third of the width without wrapping
                             contentPadding = PaddingValues(horizontal = 8.dp),
                             shapes = connectedShapes(index, ThemeMode.entries.size)
@@ -317,25 +390,17 @@ private fun LazyListScope.appearance() {
     }
     item {
         SwitchRow(
-            title = "dinamik renk",
-            subtitle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "renkleri duvar kâğıdından al" else "android 12 ve üstünde",
-            checked = AppSettings.dynamicColor.value,
-            enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S,
-            shape = segmentedShape(1, 3),
-            onCheckedChange = AppSettings::setDynamicColor
-        )
-    }
-    item {
-        SwitchRow(
             title = "simsiyah arka plan",
             subtitle = "koyu temada OLED ekranlar için",
             checked = AppSettings.pureBlack.value,
             enabled = isAppInDarkTheme(),
-            shape = segmentedShape(2, 3),
+            shape = segmentedShape(1, 2),
             onCheckedChange = AppSettings::setPureBlack
         )
     }
     item { Spacer(Modifier.height(8.dp)) }
+    // A live picture of the bars, so the two switches below show what they change
+    item { com.thesozluk.app.ui.components.GlassPreview(Modifier.padding(bottom = 8.dp)) }
     item {
         SwitchRow(
             title = "bulanık efektler",
@@ -398,68 +463,6 @@ private fun LazyListScope.appearance() {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        }
-    }
-    item { SectionTitle(
-        "renkler",
-        changed = AppSettings.dynamicColor.value || AppSettings.seed.value != SeedColor.Brand ||
-            AppSettings.palette.value != PaletteChoice.TonalSpot || AppSettings.contrast.value != ContrastChoice.Standard,
-        onReset = {
-            AppSettings.setDynamicColor(false); AppSettings.setSeed(SeedColor.Brand)
-            AppSettings.setPalette(PaletteChoice.TonalSpot); AppSettings.setContrast(ContrastChoice.Standard)
-        }
-    ) }
-    item {
-        val dynamicColor by AppSettings.dynamicColor
-        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
-            Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(
-                    if (dynamicColor) "bir renk seçince duvar kâğıdı renkleri kapanır" else "palet",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    SeedColor.ordered.forEach { seed ->
-                        SeedSwatch(
-                            seed = seed,
-                            selected = !dynamicColor && seed == AppSettings.seed.value,
-                            onClick = {
-                                AppSettings.setSeed(seed)
-                                AppSettings.setDynamicColor(false)
-                            }
-                        )
-                    }
-                }
-                Text("stil", style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PaletteChoice.entries.forEach { choice ->
-                        FilterChip(
-                            selected = choice == AppSettings.palette.value,
-                            onClick = {
-                                AppSettings.setPalette(choice)
-                                AppSettings.setDynamicColor(false)
-                            },
-                            label = { Text(choice.label) }
-                        )
-                    }
-                }
-                Text("kontrast", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
-                    ContrastChoice.entries.forEachIndexed { index, choice ->
-                        ToggleButton(
-                            checked = choice == AppSettings.contrast.value,
-                            onCheckedChange = { AppSettings.setContrast(choice) },
-                            modifier = Modifier.weight(1f),
-                            enabled = !dynamicColor,
-                            contentPadding = PaddingValues(horizontal = 4.dp),
-                            shapes = connectedShapes(index, ContrastChoice.entries.size)
-                        ) { Text(choice.label, maxLines = 1, softWrap = false) }
-                    }
-                }
             }
         }
     }

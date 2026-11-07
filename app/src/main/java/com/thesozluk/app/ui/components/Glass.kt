@@ -34,6 +34,10 @@ fun Modifier.glassSource(): Modifier {
     return hazeSource(state)
 }
 
+/** [glassSource] for a given state, e.g. a preview with its own little backdrop. */
+fun Modifier.glassSourceOf(state: HazeState): Modifier =
+    if (!AppSettings.blurEffects.value) this else hazeSource(state)
+
 /** True when bars on this screen are drawn as glass (so they use a see-through color). */
 @Composable
 fun glassActive(): Boolean = LocalGlass.current != null && AppSettings.blurEffects.value
