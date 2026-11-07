@@ -1,5 +1,6 @@
 package com.thesozluk.app.settings
 
+import com.thesozluk.app.viewmodel.HomeCategory
 import androidx.compose.ui.text.font.FontFamily
 import android.content.Context
 import android.content.SharedPreferences
@@ -111,6 +112,10 @@ object AppSettings {
     /** Home tabs the user turned off, by name */
     private val _hiddenTabs = mutableStateOf<Set<String>>(emptySet())
     val hiddenTabs: State<Set<String>> = _hiddenTabs
+
+    /** Home tabs in the order the user put them, by name; empty for the default order */
+    private val _tabOrder = mutableStateOf<List<String>>(emptyList())
+    val tabOrder: State<List<String>> = _tabOrder
 
     /** "#12" on each entry: its position in the topic */
     private val _showEntryNumbers = mutableStateOf(false)
@@ -278,6 +283,7 @@ object AppSettings {
         _openTabsTwoColumn.value = prefs.getBoolean("openTabsTwoColumn", false)
         _blockedWords.value = prefs.getStringSet("blockedWords", emptySet()).orEmpty().toSet()
         _hiddenTabs.value = prefs.getStringSet("hiddenTabs", DEFAULT_HIDDEN_TABS).orEmpty().toSet()
+        _tabOrder.value = prefs.getString("tabOrder", null)?.split(',')?.filter { it.isNotBlank() }.orEmpty()
         _showEntryNumbers.value = prefs.getBoolean("showEntryNumbers", false)
         _showAvatars.value = prefs.getBoolean("showAvatars", true)
         _showLinkAddresses.value = prefs.getBoolean("showLinkAddresses", false)
@@ -327,12 +333,25 @@ object AppSettings {
         prefs.edit().putStringSet("hiddenTabs", _hiddenTabs.value).apply()
     }
 
+    fun setTabOrder(names: List<String>) {
+        _tabOrder.value = names
+        prefs.edit().putString("tabOrder", names.joinToString(",")).apply()
+    }
+
+    /** All home tabs in the user's order; ones missing from it (e.g. added later) keep their place at the end */
+    fun orderedHomeTabs(): List<HomeCategory> {
+        val order = _tabOrder.value
+        return HomeCategory.entries.sortedBy { order.indexOf(it.name).let { i -> if (i < 0) order.size + it.ordinal else i } }
+    }
+
     fun resetHomeTabs() {
         _hiddenTabs.value = DEFAULT_HIDDEN_TABS
         prefs.edit().putStringSet("hiddenTabs", DEFAULT_HIDDEN_TABS).apply()
+        setTabOrder(emptyList())
     }
 
-    fun homeTabsChanged(): Boolean = _hiddenTabs.value != DEFAULT_HIDDEN_TABS
+    fun homeTabsChanged(): Boolean = _hiddenTabs.value != DEFAULT_HIDDEN_TABS ||
+        orderedHomeTabs() != HomeCategory.entries
 
     fun setShowEntryNumbers(enabled: Boolean) {
         _showEntryNumbers.value = enabled

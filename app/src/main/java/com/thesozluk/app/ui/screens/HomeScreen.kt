@@ -110,8 +110,9 @@ fun HomeScreen(
     val isLoggedIn by EksiSession.isLoggedIn
     val hiddenTabs by AppSettings.hiddenTabs
     // Personal lists only when logged in; the rest as chosen in settings
-    val categories = remember(isLoggedIn, hiddenTabs) {
-        HomeCategory.entries.filter { (isLoggedIn || !it.needsLogin) && it.name !in hiddenTabs }
+    val tabOrder by AppSettings.tabOrder
+    val categories = remember(isLoggedIn, hiddenTabs, tabOrder) {
+        AppSettings.orderedHomeTabs().filter { (isLoggedIn || !it.needsLogin) && it.name !in hiddenTabs }
             .ifEmpty { listOf(HomeCategory.Gundem) }
     }
     val pagerState = rememberPagerState(pageCount = { categories.size })

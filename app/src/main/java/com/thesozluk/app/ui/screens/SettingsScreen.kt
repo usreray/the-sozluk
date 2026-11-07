@@ -14,6 +14,18 @@ import com.thesozluk.app.settings.AppUpdates
 import com.thesozluk.app.settings.CustomFont
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.toMutableStateList
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.zIndex
 import com.thesozluk.app.ui.components.glassSource
 import android.content.Intent
 import android.content.pm.verify.domain.DomainVerificationManager
@@ -671,18 +683,102 @@ private fun LazyListScope.homeLists() {
         Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(24.dp))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "olay, takip, son, kenar ve çaylaklar giriş yapınca görünür",
+                    "tutamaktan sürükleyerek sırala. olay, takip, son, kenar ve çaylaklar giriş yapınca görünür",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    HomeCategory.entries.forEach { category ->
-                        val visible = category.name !in hiddenTabs
-                        FilterChip(
-                            selected = visible,
-                            onClick = { AppSettings.setTabVisible(category.name, !visible) },
-                            label = { Text(category.label) },
-                            leadingIcon = if (visible) ({ Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }) else null
+                HomeTabOrder(hiddenTabs)
+            }
+        }
+    }
+}
+
+/**
+ * The home lists in their order: drag one by its handle to move it, the switch shows or hides it.
+ * The order is saved when the finger lets go.
+ */
+@Composable
+private fun HomeTabOrder(hiddenTabs: Set<String>) {
+    val savedOrder by AppSettings.tabOrder
+    val order = remember(savedOrder) { AppSettings.orderedHomeTabs().toMutableStateList() }
+    var dragging by remember { mutableStateOf<HomeCategory?>(null) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var rowHeight by remember { mutableIntStateOf(0) }
+    val haptics = LocalHapticFeedback.current
+    Column {
+        order.forEach { category ->
+            key(category) {
+                val visible = category.name !in hiddenTabs
+                val isDragged = dragging == category
+                val lift by animateFloatAsState(if (isDragged) 1f else 0f, label = "tabLift")
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isDragged) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerLow,
+                    shadowElevation = (6 * lift).dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .cardEdge(RoundedCornerShape(16.dp))
+                        .onSizeChanged { rowHeight = it.height }
+                        .zIndex(if (isDragged) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (isDragged) dragOffset else 0f
+                            val scale = 1f + 0.03f * lift
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, end = 4.dp)) {
+                        Icon(
+                            Icons.Rounded.DragIndicator,
+                            contentDescription = "sürükleyerek taşı",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(48.dp)
+                                .padding(12.dp)
+                                .pointerInput(category, order) {
+                                    detectDragGestures(
+                                        onDragStart = {
+                                            dragging = category
+                                            dragOffset = 0f
+                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        },
+                                        onDragEnd = {
+                                            dragging = null
+                                            dragOffset = 0f
+                                            AppSettings.setTabOrder(order.map { it.name })
+                                        },
+                                        onDragCancel = {
+                                            dragging = null
+                                            dragOffset = 0f
+                                            AppSettings.setTabOrder(order.map { it.name })
+                                        }
+                                    ) { change, amount ->
+                                        change.consume()
+                                        dragOffset += amount.y
+                                        // Past half a row: trade places with the neighbour
+                                        val index = order.indexOf(category)
+                                        if (rowHeight > 0 && dragOffset > rowHeight / 2f && index < order.lastIndex) {
+                                            order.add(index + 1, order.removeAt(index))
+                                            dragOffset -= rowHeight
+                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        } else if (rowHeight > 0 && dragOffset < -rowHeight / 2f && index > 0) {
+                                            order.add(index - 1, order.removeAt(index))
+                                            dragOffset += rowHeight
+                                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                    }
+                                }
+                        )
+                        Text(
+                            category.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (visible) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = visible,
+                            onCheckedChange = { AppSettings.setTabVisible(category.name, it) },
+                            modifier = Modifier.padding(end = 8.dp)
                         )
                     }
                 }
