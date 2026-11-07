@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.ui.unit.dp
 import com.thesozluk.app.settings.AppSettings
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.remember
@@ -38,5 +39,40 @@ fun Modifier.pressBounce(interactionSource: InteractionSource, pressedScale: Flo
     return graphicsLayer {
         scaleX = scale
         scaleY = scale
+    }
+}
+
+/**
+ * A list's first rows coming in one after another when it first shows (or shows new content):
+ * each fades and rises a little, a beat after the one above. Only the first [StaggerRows] rows,
+ * and only right after the list appeared; rows scrolled to later just appear. Made per list
+ * with [rememberStagger], keyed by what the list shows so a refresh plays it again.
+ */
+class Stagger internal constructor() {
+    internal var start = 0L
+}
+
+private const val StaggerRows = 12
+
+@Composable
+fun rememberStagger(key: Any?): Stagger = remember(key) { Stagger() }
+
+@Composable
+fun Modifier.staggerIn(stagger: Stagger, index: Int): Modifier {
+    if (motionReduced()) return this
+    val composedAt = remember { android.os.SystemClock.uptimeMillis() }
+    if (stagger.start == 0L) stagger.start = composedAt
+    // Rows that join well after the list appeared (scrolling) don't animate
+    val plays = remember { index < StaggerRows && composedAt - stagger.start < 300 }
+    if (!plays) return this
+    val shown = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(index * 40L)
+        shown.animateTo(1f, androidx.compose.animation.core.tween(380, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+    }
+    return graphicsLayer {
+        val t = shown.value
+        alpha = t
+        translationY = (1f - t) * 24.dp.toPx()
     }
 }

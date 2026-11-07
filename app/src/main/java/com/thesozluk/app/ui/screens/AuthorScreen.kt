@@ -1,5 +1,8 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.staggerIn
+import com.thesozluk.app.ui.components.rememberStagger
+import androidx.compose.foundation.lazy.itemsIndexed
 import com.thesozluk.app.ui.components.AppAlertDialog
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.rounded.PersonOff
@@ -340,6 +343,8 @@ fun AuthorScreen(
                     onRefresh = { viewModel.refresh(selectedTab) },
                     top = floatingTopBarInset(compact = true)
                 ) { pullOffset ->
+                // Each tab's first entries come in one after another
+                val entryStagger = rememberStagger(selectedTab to tabState.entries.firstOrNull()?.entryId)
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
@@ -393,7 +398,7 @@ fun AuthorScreen(
                             repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                         }
                     }
-                    items(tabState.entries, key = { "${selectedTab.name}:${it.entryId}" }) { entry ->
+                    itemsIndexed(tabState.entries, key = { _, it -> "${selectedTab.name}:${it.entryId}" }) { index, entry ->
                         EntryCard(
                             entry = entry,
                             isExpanded = entry.entryId in expandedEntries,
@@ -409,7 +414,7 @@ fun AuthorScreen(
                             },
                             showExpandToggle = true,
                             actions = actions,
-                            modifier = Modifier
+                            modifier = Modifier.staggerIn(entryStagger, index)
                         )
                     }
                     item(key = "footer:${selectedTab.name}") {

@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.staggerIn
+import com.thesozluk.app.ui.components.rememberStagger
 import com.thesozluk.app.ui.components.AppAlertDialog
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -444,6 +446,7 @@ private fun CategoryPage(
                     onRefresh = { viewModel.refresh(category) },
                     top = topPadding
                 ) { pullOffset ->
+                    val stagger = rememberStagger(topics.firstOrNull()?.url)
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
@@ -472,7 +475,7 @@ private fun CategoryPage(
                                     com.thesozluk.app.ui.navigation.TopicSequence.set(topics.map { it.title to linkOf(it.url) })
                                     onTopicClick(topic.title, linkOf(topic.url), category == HomeCategory.Kenar)
                                 },
-                                modifier = Modifier.animateItem()
+                                modifier = Modifier.animateItem().staggerIn(stagger, index)
                             )
                         }
                         if (state.isLoadingMore) {

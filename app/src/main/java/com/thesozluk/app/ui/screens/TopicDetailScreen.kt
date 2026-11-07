@@ -1,5 +1,8 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.staggerIn
+import com.thesozluk.app.ui.components.rememberStagger
+import androidx.compose.foundation.lazy.itemsIndexed
 import com.thesozluk.app.ui.components.cardEdge
 import androidx.compose.material3.FloatingActionButtonDefaults
 import com.thesozluk.app.ui.components.LiquidGlassBehind
@@ -677,13 +680,14 @@ fun TopicDetailScreen(
                         listState.scrollToItem(index)
                     }
                 }
+                val entryStagger = rememberStagger(rows.firstNotNullOfOrNull { (it as? TopicRow.EntryItem)?.entry?.entryId })
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize().then(pullOffset).glassSource().nestedScroll(endPullConnection),
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = topInset, bottom = 128.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(rows, key = { it.key }) { row ->
+                    itemsIndexed(rows, key = { _, it -> it.key }) { index, row ->
                         when (row) {
                             // Like the bar title: the whole topic from its first page
                             TopicRow.Header -> TopicHeader(displayTitle, onClick = viewModel::showOlderEntries)
@@ -697,7 +701,7 @@ fun TopicDetailScreen(
                                 isExpanded = viewModel.isEntryExpanded(row.entry.entryId),
                                 onToggleExpand = { viewModel.toggleEntryExpansion(row.entry.entryId) },
                                 actions = actions,
-                                modifier = Modifier.animateItem()
+                                modifier = Modifier.animateItem().staggerIn(entryStagger, index)
                             )
                             TopicRow.Footer -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                                 when {

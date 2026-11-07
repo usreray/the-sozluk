@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.staggerIn
+import com.thesozluk.app.ui.components.rememberStagger
 import com.thesozluk.app.ui.components.glassSource
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -128,6 +130,7 @@ fun ChannelsScreen(
                         message = "burada şu an gösterilecek bir şey yok."
                     )
                     else -> RevealPullToRefresh(isRefreshing = state.isLoading, onRefresh = viewModel::retry, top = 0.dp) { pullOffset ->
+                        val stagger = rememberStagger(state.topics.firstOrNull()?.url)
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize().then(pullOffset).glassSource(),
@@ -150,7 +153,7 @@ fun ChannelsScreen(
                                     shape = segmentedShape(index, state.topics.size),
                                     isRead = topic.title.trim().lowercase() in readTitles,
                                     onClick = { navController.navigate(Screen.TopicDetail.createRoute(topic.title, topic.url)) },
-                                    modifier = Modifier.animateItem()
+                                    modifier = Modifier.staggerIn(stagger, index).animateItem()
                                 )
                             }
                             if (state.isLoadingMore) {
