@@ -17,6 +17,23 @@ object WhatsNew {
     /** Newest first; the first entry is the current version's. Titles and descriptions in lowercase, like the app. */
     val releases = listOf(
         Release(
+            "3.3",
+            listOf(
+                "profilini düzenle" to "kendi profilinde biyografini yaz, fotoğrafını kırparak değiştir, öne çıkan rozetlerini sürükleyerek seç. bütün rozetlerin de görünür.",
+                "çöp kutusu" to "profilindeki ⋮ menüsünden: sildiğin entry'leri canlandır ya da tamamen sil.",
+                "takip / engellenmiş" to "takip ettiklerin, engellediklerin, başlıklarını engellediklerin ve sessize aldıkların tek yerde; buradan kaldırabilirsin. takip listende takipten de çıkabilirsin.",
+                "şikayet et" to "başkasının entry menüsünde: ekşi'nin şikayet formu açılır.",
+                "yeni alt çubuk" to "hap parmağını izler: çubukta sürükleyerek sekme değiştir. aşağı kaydırınca yazılar sadeleşir; ayarlarda çubuğun önizlemesi var.",
+                "sıvı cam" to "isteğe bağlı: çubuklar, düğmeler, menüler, pencereler, alt sayfalar ve kartlar cam olur, kenarları arkadan geçen renkleri yansıtır. ayarlar → görünüm'de canlı önizlemesi var.",
+                "yeni alt sayfalar" to "alt sayfalar ekranın kenarından ayrık, havada duran kartlar oldu; filtrele seçenekleri ikonlu satırlar halinde.",
+                "entry önizleme" to "bir entry'ye basılı tut: öne çıkar, favorile, paylaş, kaydet gibi eylemler altında açılır.",
+                "listeleri sırala" to "ana sayfadaki gündem, bugün, debe gibi listeleri ayarlar → ana sayfa'da sürükleyerek sırala.",
+                "yüzen bildirimler" to "kaydedildi, kopyalandı gibi bildirimler çubukların üstünde kart olarak gelir; sağa ya da sola kaydırıp kapatabilirsin.",
+                "başlığın sonu" to "son sayfada yukarı çekince yükleme şekilleri belirir ve yeni entry'lere bakılır.",
+                "küçük güzellikler" to "sekmelerden geri dönerken sayfanın köşeleri yuvarlanır, boş ekranlarda çizimler var, tek entry ekranında başlığa dokununca başlığın ilk sayfası açılır, ayarlarda renkler en üstte."
+            )
+        ),
+        Release(
             "3.2",
             listOf(
                 "neler yeni" to "güncellemeden sonra yeni gelenler burada gösterilir. ayarlar → hakkında'dan da açılır.",
