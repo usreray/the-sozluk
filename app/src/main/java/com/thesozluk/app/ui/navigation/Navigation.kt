@@ -63,10 +63,10 @@ fun Navigation(navController: NavHostController) {
             else ExitTransition.KeepUntilTransitionsFinished
         }
     ) {
-        screen(navController, Screen.Home.route, backSwipe = false) { HomeScreen(navController) }
-        screen(navController, Screen.Search.route, backSwipe = false) { SearchScreen(navController) }
-        screen(navController, Screen.Random.route, backSwipe = false) { com.thesozluk.app.ui.screens.RandomScreen(navController) }
-        screen(navController, Screen.Profile.route, backSwipe = false) { ProfileScreen(navController) }
+        screen(navController, Screen.Home.route, backSwipe = false, roundOnExit = true) { HomeScreen(navController) }
+        screen(navController, Screen.Search.route, backSwipe = false, roundOnExit = true) { SearchScreen(navController) }
+        screen(navController, Screen.Random.route, backSwipe = false, roundOnExit = true) { com.thesozluk.app.ui.screens.RandomScreen(navController) }
+        screen(navController, Screen.Profile.route, backSwipe = false, roundOnExit = true) { ProfileScreen(navController) }
         screen(
             navController,
             route = Screen.Channels.pattern,
@@ -150,7 +150,8 @@ fun Navigation(navController: NavHostController) {
             Screen.Login.route,
             enterTransition = { slideInVertically { it } + fadeIn() },
             popExitTransition = { slideOutVertically { it } + fadeOut() },
-            backSwipe = false
+            backSwipe = false,
+            roundOnExit = true
         ) { LoginScreen(navController) }
 
         screen(

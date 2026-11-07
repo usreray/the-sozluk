@@ -46,6 +46,11 @@ fun AnimatedContentScope.BackSwipe(
     navController: NavController,
     entry: NavBackStackEntry,
     enabled: Boolean,
+    /**
+     * For pages that leave with their own motion (the tabs sink back, login slides down): only
+     * round the corners and lift a shadow while they go, so they read as a card being put away.
+     */
+    roundOnExit: Boolean = false,
     content: @Composable () -> Unit
 ) {
     // 0 while shown, 1 once gone; seeked with the finger during the gesture
@@ -60,6 +65,12 @@ fun AnimatedContentScope.BackSwipe(
     if (exiting && !popping && navController.currentBackStackEntry?.id == entry.id) popping = true
     if (!exiting && transition.currentState == EnterExitState.Visible) popping = false
     val active = enabled && popping
+
+    // Leaving for good (by gesture, back or a tab that pops it), not covered by a new page
+    var closing by remember { mutableStateOf(false) }
+    if (exiting && !closing && (navController.currentBackStackEntry?.id == entry.id ||
+            navController.currentBackStack.value.none { it.id == entry.id })) closing = true
+    if (!exiting && transition.currentState == EnterExitState.Visible) closing = false
 
     // The page coming back from below: it rises from slightly smaller and dimmed as the top page
     // leaves. It is not the top of the stack yet while the gesture runs, unlike a pushed page.
@@ -82,6 +93,13 @@ fun AnimatedContentScope.BackSwipe(
                     val s = 0.94f + 0.06f * shown
                     scaleX = s
                     scaleY = s
+                    return@graphicsLayer
+                }
+                if (roundOnExit && closing && progress > 0f) {
+                    val early = (progress * 3f).coerceAtMost(1f)
+                    shape = RoundedCornerShape((32 * early).dp)
+                    clip = true
+                    shadowElevation = 24.dp.toPx() * early
                     return@graphicsLayer
                 }
                 if (!active || progress == 0f) return@graphicsLayer
@@ -117,6 +135,7 @@ fun NavGraphBuilder.screen(
     enterTransition: (AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition?)? = null,
     popExitTransition: (AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition?)? = null,
     backSwipe: Boolean = true,
+    roundOnExit: Boolean = false,
     content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit
 ) {
     composable(
@@ -125,6 +144,6 @@ fun NavGraphBuilder.screen(
         enterTransition = enterTransition,
         popExitTransition = popExitTransition
     ) { entry ->
-        BackSwipe(navController, entry, enabled = backSwipe) { content(entry) }
+        BackSwipe(navController, entry, enabled = backSwipe, roundOnExit = roundOnExit) { content(entry) }
     }
 }
