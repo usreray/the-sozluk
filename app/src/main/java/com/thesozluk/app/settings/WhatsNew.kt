@@ -17,6 +17,16 @@ object WhatsNew {
     /** Newest first; the first entry is the current version's. Titles and descriptions in lowercase, like the app. */
     val releases = listOf(
         Release(
+            "3.4",
+            listOf(
+                "birden fazla hesap" to "profil → hesap değiştir: bu cihazda giriş yaptığın hesaplar arasında tek dokunuşla geç, yeni hesap ekle ya da kaldır.",
+                "yorumlar" to "entry altındaki yorumlar artık entry'ler gibi: yazarın adı, tarihi ve profil resmi sağ altta.",
+                "akıcı listeler" to "listeler ilk açılışta satır satır belirir.",
+                "sıvı cam" to "kapatılınca alt çubuk da diğer çubuklar gibi sade buzlu cama döner.",
+                "küçük düzeltmeler" to "yükleniyor kartları da cam kenarlı; öne çıkan rozetlerin yanında gereksiz \"+0\" yazmıyor."
+            )
+        ),
+        Release(
             "3.3",
             listOf(
                 "profilini düzenle" to "kendi profilinde biyografini yaz, fotoğrafını kırparak değiştir, öne çıkan rozetlerini sürükleyerek seç. bütün rozetlerin de görünür.",
