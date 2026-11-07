@@ -69,7 +69,8 @@ fun TopicListSkeleton(modifier: Modifier = Modifier, contentPadding: PaddingValu
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         widths.forEachIndexed { index, width ->
-            Surface(shape = segmentedShape(index, widths.size), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            // The real rows' light line under liquid glass, so it doesn't pop in once they load
+            Surface(shape = segmentedShape(index, widths.size), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(index, widths.size))) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 20.dp, bottom = 20.dp)
@@ -92,7 +93,7 @@ fun EntryListSkeleton(modifier: Modifier = Modifier, contentPadding: PaddingValu
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         shapes.forEach { lines ->
-            Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerLow) {
+            Surface(shape = RoundedCornerShape(28.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(RoundedCornerShape(28.dp))) {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
