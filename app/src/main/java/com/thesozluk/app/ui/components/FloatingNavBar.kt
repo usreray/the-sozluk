@@ -530,8 +530,20 @@ private fun JellyBar(
                         translationY = f.pull
                     }
             ) {
-                // The bar: the app's glass, with light on its rim from what passes behind it
-                GlassBackdrop(CircleShape, Modifier.matchParentSize(), state = glassState)
+                // The bar: with liquid glass, the glass with light on its rim from what passes
+                // behind it; without, the frosted bar the other bars have (plain with blur off)
+                if (liquidGlass()) {
+                    GlassBackdrop(CircleShape, Modifier.matchParentSize(), state = glassState)
+                } else {
+                    val surface = MaterialTheme.colorScheme.surfaceContainerHigh
+                    val frosted = glassState != null && AppSettings.blurEffects.value
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .glass(CircleShape, glassState)
+                            .background(if (frosted) surface.copy(alpha = 0.62f) else surface, CircleShape)
+                    )
+                }
                 // Plain tabs everywhere but under the pill
                 Box(
                     Modifier
