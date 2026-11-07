@@ -39,10 +39,21 @@
   </tr>
 </table>
 
+### Renk paletleri
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/renk-kehribar.png" width="180" alt="Kehribar"><br><sub>Kehribar</sub></td>
+    <td align="center"><img src="docs/screenshots/renk-toprak.png" width="180" alt="Toprak"><br><sub>Toprak</sub></td>
+    <td align="center"><img src="docs/screenshots/renk-nane.png" width="180" alt="Nane"><br><sub>Nane</sub></td>
+    <td align="center"><img src="docs/screenshots/renk-gul.png" width="180" alt="Gül"><br><sub>Gül</sub></td>
+  </tr>
+</table>
+
 ## Özellikler
 
 ### Akış ve listeler
-- Gündem, bugün, debe, olay, takip, son, kenar, çaylaklar ve kanal listeleri; hangi listelerin görüneceği ayarlanabilir
+- Gündem, bugün, debe, olay, takip, son, kenar, çaylaklar ve kanal listeleri; hangi listelerin görüneceği ve sırası ayarlanabilir
 - Belirli kelimeleri içeren başlıkları listelerden gizleyen kelime engelleme
 - Daha önce okunan başlıkların listelerde soluk gösterilmesi
 - Gündem widget'ı
@@ -68,9 +79,11 @@
 - Okurken ekranın kararmasını engelleme, kaydırırken üst ve alt çubukların gizlenmesi
 
 ### Entry ve yazar
+- Entry'ye basılı tutunca öne çıkan önizleme ve altında favorileme, paylaşma, kaydetme gibi işlemler
 - Entry'leri kopyalama, bağlantısını paylaşma ve görsel olarak paylaşma
+- Başkalarının entry'lerini ekşi sözlük'ün şikayet formuyla şikayet etme
 - Favorileyenler ve çaylak favorileyenler listesi, yorumlar
-- Yazar profili: karma, biyografi, rozetler, takipçi ve takip edilen listeleri, paylaştığı görseller
+- Yazar profili: karma, biyografi, bütün rozetler, takipçi ve takip edilen listeleri, paylaştığı görseller
 - Yazarın son entry'leri, en beğenilenleri ve en çok favorilenenleri
 
 ### Yazma ve hesap
@@ -78,6 +91,9 @@
 - Entry yazma; bkz, hede, gizli bkz, spoiler ve bağlantı araçları ile yazarken önizleme
 - Galeriden görsel ekleme; konum gibi fotoğraf bilgileri yüklemeden önce kaldırılır, yüklenen görsel önizlenebilir ve silinebilir
 - Kendi entry'lerini düzenleme ve silme
+- Kendi profilini düzenleme: biyografi yazma, profil fotoğrafını kırparak değiştirme, öne çıkan rozetleri sürükleyerek seçme
+- Çöp kutusu: silinen entry'leri canlandırma, tamamen silme ve çöpü boşaltma
+- Takip ve engellenmişler: takip edilen, engellenen, başlıkları engellenen ve sessize alınan yazarlar tek yerde; buradan ve kendi takip listesinden takibi bırakma
 - Cihazda otomatik saklanan taslaklar
 - Mesajlaşma ve yeni olay ile mesajlar için isteğe bağlı bildirimler
 
@@ -96,14 +112,17 @@
 - Material 3 Expressive tasarım dili
 - Açık, koyu ve tam siyah (OLED) tema; hazır renk paletleri, duvar kâğıdından renk alma ve kontrast ayarı
 - Buzlu cam görünümünde çubuklar, bulanık spoiler ve pencerelerin arkasında bulanıklık (kapatılabilir)
-- Tahmine dayalı geri hareketi ve hareketi azaltma seçeneği
+- Sıvı cam: çubuklar, düğmeler, menüler, pencereler, alt sayfalar ve kartlar cam olur, kenarları arkadan geçen renkleri yansıtır; ayarlarda canlı önizlemesi var (varsayılan olarak açık, kapatılabilir)
+- Parmağı takip eden alt çubuk: çubukta sürükleyerek sekme değiştirme; yazılı ya da yalnızca simgeli iki tarz
+- Ekranın kenarından ayrık, havada duran alt sayfalar ve çubukların üstünde kart olarak gelen bildirimler
+- Tahmine dayalı geri hareketi: sayfalar parmağı takip ederek küçülür ve köşeleri yuvarlanır; hareketi azaltma seçeneği
 - Yazı tipi, yazı boyutu, satır aralığı ve kenar boşluğu ayarları; kalın yazı, yazı tipini tüm uygulamada kullanma ve kendi yazı tipini ekleme
 
 ### Sistem
 - eksisozluk.com bağlantılarının doğrudan uygulamada açılması
 - Uygulama simgesi kısayolları: ara, mesajlar, olay
 - Tablet ve yatay ekranlarda iki bölmeli görünüm
-- Uygulama içinden yeni sürüm kontrolü ve tek dokunuşla hata bildirimi
+- Uygulama içinden yeni sürüm kontrolü, güncellemeden sonra yenilikleri gösteren "neler yeni" ekranı ve tek dokunuşla hata bildirimi
 
 ## Kurulum
 
