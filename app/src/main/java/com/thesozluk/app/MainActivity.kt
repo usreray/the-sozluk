@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.thesozluk.app.network.Demo.init(this)
+        com.thesozluk.app.ui.components.Onboarding.init(this)
         EksiSession.init(this)
         AppSettings.init(this)
         TopicTabs.init(this, AppSettings.rememberOpenTabs.value)
@@ -311,6 +312,10 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
     com.thesozluk.app.ui.components.EntryPeekOverlay(glassState = navGlass)
     // ⋮ menus opened as glass (liquid glass), over the app
     com.thesozluk.app.ui.components.GlassMenuHost(glassState = navGlass)
+    // A fresh install: the first-run guide over everything, once
+    if (com.thesozluk.app.ui.components.Onboarding.needed.value) {
+        com.thesozluk.app.ui.components.OnboardingScreen()
+    }
     // Debug builds: a small mark while the made-up screenshot content is on
     if (com.thesozluk.app.network.Demo.active && com.thesozluk.app.network.Demo.showBadge.value) {
         androidx.compose.material3.Surface(
