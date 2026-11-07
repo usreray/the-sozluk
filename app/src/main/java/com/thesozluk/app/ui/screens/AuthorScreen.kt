@@ -818,8 +818,13 @@ private fun ProfileHeader(
                                     Icon(Icons.Rounded.Edit, contentDescription = null, modifier = Modifier.size(22.dp))
                                     Text("düzenle", style = MaterialTheme.typography.labelSmall)
                                 } else {
-                                    Text("+$additionalOwnedBadges", style = MaterialTheme.typography.titleMedium)
-                                    Text("tümü", style = MaterialTheme.typography.labelSmall)
+                                    // "+N" only when there are more earned ones than shown
+                                    if (additionalOwnedBadges > 0) {
+                                        Text("+$additionalOwnedBadges", style = MaterialTheme.typography.titleMedium)
+                                        Text("tümü", style = MaterialTheme.typography.labelSmall)
+                                    } else {
+                                        Text("tümü", style = MaterialTheme.typography.titleSmall)
+                                    }
                                 }
                             }
                         }
