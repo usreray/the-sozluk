@@ -80,15 +80,22 @@ fun TopicTabsOverview(
                     Text("açık başlıklar", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = "kapat") }
                 }
+                // Under liquid glass the light line sits on each button's own edge: their touch
+                // margin is given back as spacing
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp
+                ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
                 ) {
+                    val leading = ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    val trailing = ButtonGroupDefaults.connectedTrailingButtonShapes()
                     ToggleButton(
                         checked = !twoColumnView,
                         onCheckedChange = { AppSettings.setOpenTabsTwoColumn(false) },
-                        modifier = Modifier.weight(1f),
-                        shapes = ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        modifier = Modifier.weight(1f).cardEdge(if (!twoColumnView) leading.checkedShape else leading.shape),
+                        shapes = leading
                     ) {
                         Icon(Icons.Rounded.ViewAgenda, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                         Text("tek sütun")
@@ -96,12 +103,13 @@ fun TopicTabsOverview(
                     ToggleButton(
                         checked = twoColumnView,
                         onCheckedChange = { AppSettings.setOpenTabsTwoColumn(true) },
-                        modifier = Modifier.weight(1f),
-                        shapes = ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        modifier = Modifier.weight(1f).cardEdge(if (twoColumnView) trailing.checkedShape else trailing.shape),
+                        shapes = trailing
                     ) {
                         Icon(Icons.Rounded.GridView, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
                         Text("iki sütun")
                     }
+                }
                 }
                 if (tabs.isEmpty()) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
