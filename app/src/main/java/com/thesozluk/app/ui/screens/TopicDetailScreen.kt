@@ -830,6 +830,12 @@ fun TopicDetailScreen(
                 // Back in the list at the entry the reader swiped to
                 val index = rows.indexOfFirst { it is TopicRow.EntryItem && it.entry.entryId == lastId }
                 if (index >= 0) scope.launch { listState.scrollToItem(index) }
+            },
+            // The title: out of the entry, into the topic from its first page
+            onOpenTopic = {
+                pagerEntryId = null
+                viewModel.showOlderEntries()
+                scope.launch { listState.scrollToItem(0) }
             }
         )
 
@@ -852,7 +858,8 @@ private fun EntryPager(
     actions: EntryActions,
     isLoadingNext: Boolean,
     onNearEnd: () -> Unit,
-    onClose: (lastEntryId: String?) -> Unit
+    onClose: (lastEntryId: String?) -> Unit,
+    onOpenTopic: () -> Unit
 ) {
     AnimatedVisibility(
         visible = openEntryId != null,
@@ -894,6 +901,8 @@ private fun EntryPager(
                 FloatingTopBar(
                     title = title,
                     subtitle = numbers[currentId]?.let { "#$it" } ?: "${pager.currentPage + 1} / ${entries.size}",
+                    // The title opens the topic from its first page, as the list bar's title does
+                    onTitleClick = onOpenTopic,
                     onBack = { onClose(currentId) },
                     modifier = Modifier.align(Alignment.TopCenter)
                 )
