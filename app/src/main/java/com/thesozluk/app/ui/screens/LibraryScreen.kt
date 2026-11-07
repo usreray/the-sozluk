@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.AppAlertDialog
 import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.glassSource
 import android.app.Application
@@ -233,7 +234,7 @@ fun LibraryScreen(
         }
     }
     if (confirmClear) {
-        androidx.compose.material3.AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("geçmiş silinsin mi?") },
             confirmButton = {
@@ -307,7 +308,7 @@ private fun SavedEntryCard(item: SavedEntry, navController: NavController, modif
                 modifier = Modifier.padding(end = 12.dp)
             )
             if (item.note.isNotBlank()) {
-                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.padding(end = 12.dp)) {
+                Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.padding(end = 12.dp).cardEdge(RoundedCornerShape(16.dp))) {
                     Text(item.note, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
                 }
             }

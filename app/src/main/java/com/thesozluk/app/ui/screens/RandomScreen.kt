@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.AppMenuItem
 import com.thesozluk.app.ui.components.AppMenu
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -412,7 +413,9 @@ private fun EntryBubble(
                 Surface(
                     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomEnd = 24.dp, bottomStart = 6.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    modifier = Modifier.combinedClickable(onClick = onTopic, onLongClick = { menu = true })
+                    modifier = Modifier
+                        .cardEdge(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomEnd = 24.dp, bottomStart = 6.dp))
+                        .combinedClickable(onClick = onTopic, onLongClick = { menu = true })
                 ) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp).animateContentSize()) {
                         Text(
@@ -518,7 +521,7 @@ private fun TypingBubble(modifier: Modifier) {
         Surface(
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomEnd = 24.dp, bottomStart = 6.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.padding(start = 10.dp)
+            modifier = Modifier.padding(start = 10.dp).cardEdge(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp, bottomEnd = 24.dp, bottomStart = 6.dp))
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
                 repeat(3) { index ->

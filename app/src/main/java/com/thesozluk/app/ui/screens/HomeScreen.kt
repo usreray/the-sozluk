@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.AppAlertDialog
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.ToggleButtonDefaults
@@ -367,7 +368,7 @@ private fun YearPicker(year: Int?, onPick: (Int?) -> Unit) {
         modifier = Modifier.padding(bottom = 6.dp)
     )
     if (open) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { open = false },
             title = { Text("hangi yıl?") },
             text = {

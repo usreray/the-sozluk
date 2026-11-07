@@ -1,5 +1,9 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.TravelExplore
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.FlowRow
@@ -152,7 +156,7 @@ fun TextPromptDialog(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     val submit = { if (text.isNotBlank()) onConfirm(text.trim()) }
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
@@ -190,7 +194,7 @@ fun TopicCreatorDialog(
             error = e.message ?: "bilgi alınamadı"
         }
     }
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Rounded.Info, contentDescription = null) },
         title = { Text("başlığı açan") },
@@ -251,31 +255,80 @@ fun TopicFilterSheet(current: TopicFilter, isLoggedIn: Boolean, nick: String?, o
             add(TopicFilter.Rookies to Icons.Rounded.Spa)
         }
     }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    AppBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 12.dp)
+                .padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Text("filtrele", style = MaterialTheme.typography.titleLargeEmphasized)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                filters.forEach { (filter, icon) ->
-                    val selected = current == filter
-                    FilterChip(
-                        selected = selected,
-                        onClick = { onPick(filter) },
-                        label = { Text(filter.label) },
-                        leadingIcon = { Icon(if (selected) Icons.Rounded.Check else icon, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    )
-                }
+            Text(
+                "filtrele",
+                style = MaterialTheme.typography.titleLargeEmphasized,
+                modifier = Modifier.padding(start = 8.dp, bottom = 10.dp)
+            )
+            filters.forEach { (filter, icon) ->
+                FilterRow(label = filter.label, icon = icon, selected = current == filter) { onPick(filter) }
             }
             if (!isLoggedIn) {
                 Text(
                     "linkler, benimkiler, takip ettiklerim ve çaylaklar giriş yapınca görünür",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp, top = 10.dp)
                 )
             }
+        }
+    }
+}
+
+/**
+ * One filter as a row: its icon in a small rounded box tinted with the accent, then its name.
+ * The one that is on gets a faint accent background, a bolder name and a check at the end.
+ */
+@Composable
+private fun FilterRow(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    androidx.compose.foundation.layout.Row(
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clip(shape)
+            .background(if (selected) colors.primary.copy(alpha = 0.10f) else androidx.compose.ui.graphics.Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        androidx.compose.foundation.layout.Box(
+            contentAlignment = androidx.compose.ui.Alignment.Center,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .background(colors.primary.copy(alpha = if (selected) 0.24f else 0.14f))
+        ) {
+            Icon(icon, contentDescription = null, tint = colors.primary, modifier = Modifier.size(20.dp))
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.SemiBold else null,
+            color = colors.onSurface,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
+        if (selected) {
+            Icon(Icons.Rounded.Check, contentDescription = "seçili", tint = colors.primary, modifier = Modifier.size(20.dp))
         }
     }
 }

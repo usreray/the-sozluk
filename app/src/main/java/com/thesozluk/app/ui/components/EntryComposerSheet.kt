@@ -151,7 +151,7 @@ fun EntryComposerSheet(
     // The send buttons sit at the top, next to the heading.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    AppBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Column(
             modifier = Modifier.fillMaxWidth().weight(1f)
@@ -287,7 +287,7 @@ private fun EntryPreview(raw: String, modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth().cardEdge(RoundedCornerShape(16.dp))
     ) {
         Box(Modifier.verticalScroll(rememberScrollState()).padding(16.dp)) {
             if (raw.isBlank()) {
@@ -312,7 +312,7 @@ private fun LinkDialog(initialText: String, onConfirm: (url: String, label: Stri
     // The site only links http(s) addresses; a bare "site.com" gets https:// in front
     val address = url.trim().let { if (it.isEmpty() || it.contains("://")) it else "https://$it" }
     val valid = address.startsWith("http://") || address.startsWith("https://")
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("link ekle") },
         text = {

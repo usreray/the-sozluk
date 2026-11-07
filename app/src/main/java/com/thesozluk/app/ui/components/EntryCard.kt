@@ -174,7 +174,7 @@ fun EntryCard(
     )
 
     if (confirmDelete && actions.onDelete != null) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { confirmDelete = false },
             icon = { Icon(Icons.Rounded.Delete, contentDescription = null) },
             title = { Text("entry silinsin mi?") },
@@ -428,7 +428,11 @@ private fun CommentsSection(
             )
         }
         comments.comments.forEach { comment ->
-            Surface(shape = RoundedCornerShape(20.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                modifier = Modifier.cardEdge(RoundedCornerShape(20.dp))
+            ) {
                 Column(modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 2.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AuthorAvatar(

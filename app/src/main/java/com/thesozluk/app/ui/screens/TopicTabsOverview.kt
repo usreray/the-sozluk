@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
+import com.thesozluk.app.ui.components.AppAlertDialog
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -131,7 +133,7 @@ fun TopicTabsOverview(
                                 }
                             }
                             if (showFullTitle) {
-                                AlertDialog(
+                                AppAlertDialog(
                                     onDismissRequest = { showFullTitle = false },
                                     title = { Text("tam başlık") },
                                     text = { Text(tab.title) },
@@ -157,6 +159,7 @@ fun TopicTabsOverview(
                                     .animateItem()
                                     .fillMaxWidth()
                                     .height(280.dp)
+                                    .cardEdge(RoundedCornerShape(24.dp))
                                     .pointerInput(tab.id, dismissThreshold) {
                                         detectHorizontalDragGestures(
                                             onHorizontalDrag = { change, amount ->
@@ -203,7 +206,7 @@ fun TopicTabsOverview(
                                     Surface(
                                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.58f),
                                         shape = RoundedCornerShape(16.dp),
-                                        modifier = Modifier.fillMaxWidth().weight(1f)
+                                        modifier = Modifier.fillMaxWidth().weight(1f).cardEdge(RoundedCornerShape(16.dp))
                                     ) {
                                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopStart) {
                                             Text(

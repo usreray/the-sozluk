@@ -60,7 +60,7 @@ fun PagePickerDialog(
     LaunchedEffect(Unit) { focus.requestFocus() }
     val bigStep = if (totalPages > 200) 100 else 10
 
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("sayfaya git") },
         text = {
@@ -118,7 +118,7 @@ private fun StepButton(label: String, modifier: Modifier, onClick: () -> Unit) {
 
 @Composable
 fun LoginRequiredDialog(onLogin: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    AppAlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(FavoriteIcons.DropFilled, contentDescription = null) },
         title = { Text("giriş yapın") },

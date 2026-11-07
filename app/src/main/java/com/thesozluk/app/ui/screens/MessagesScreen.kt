@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.AppBottomSheet
 import com.thesozluk.app.ui.components.cardEdge
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.thesozluk.app.ui.components.FloatingPromptHost
@@ -293,7 +294,7 @@ private fun ThreadRow(thread: MessageThread, index: Int, count: Int, onClick: ()
 fun NewMessageSheet(initialTo: String, isSending: Boolean, onSend: (String, String) -> Unit, onDismiss: () -> Unit) {
     var to by rememberSaveable { mutableStateOf(initialTo) }
     var text by rememberSaveable { mutableStateOf("") }
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    AppBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         SheetBlur.BlurBehind()
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(),

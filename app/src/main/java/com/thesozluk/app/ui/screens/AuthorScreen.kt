@@ -682,7 +682,11 @@ private fun ProfileHeader(
             }
         }
         if (profile.karma.isNotBlank()) {
-            Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.tertiaryContainer) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                modifier = Modifier.cardEdge(RoundedCornerShape(50))
+            ) {
                 Text(
                     profile.karma,
                     style = MaterialTheme.typography.labelLarge,
@@ -834,7 +838,7 @@ private fun StatTile(label: String, value: Int, modifier: Modifier = Modifier, o
         enabled = onClick != null,
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = modifier
+        modifier = modifier.cardEdge(RoundedCornerShape(24.dp))
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 14.dp)) {
             Text(
@@ -852,21 +856,28 @@ private fun StatTile(label: String, value: Int, modifier: Modifier = Modifier, o
 @Composable
 private fun TabButtons(selected: AuthorTab, onSelect: (AuthorTab) -> Unit) {
     val tabs = AuthorTab.entries
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp
+    ) {
     Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
+        modifier = Modifier.horizontalScroll(rememberScrollState()).padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
     ) {
         tabs.forEachIndexed { index, tab ->
+            val shapes = when (index) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                tabs.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            }
             ToggleButton(
                 checked = tab == selected,
                 onCheckedChange = { onSelect(tab) },
-                shapes = when (index) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    tabs.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                }
+                shapes = shapes,
+                // Liquid glass: the light line along the top, as on the home lists' buttons
+                modifier = Modifier.cardEdge(if (tab == selected) shapes.checkedShape else shapes.shape)
             ) { Text(tab.label) }
         }
+    }
     }
 }
 

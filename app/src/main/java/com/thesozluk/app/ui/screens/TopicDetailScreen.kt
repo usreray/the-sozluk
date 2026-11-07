@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
 import androidx.compose.material3.FloatingActionButtonDefaults
 import com.thesozluk.app.ui.components.LiquidGlassBehind
 import com.thesozluk.app.ui.components.liquidGlass
@@ -932,7 +933,7 @@ private fun FilterBanner(label: String, onClear: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(50),
         color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().cardEdge(RoundedCornerShape(50))
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 20.dp, end = 4.dp)) {
             Icon(Icons.Rounded.FilterList, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)

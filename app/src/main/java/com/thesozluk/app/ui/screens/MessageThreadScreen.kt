@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.cardEdge
+import com.thesozluk.app.ui.components.AppAlertDialog
 import com.thesozluk.app.ui.components.AppMenuItem
 import com.thesozluk.app.ui.components.AppMenu
 import com.thesozluk.app.ui.components.FloatingPromptHost
@@ -119,7 +121,7 @@ fun MessageThreadScreen(
     }
 
     if (confirmDelete) {
-        AlertDialog(
+        AppAlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("konuşma silinsin mi?") },
             confirmButton = {
@@ -271,7 +273,16 @@ private fun Bubble(message: Message, onLink: (com.thesozluk.app.ui.components.Ek
                 bottomEnd = if (outgoing) 6.dp else 24.dp
             ),
             color = if (outgoing) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.widthIn(max = 320.dp).alpha(if (message.isPending) 0.6f else 1f)
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .cardEdge(
+                    RoundedCornerShape(
+                        topStart = 24.dp, topEnd = 24.dp,
+                        bottomStart = if (outgoing) 24.dp else 6.dp,
+                        bottomEnd = if (outgoing) 6.dp else 24.dp
+                    )
+                )
+                .alpha(if (message.isPending) 0.6f else 1f)
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
                 // Long-press to select and copy, as in any messaging app

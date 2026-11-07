@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.AppAlertDialog
 import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.NavBarPreview
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -378,12 +379,12 @@ private fun LazyListScope.appearance() {
                 Text("tarz", style = MaterialTheme.typography.titleMedium)
                 // The bar as it will look, to try out right here
                 NavBarPreview(Modifier.padding(vertical = 6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+                ConnectedRow {
                     NavBarStyle.entries.forEachIndexed { index, style ->
                         ToggleButton(
                             checked = AppSettings.navBarStyle.value == style,
                             onCheckedChange = { AppSettings.setNavBarStyle(style) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).toggleEdge(index, NavBarStyle.entries.size, checked = AppSettings.navBarStyle.value == style),
                             contentPadding = PaddingValues(horizontal = 4.dp),
                             shapes = connectedShapes(index, NavBarStyle.entries.size)
                         ) { Text(style.label, maxLines = 1, softWrap = false) }
@@ -505,13 +506,13 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
         Surface(shape = segmentedShape(1, 4), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.cardEdge(segmentedShape(1, 4))) {
             Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("yazı tipi", style = MaterialTheme.typography.titleMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)) {
+                ConnectedRow {
                     val fonts = ReadingFont.entries.filter { it != ReadingFont.Custom || CustomFont.family.value != null }
                     fonts.forEachIndexed { index, font ->
                         ToggleButton(
                             checked = AppSettings.readingFont.value == font,
                             onCheckedChange = { AppSettings.setReadingFont(font) },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f).toggleEdge(index, fonts.size, checked = AppSettings.readingFont.value == font),
                             contentPadding = PaddingValues(horizontal = 4.dp),
                             shapes = connectedShapes(index, fonts.size)
                         ) { Text(font.label, fontFamily = font.family, maxLines = 1, softWrap = false) }
@@ -980,7 +981,7 @@ private fun LazyListScope.data(navController: NavController) {
             }
         }
         restoreUri?.let { uri ->
-            AlertDialog(
+            AppAlertDialog(
                 onDismissRequest = { restoreUri = null },
                 title = { Text("yedek geri yüklensin mi?") },
                 text = {
@@ -1394,3 +1395,43 @@ private fun SeedSwatch(seed: SeedColor, selected: Boolean, onClick: () -> Unit) 
         )
     }
 }
+
+/**
+ * A row of connected toggle buttons. Their touch margin is given back as spacing so that,
+ * under liquid glass, the light line sits on each button's own edge.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ConnectedRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            modifier = Modifier.padding(vertical = 4.dp),
+            content = content
+        )
+    }
+}
+
+/** Chips laid out the same way, for the same reason. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ChipFlowRow(content: @Composable androidx.compose.foundation.layout.FlowRowScope.() -> Unit) {
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp
+    ) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(vertical = 4.dp),
+            content = content
+        )
+    }
+}
+
+/** A connected toggle's lit edge under liquid glass, on the shape it has in its state. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun Modifier.toggleEdge(index: Int, count: Int, checked: Boolean): Modifier =
+    cardEdge(connectedShapes(index, count).let { if (checked) it.checkedShape else it.shape })

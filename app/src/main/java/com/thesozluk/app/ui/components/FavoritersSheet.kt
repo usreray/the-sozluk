@@ -66,7 +66,7 @@ fun FavoritersSheet(
     // Opens half way; dragging it (anywhere, or the handle) up gives the list the whole screen,
     // down closes it: the sheet's own states, so one thing moves it and it stays smooth
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    AppBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Row(
             verticalAlignment = Alignment.CenterVertically,

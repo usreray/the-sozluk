@@ -79,6 +79,7 @@ fun EntryImagePreviews(html: String, onOpen: (String) -> Unit, modifier: Modifie
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHighest,
                 modifier = Modifier.height(180.dp).widthIn(min = 120.dp, max = 280.dp).clip(RoundedCornerShape(16.dp))
+                    .cardEdge(RoundedCornerShape(16.dp))
                     .clickable { onOpen(ref) }
             ) {
                 if (url != null) {

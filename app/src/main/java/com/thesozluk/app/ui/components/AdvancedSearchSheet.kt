@@ -70,7 +70,7 @@ fun AdvancedSearchSheet(initialKeywords: String, onSearch: (path: String, name: 
     var picking by remember { mutableStateOf<String?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    AppBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Column(
             modifier = Modifier

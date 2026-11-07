@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.screens
 
+import com.thesozluk.app.ui.components.AppAlertDialog
 import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.glassSource
 import androidx.compose.foundation.Image
@@ -203,7 +204,12 @@ private fun AccountCard(
     val content = if (isLoggedIn) MaterialTheme.colorScheme.onPrimaryContainer
     else MaterialTheme.colorScheme.onSurface
 
-    Surface(shape = RoundedCornerShape(32.dp), color = container, contentColor = content) {
+    Surface(
+        shape = RoundedCornerShape(32.dp),
+        color = container,
+        contentColor = content,
+        modifier = Modifier.cardEdge(RoundedCornerShape(32.dp))
+    ) {
         AnimatedContent(targetState = isLoggedIn, label = "account") { loggedIn ->
             Column(
                 modifier = Modifier.fillMaxWidth().padding(24.dp),
@@ -247,7 +253,7 @@ private fun AccountCard(
                 if (loggedIn) {
                     var confirmLogout by remember { mutableStateOf(false) }
                     if (confirmLogout) {
-                        AlertDialog(
+                        AppAlertDialog(
                             onDismissRequest = { confirmLogout = false },
                             icon = { Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = null) },
                             title = { Text("çıkış yapılsın mı?") },

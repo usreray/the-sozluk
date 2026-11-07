@@ -30,7 +30,7 @@ import com.thesozluk.app.settings.Release
 fun WhatsNewSheet(release: Release, onDismiss: () -> Unit) {
     // Like the other list sheets: opens half way, dragged up it takes the screen
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    AppBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Column(Modifier.fillMaxWidth().weight(1f).padding(horizontal = 24.dp).padding(bottom = 24.dp)) {
             // "tamam" at the top, so half open still reaches it
