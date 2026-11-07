@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
@@ -80,6 +81,7 @@ import androidx.compose.runtime.mutableStateOf
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.thesozluk.app.network.Demo.init(this)
         EksiSession.init(this)
         AppSettings.init(this)
         TopicTabs.init(this, AppSettings.rememberOpenTabs.value)
@@ -309,5 +311,20 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
     com.thesozluk.app.ui.components.EntryPeekOverlay(glassState = navGlass)
     // ⋮ menus opened as glass (liquid glass), over the app
     com.thesozluk.app.ui.components.GlassMenuHost(glassState = navGlass)
+    // Debug builds: a small mark while the made-up screenshot content is on
+    if (com.thesozluk.app.network.Demo.active && com.thesozluk.app.network.Demo.showBadge.value) {
+        androidx.compose.material3.Surface(
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.tertiary,
+            contentColor = MaterialTheme.colorScheme.onTertiary,
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 2.dp)
+        ) {
+            androidx.compose.material3.Text(
+                "demo",
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+            )
+        }
+    }
     }
 }

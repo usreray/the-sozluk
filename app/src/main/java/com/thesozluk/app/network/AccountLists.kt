@@ -50,7 +50,7 @@ object AccountLists {
 
     // ------------------------------------------------------------------------------------- çöp
 
-    suspend fun fetchTrash(page: Int): TrashPage = withContext(Dispatchers.IO) {
+    suspend fun fetchTrash(page: Int): TrashPage = Demo.on?.trash(page) ?: withContext(Dispatchers.IO) {
         val response = request("$BASE_URL/cop?p=$page").execute()
         if (response.statusCode() != 200) throw IOException("çöp kutusu açılamadı (HTTP ${response.statusCode()})")
         parseTrash(response.parse(), page)
@@ -81,7 +81,7 @@ object AccountLists {
      * Brings an entry back ("canlandır") or deletes it for good ("sil"). The site's links are
      * plain addresses behind a confirm box; whether it worked is checked on the trash itself.
      */
-    private suspend fun trashAction(action: String, id: String): String? = withContext(Dispatchers.IO) {
+    private suspend fun trashAction(action: String, id: String): String? = if (Demo.on != null) null else withContext(Dispatchers.IO) {
         try {
             val response = request("$BASE_URL/cop/$action?id=$id").execute()
             if (response.statusCode() !in 200..399) return@withContext "işlem başarısız (HTTP ${response.statusCode()})"
@@ -109,7 +109,7 @@ object AccountLists {
     suspend fun deleteForever(id: String): String? = trashAction("sil", id)
 
     /** "çöpü boşalt": the page's form, with its token. */
-    suspend fun emptyTrash(): String? = withContext(Dispatchers.IO) {
+    suspend fun emptyTrash(): String? = if (Demo.on != null) null else withContext(Dispatchers.IO) {
         try {
             val page = request("$BASE_URL/cop").execute().parse()
             val form = page.selectFirst("form[action*=/cop/bosalt]") ?: return@withContext "çöp zaten boş"
@@ -129,7 +129,7 @@ object AccountLists {
 
     // --------------------------------------------------------------------- takip / engellenmiş
 
-    suspend fun fetchRelations(kind: RelationKind, page: Int): RelationPage = withContext(Dispatchers.IO) {
+    suspend fun fetchRelations(kind: RelationKind, page: Int): RelationPage = Demo.on?.relations(kind, page) ?: withContext(Dispatchers.IO) {
         val response = request("$BASE_URL/relation-list?relationType=${kind.code}&pageIndex=$page")
             .header("X-Requested-With", "XMLHttpRequest")
             .header("Accept", "application/json, text/javascript, */*; q=0.01")

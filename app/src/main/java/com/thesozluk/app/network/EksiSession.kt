@@ -25,11 +25,12 @@ object EksiSession {
     private lateinit var prefs: SharedPreferences
 
     private val _isLoggedIn = mutableStateOf(false)
-    val isLoggedIn: State<Boolean> = _isLoggedIn
+    /** Signed in; the demo (debug builds only) counts as signed in */
+    val isLoggedIn: State<Boolean> = androidx.compose.runtime.derivedStateOf { Demo.active || _isLoggedIn.value }
 
     // The logged-in user's nick, for "my profile"; read from the site after login
     private val _nick = mutableStateOf<String?>(null)
-    val nick: State<String?> = _nick
+    val nick: State<String?> = androidx.compose.runtime.derivedStateOf { if (Demo.active) Demo.source?.ownNick else _nick.value }
 
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

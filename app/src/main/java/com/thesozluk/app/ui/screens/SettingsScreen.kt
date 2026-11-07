@@ -1145,6 +1145,42 @@ private fun LazyListScope.about() {
             }
         }
     }
+    // Debug builds only: made-up content for screenshots (the release has no demo at all)
+    if (com.thesozluk.app.network.Demo.source != null) {
+        item { SectionTitle("demo (sadece debug)") }
+        item {
+            val context = LocalContext.current
+            SwitchRow(
+                title = "demo modu",
+                subtitle = "ekran görüntüleri için uydurma başlıklar, entry'ler ve yazarlar; siteye hiçbir istek gitmez. değişince uygulama yeniden açılır",
+                checked = com.thesozluk.app.network.Demo.enabled.value,
+                enabled = true,
+                shape = segmentedShape(0, 2),
+                onCheckedChange = { on ->
+                    com.thesozluk.app.network.Demo.setEnabled(on)
+                    // Start the app's screens over (new view models), so nothing loaded before
+                    // stays on screen; the process keeps running
+                    val activity = generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }
+                        .filterIsInstance<android.app.Activity>().firstOrNull()
+                    context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { intent ->
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                        context.startActivity(intent)
+                        activity?.finish()
+                    }
+                }
+            )
+        }
+        item {
+            SwitchRow(
+                title = "demo işareti",
+                subtitle = "ekranın üstündeki küçük \"demo\" yazısı; görüntü almadan önce kapat",
+                checked = com.thesozluk.app.network.Demo.showBadge.value,
+                enabled = com.thesozluk.app.network.Demo.enabled.value,
+                shape = segmentedShape(1, 2),
+                onCheckedChange = com.thesozluk.app.network.Demo::setShowBadge
+            )
+        }
+    }
     item { SectionTitle(
         "güncelleme ve destek",
         changed = !AppSettings.checkUpdates.value,

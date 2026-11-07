@@ -72,7 +72,7 @@ object EksiNetworkDataSource {
         return configured
     }
 
-    suspend fun fetchTopics(page: Int, category: String): List<Topic> = withContext(Dispatchers.IO) {
+    suspend fun fetchTopics(page: Int, category: String): List<Topic> = Demo.on?.topics(category, page) ?: withContext(Dispatchers.IO) {
         val urlPath = when (category) {
             "today" -> "basliklar/bugun"
             "debe" -> "debe"
@@ -137,7 +137,7 @@ object EksiNetworkDataSource {
         return@withContext topics
     }
 
-    suspend fun searchTopic(query: String, page: Int, redirectedUrl: String = ""): Topic = withContext(Dispatchers.IO) {
+    suspend fun searchTopic(query: String, page: Int, redirectedUrl: String = ""): Topic = Demo.on?.topic(query, page, redirectedUrl) ?: withContext(Dispatchers.IO) {
         val searchUrl = if (redirectedUrl.isNotEmpty()) {
             if (page > 1) {
                 if (redirectedUrl.contains("?")) {
@@ -178,7 +178,7 @@ object EksiNetworkDataSource {
         return@withContext HtmlParser.parseTopicDetail(document, query, page, searchUrl, BASE_URL)
     }
     
-    suspend fun fetchSuggestions(query: String): Pair<List<String>, List<String>> = withContext(Dispatchers.IO) {
+    suspend fun fetchSuggestions(query: String): Pair<List<String>, List<String>> = Demo.on?.suggestions(query) ?: withContext(Dispatchers.IO) {
         val url = "$BASE_URL/autocomplete/query?q=${URLEncoder.encode(query.trim(), "UTF-8")}"
         val response = Jsoup.connect(url)
             .userAgent(USER_AGENT)
@@ -213,7 +213,7 @@ object EksiNetworkDataSource {
         }
     }
 
-    suspend fun favoriteEntry(entryId: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun favoriteEntry(entryId: String): Boolean = Demo.on?.let { true } ?: withContext(Dispatchers.IO) {
         try {
             val favlaUrl = "$BASE_URL/entry/favla"
             val connection = applyCommonConnectionSettings(session.newRequest(favlaUrl))
@@ -231,7 +231,7 @@ object EksiNetworkDataSource {
         }
     }
 
-    suspend fun unfavoriteEntry(entryId: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun unfavoriteEntry(entryId: String): Boolean = Demo.on?.let { true } ?: withContext(Dispatchers.IO) {
         try {
             val favlamaUrl = "$BASE_URL/entry/favlama"
             val connection = applyCommonConnectionSettings(session.newRequest(favlamaUrl))
@@ -254,7 +254,7 @@ object EksiNetworkDataSource {
      * author's id. [rate] 0 takes a vote back.
      */
     suspend fun vote(entryId: String, authorId: String, rate: Int, previous: Int): Boolean =
-        withContext(Dispatchers.IO) {
+        Demo.on?.let { true } ?: withContext(Dispatchers.IO) {
             try {
                 // Switching sides or taking a vote back first removes the old one
                 if (previous != 0) {
@@ -269,7 +269,7 @@ object EksiNetworkDataSource {
 
     /** Comment votes use the same payload as entries, on /yorum/vote. */
     suspend fun voteComment(commentId: String, authorId: String, rate: Int, previous: Int): Boolean =
-        withContext(Dispatchers.IO) {
+        Demo.on?.let { true } ?: withContext(Dispatchers.IO) {
             try {
                 if (previous != 0) {
                     val removed = ajaxPost("/yorum/removevote", mapOf("id" to commentId, "rate" to "$previous", "owner" to authorId))
@@ -281,7 +281,7 @@ object EksiNetworkDataSource {
             }
         }
 
-    suspend fun fetchComments(entryId: String): List<Comment> = withContext(Dispatchers.IO) {
+    suspend fun fetchComments(entryId: String): List<Comment> = Demo.on?.comments(entryId) ?: withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/yorum/liste/$entryId"))
             .header("X-Requested-With", "XMLHttpRequest")
             .execute()
@@ -290,7 +290,7 @@ object EksiNetworkDataSource {
     }
 
     /** The message box (or its archive), with the forms to send and to delete / archive. */
-    suspend fun fetchMessageBox(archive: Boolean, page: Int): MessageBox = withContext(Dispatchers.IO) {
+    suspend fun fetchMessageBox(archive: Boolean, page: Int): MessageBox = Demo.on?.messageBox() ?: withContext(Dispatchers.IO) {
         val path = if (archive) "/mesaj/arsiv" else "/mesaj"
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path?p=$page"))
             .followRedirects(false)
@@ -306,7 +306,7 @@ object EksiNetworkDataSource {
      * /mesaj), so only a notice on the landing page means a rejection; callers confirm delivery
      * by reloading.
      */
-    suspend fun sendMessage(form: FormSpec, to: String, text: String): String? = withContext(Dispatchers.IO) {
+    suspend fun sendMessage(form: FormSpec, to: String, text: String): String? = if (Demo.on != null) null else withContext(Dispatchers.IO) {
         try {
             val action = if (form.action.startsWith("http")) form.action else BASE_URL + form.action
             val response = applyCommonConnectionSettings(session.newRequest(action))
@@ -328,7 +328,7 @@ object EksiNetworkDataSource {
         }
     }
 
-    suspend fun fetchThread(id: String): ThreadDetail = withContext(Dispatchers.IO) {
+    suspend fun fetchThread(id: String): ThreadDetail = Demo.on?.thread(id) ?: withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/mesaj/$id")).execute()
         if (response.statusCode() != 200) throw IOException("konuşma yüklenemedi (HTTP ${response.statusCode()})")
         HtmlParser.parseThread(response.parse())
@@ -336,7 +336,7 @@ object EksiNetworkDataSource {
 
     /** Nicks who favorited an entry (logged-in only; anonymous gets 403). */
     /** Who favorited an entry; [rookies]: the çaylak (rookie) favorites the site lists apart. */
-    suspend fun fetchFavoriters(entryId: String, rookies: Boolean = false): List<String> = withContext(Dispatchers.IO) {
+    suspend fun fetchFavoriters(entryId: String, rookies: Boolean = false): List<String> = Demo.on?.favoriters(entryId) ?: withContext(Dispatchers.IO) {
         val path = if (rookies) "entry/caylakfavorites" else "entry/favorileyenler"
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/$path?entryId=$entryId"))
             .header("X-Requested-With", "XMLHttpRequest")
@@ -347,7 +347,7 @@ object EksiNetworkDataSource {
         response.parse().select("li a[href^=/biri/]").map { it.text().trim() }.filter { it.isNotEmpty() }
     }
 
-    suspend fun fetchChannels(): List<Channel> = withContext(Dispatchers.IO) {
+    suspend fun fetchChannels(): List<Channel> = Demo.on?.channels() ?: withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/kanallar")).execute()
         if (response.statusCode() != 200) throw IOException("kanallar yüklenemedi (HTTP ${response.statusCode()})")
         HtmlParser.parseChannels(response.parse())
@@ -358,7 +358,7 @@ object EksiNetworkDataSource {
      * Returns null on success or the reason. Like the site's script, judges by the reply text:
      * "LimitReached", "InvalidRelation" and "SystemUser" are refusals even with HTTP 200.
      */
-    suspend fun postRelation(url: String): String? = withContext(Dispatchers.IO) {
+    suspend fun postRelation(url: String): String? = if (Demo.on != null) null else withContext(Dispatchers.IO) {
         try {
             val path = if (url.startsWith("http")) url.removePrefix(BASE_URL) else url
             val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))
@@ -428,21 +428,21 @@ object EksiNetworkDataSource {
 
     /** Saves the signed-in user's biography; an empty text deletes it, as the site's "biyografiyi sil". */
     suspend fun saveBiography(text: String): String? =
-        profilePost("/set-profile-biography", if (text.isBlank()) emptyList() else listOf("content" to text))
+        if (Demo.on != null) null else profilePost("/set-profile-biography", if (text.isBlank()) emptyList() else listOf("content" to text))
 
     /** The featured badges, in order; the site keeps the first four. */
     suspend fun selectBadges(ids: List<String>): String? =
-        profilePost("/select-badges", ids.take(4).map { "selectBadge[]" to it })
+        if (Demo.on != null) null else profilePost("/select-badges", ids.take(4).map { "selectBadge[]" to it })
 
     /**
      * A new profile picture, sent as the site's cropper does: a square picture as a data URL in
      * the "base64" field.
      */
     suspend fun setProfilePicture(nick: String, dataUrl: String): String? =
-        profilePost("/biri/${encodePath(nick)}/profilepicture", listOf("base64" to dataUrl), timeout = 60000)
+        if (Demo.on != null) null else profilePost("/biri/${encodePath(nick)}/profilepicture", listOf("base64" to dataUrl), timeout = 60000)
 
     suspend fun removeProfilePicture(nick: String): String? =
-        profilePost("/biri/${encodePath(nick)}/removeprofilepicture", emptyList())
+        if (Demo.on != null) null else profilePost("/biri/${encodePath(nick)}/removeprofilepicture", emptyList())
 
     private fun ajaxPost(path: String, data: Map<String, String>): Boolean {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL$path"))
@@ -459,7 +459,7 @@ object EksiNetworkDataSource {
      * the CSRF token, plus [values]. Returns an error message, or null on success.
      */
     suspend fun submitForm(form: FormSpec, values: Map<String, String>, ajax: Boolean = false): String? =
-        withContext(Dispatchers.IO) {
+        if (Demo.on != null) null else withContext(Dispatchers.IO) {
             try {
                 val action = if (form.action.startsWith("http")) form.action else BASE_URL + form.action
                 val request = applyCommonConnectionSettings(session.newRequest(action))
@@ -582,7 +582,7 @@ object EksiNetworkDataSource {
 
     /** Followers (or, with [following], who they follow): the site's JSON list, up to 100 people. */
     suspend fun fetchFollowList(nick: String, following: Boolean): List<com.thesozluk.app.model.FollowUser> =
-        withContext(Dispatchers.IO) {
+        Demo.on?.followList(nick, following) ?: withContext(Dispatchers.IO) {
             val kind = if (following) "following" else "follower"
             val response = applyCommonConnectionSettings(
                 session.newRequest("$BASE_URL/$kind?nick=${URLEncoder.encode(nick, "UTF-8")}")
@@ -605,7 +605,7 @@ object EksiNetworkDataSource {
         }
 
     /** The form of an entry's "düzelt" page (/entry/duzelt/<id>), holding its current text. */
-    suspend fun fetchEditForm(entryId: String): FormSpec = withContext(Dispatchers.IO) {
+    suspend fun fetchEditForm(entryId: String): FormSpec = Demo.on?.let { FormSpec(action = "/demo", fields = emptyMap(), textFieldName = "Content") } ?: withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/entry/duzelt/$entryId"))
             .timeout(20000)
             .execute()
@@ -615,7 +615,7 @@ object EksiNetworkDataSource {
     }
 
     /** The header lights the site polls (GET /top/led); null when it can't be read. */
-    suspend fun fetchSiteStatus(): com.thesozluk.app.notify.SiteStatus? = withContext(Dispatchers.IO) {
+    suspend fun fetchSiteStatus(): com.thesozluk.app.notify.SiteStatus? = Demo.on?.let { com.thesozluk.app.notify.SiteStatus(hasMessages = true, hasEvents = true) } ?: withContext(Dispatchers.IO) {
         try {
             val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/top/led"))
                 .header("X-Requested-With", "XMLHttpRequest")
@@ -635,7 +635,7 @@ object EksiNetworkDataSource {
     }
 
     /** "Başlığı açan" box: who opened the topic and when, as plain text lines. */
-    suspend fun fetchTopicCreator(topicId: String): com.thesozluk.app.model.TopicCreator = withContext(Dispatchers.IO) {
+    suspend fun fetchTopicCreator(topicId: String): com.thesozluk.app.model.TopicCreator = Demo.on?.let { com.thesozluk.app.model.TopicCreator("uykusuz baykuş", listOf("bu başlık örnek olarak uyduruldu")) } ?: withContext(Dispatchers.IO) {
         val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/topic/gettopiccreatorinfo?topicId=$topicId"))
             .header("X-Requested-With", "XMLHttpRequest")
             .execute()
@@ -663,7 +663,7 @@ object EksiNetworkDataSource {
         com.thesozluk.app.model.TopicCreator(nick, lines)
     }
 
-    suspend fun fetchProfile(nick: String): AuthorProfile = withContext(Dispatchers.IO) {
+    suspend fun fetchProfile(nick: String): AuthorProfile = Demo.on?.profile(nick) ?: withContext(Dispatchers.IO) {
         // The badge page loads alongside the profile; its failure leaves the profile intact
         val badgesAsync = async {
             try {
@@ -688,7 +688,7 @@ object EksiNetworkDataSource {
     }
 
     /** The author's uploaded images ("görselleri"); the site sends them all at once. */
-    suspend fun fetchUserImages(nick: String): List<com.thesozluk.app.model.AuthorImage> = withContext(Dispatchers.IO) {
+    suspend fun fetchUserImages(nick: String): List<com.thesozluk.app.model.AuthorImage> = Demo.on?.userImages(nick) ?: withContext(Dispatchers.IO) {
         val url = "$BASE_URL/gorselleri?nick=${URLEncoder.encode(nick, "UTF-8")}"
         val response = applyCommonConnectionSettings(session.newRequest(url))
             .header("X-Requested-With", "XMLHttpRequest")
@@ -698,7 +698,7 @@ object EksiNetworkDataSource {
     }
 
     /** One page of a profile tab such as "son-entryleri" or "en-begenilenleri". */
-    suspend fun fetchUserEntries(nick: String, tab: String, page: Int): List<Entry> = withContext(Dispatchers.IO) {
+    suspend fun fetchUserEntries(nick: String, tab: String, page: Int): List<Entry> = Demo.on?.userEntries(nick, tab, page) ?: withContext(Dispatchers.IO) {
         val url = "$BASE_URL/$tab?nick=${URLEncoder.encode(nick, "UTF-8")}&p=$page"
         val response = applyCommonConnectionSettings(session.newRequest(url))
             .header("X-Requested-With", "XMLHttpRequest")
@@ -708,7 +708,7 @@ object EksiNetworkDataSource {
     }
 
     /** The logged-in user's nick, read from the "ben" link in the site header. */
-    suspend fun fetchOwnNick(): String? = withContext(Dispatchers.IO) {
+    suspend fun fetchOwnNick(): String? = Demo.on?.ownNick ?: withContext(Dispatchers.IO) {
         try {
             val document = applyCommonConnectionSettings(session.newRequest("$BASE_URL/")).execute().parse()
             document.select("#top-navigation a[href^=/biri/], header a[href^=/biri/], nav a[href^=/biri/]")
