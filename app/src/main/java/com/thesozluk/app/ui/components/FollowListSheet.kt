@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,8 +47,14 @@ fun FollowListSheet(
     total: Int,
     load: suspend () -> List<FollowUser>,
     onAuthor: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** One's own "takip ettikleri": a "takipten çık" button per person; returns an error or null */
+    onUnfollow: (suspend (FollowUser) -> String?)? = null
 ) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var busy by remember { mutableStateOf<String?>(null) }
+    var confirm by remember { mutableStateOf<FollowUser?>(null) }
+    var failure by remember { mutableStateOf<String?>(null) }
     var users by remember { mutableStateOf<List<FollowUser>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
@@ -60,10 +67,40 @@ fun FollowListSheet(
         }
     }
 
+    confirm?.let { user ->
+        AppAlertDialog(
+            onDismissRequest = { confirm = null },
+            title = { Text(user.nick) },
+            text = { Text("takipten çıkılsın mı?") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirm = null
+                    val unfollow = onUnfollow
+                    if (unfollow != null) {
+                        busy = user.nick
+                        scope.launch {
+                            val error = unfollow(user)
+                            busy = null
+                            if (error == null) users = users?.filterNot { it.nick == user.nick } else failure = error
+                        }
+                    }
+                }) { Text("takipten çık") }
+            },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirm = null }) { Text("vazgeç") } }
+        )
+    }
+    failure?.let { message ->
+        AppAlertDialog(
+            onDismissRequest = { failure = null },
+            text = { Text(message) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { failure = null }) { Text("tamam") } }
+        )
+    }
+
     // Opens half way; dragging it (anywhere, or the handle) up gives the list the whole screen,
     // down closes it: the sheet's own states, so one thing moves it and it stays smooth
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    AppBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
         Column(modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 8.dp)) {
             Text(title, style = MaterialTheme.typography.titleLargeEmphasized)
@@ -114,6 +151,16 @@ fun FollowListSheet(
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(start = 6.dp).size(16.dp)
                                 )
+                            }
+                            if (onUnfollow != null && user.id.isNotBlank()) {
+                                Box(Modifier.weight(1f))
+                                androidx.compose.material3.OutlinedButton(
+                                    onClick = { confirm = user },
+                                    enabled = busy != user.nick,
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)
+                                ) {
+                                    Text(if (busy == user.nick) "bekle" else "takipten çık", style = MaterialTheme.typography.labelLarge)
+                                }
                             }
                         }
                     }

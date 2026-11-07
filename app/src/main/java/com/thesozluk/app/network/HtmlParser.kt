@@ -432,6 +432,15 @@ object HtmlParser {
                 )
         }
 
+        /** "engelle" → "engeli kaldır": what undoing a profile relation is called. */
+        private fun undoLabel(label: String): String = when (label.trim().lowercase()) {
+                "engelle" -> "engeli kaldır"
+                "başlıklarını engelle" -> "başlıklarını engellemeyi bırak"
+                "sessize al" -> "sessizden çıkar"
+                "takip et" -> "takibi bırak"
+                else -> "$label: geri al"
+        }
+
         fun parseProfile(document: Document, nick: String): AuthorProfile {
                 fun count(id: String) =
                         document.selectFirst("#$id")?.text()?.filter(Char::isDigit)?.toIntOrNull() ?: 0
@@ -477,7 +486,9 @@ object HtmlParser {
                                         if (label.isBlank()) return@mapNotNull null
                                         RelationAction(
                                                 label = label,
-                                                removeLabel = link.attr("data-remove-caption").ifBlank { "$label (geri al)" },
+                                                // The site's caption is the state ("engellenmiş");
+                                                // the menu offers the undo as an action instead
+                                                removeLabel = undoLabel(label),
                                                 addUrl = link.attr("data-add-url"),
                                                 removeUrl = link.attr("data-remove-url"),
                                                 isAdded = link.attr("data-added") == "true"

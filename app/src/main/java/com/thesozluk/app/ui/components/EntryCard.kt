@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.graphicsLayer
@@ -583,6 +585,7 @@ private fun rememberEntryMenuItems(
     val scope = rememberCoroutineScope()
     val link = "${EksiSession.BASE_URL}/entry/${entry.entryId}"
     val saved = EntryBookmarks.isSaved(entry.entryId)
+    val toolbarColor = MaterialTheme.colorScheme.surface.toArgb()
     return buildList {
         if (entry.entryId.isNotEmpty()) add(EntryMenuItem("paylaş", Icons.Rounded.Share) {
             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link)
@@ -603,6 +606,10 @@ private fun rememberEntryMenuItems(
         if (onShareImage != null) add(EntryMenuItem("görsel olarak paylaş", Icons.Rounded.Image, onClick = onShareImage))
         if (onEdit != null) add(EntryMenuItem("düzelt", Icons.Rounded.Edit, onClick = onEdit))
         if (onDelete != null) add(EntryMenuItem("sil", Icons.Rounded.Delete, destructive = true, onClick = onDelete))
+        // Someone else's entry: the site's own complaint form, on the entry's page in a browser tab
+        if (onDelete == null && onEdit == null && entry.entryId.isNotEmpty()) add(EntryMenuItem("şikayet et", Icons.Rounded.Flag) {
+            com.thesozluk.app.ui.navigation.openInAppTab(context, link, toolbarColor)
+        })
     }
 }
 

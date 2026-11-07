@@ -211,7 +211,11 @@ fun AuthorScreen(
             total = if (following) profile?.followingCount ?: 0 else profile?.followerCount ?: 0,
             load = { viewModel.followList(following) },
             onAuthor = { other -> navController.navigate(Screen.Author.createRoute(other)) },
-            onDismiss = { followSheet = null }
+            onDismiss = { followSheet = null },
+            // One's own following list: unfollow from here, as on the site's list
+            onUnfollow = if (following && nick.equals(EksiSession.nick.value, ignoreCase = true)) ({ user ->
+                com.thesozluk.app.network.AccountLists.removeRelation(com.thesozluk.app.network.RelationKind.Followed, user.id)
+            }) else null
         )
     }
     var pendingRelation by remember { mutableStateOf<com.thesozluk.app.model.RelationAction?>(null) }
@@ -451,10 +455,31 @@ fun AuthorScreen(
             }
             val relations = profile?.relations.orEmpty()
             if (relations.isNotEmpty()) RelationMenu(relations, onPick = { pendingRelation = it })
+            // One's own profile: the account's lists on the site
+            if (nick.equals(EksiSession.nick.value, ignoreCase = true)) {
+                var ownMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { ownMenu = true }) {
+                        Icon(Icons.Rounded.MoreVert, contentDescription = "diğer")
+                    }
+                    AppMenu(expanded = ownMenu, onDismissRequest = { ownMenu = false }) {
+                        AppMenuItem(
+                            text = "çöp kutusu",
+                            icon = Icons.Rounded.RestoreFromTrash,
+                            onClick = { ownMenu = false; navController.navigate(Screen.Trash.route) }
+                        )
+                        AppMenuItem(
+                            text = "takip / engellenmiş",
+                            icon = Icons.Rounded.PersonOff,
+                            onClick = { ownMenu = false; navController.navigate(Screen.Relations.route) }
+                        )
+                    }
+                }
+            }
         }
         pendingRelation?.let { action ->
             val label = if (action.isAdded) action.removeLabel else action.label
-            AlertDialog(
+            AppAlertDialog(
                 onDismissRequest = { pendingRelation = null },
                 title = { Text("$label?") },
                 text = { Text("$nick için \"$label\" uygulanacak.") },

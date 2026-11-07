@@ -39,6 +39,9 @@ object EksiNetworkDataSource {
         session = Jsoup.newSession()
     }
 
+    /** A request on the app's session with its cookies, for the account lists (see AccountLists). */
+    internal fun newSessionRequest(url: String): org.jsoup.Connection = applyCommonConnectionSettings(session.newRequest(url))
+
     private fun applyCommonConnectionSettings(connection: org.jsoup.Connection): org.jsoup.Connection {
         // Accept-Encoding is left to Jsoup: it only decodes gzip/deflate, not br/zstd
         val configured = connection
@@ -595,7 +598,8 @@ object EksiNetworkDataSource {
                 com.thesozluk.app.model.FollowUser(
                     nick = item.optJSONObject("Nick")?.optString("Value").orEmpty(),
                     avatarUrl = avatar.takeIf { it.startsWith("http") && !it.contains("default-profile") },
-                    isVerified = item.optBoolean("IsVerified")
+                    isVerified = item.optBoolean("IsVerified"),
+                    id = item.optLong("Id").takeIf { it > 0 }?.toString().orEmpty()
                 )
             }.filter { it.nick.isNotBlank() }
         }

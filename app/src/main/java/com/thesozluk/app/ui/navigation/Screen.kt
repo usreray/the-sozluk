@@ -8,6 +8,10 @@ sealed class Screen(val route: String) {
     object Profile : Screen("profile")
     object Random : Screen("random")
     object Login : Screen("login")
+    /** The site's trash (/cop) */
+    object Trash : Screen("trash")
+    /** The site's follow / block lists (/takip-engellenmis) */
+    object Relations : Screen("relations")
     object Settings : Screen("settings") {
         const val pattern = "settings?section={section}"
         fun createRoute(section: String? = null): String = if (section == null) "settings" else "settings?section=$section"

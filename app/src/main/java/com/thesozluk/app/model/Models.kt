@@ -128,7 +128,7 @@ data class TopicCreator(val nick: String?, val details: List<String>)
 data class AuthorImage(val ref: String, val thumbnailUrl: String)
 
 /** Someone in a follower / following list. */
-data class FollowUser(val nick: String, val avatarUrl: String?, val isVerified: Boolean)
+data class FollowUser(val nick: String, val avatarUrl: String?, val isVerified: Boolean, val id: String = "")
 
 /** A comment ("yorum") under an entry. */
 data class Comment(
