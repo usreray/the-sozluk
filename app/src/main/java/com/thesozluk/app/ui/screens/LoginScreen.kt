@@ -45,6 +45,8 @@ import kotlinx.coroutines.launch
 fun LoginScreen(navController: NavController) {
     var isLoading by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
+    // Adding an account and backing out: the current account stays as it was
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { EksiSession.cancelAddAccount() } }
 
     Scaffold(
         topBar = {
@@ -85,13 +87,16 @@ fun LoginScreen(navController: NavController) {
                                                     EksiNetworkDataSource.isLoggedIn(cookies, userAgent)
                                     if (confirmed && !loggedIn) {
                                         loggedIn = true
+                                        val adding = EksiSession.addingAccount
                                         EksiSession.saveLogin(cookies, userAgent)
+                                        // Whose session it is, so it can be switched back to later
+                                        runCatching { EksiNetworkDataSource.fetchOwnNick() }.getOrNull()?.let(EksiSession::saveNick)
                                         // Message / olay checks start with the session
                                         com.thesozluk.app.notify.Notifier.schedule(
                                             view.context,
                                             com.thesozluk.app.settings.AppSettings.notifications.value
                                         )
-                                        navController.popBackStack()
+                                        if (adding) restartApp(view.context) else navController.popBackStack()
                                     } else if (!confirmed) {
                                         // Wandered off without logging in: back to the form
                                         view.loadUrl(EksiSession.LOGIN_URL)
@@ -110,5 +115,19 @@ fun LoginScreen(navController: NavController) {
                 )
             }
         }
+    }
+}
+
+/**
+ * Starts the app's screens over (new view models), e.g. after switching accounts, so nothing
+ * loaded for the previous one stays on them. The process keeps running.
+ */
+fun restartApp(context: android.content.Context) {
+    val activity = generateSequence(context) { (it as? android.content.ContextWrapper)?.baseContext }
+        .filterIsInstance<android.app.Activity>().firstOrNull()
+    context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { intent ->
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        context.startActivity(intent)
+        activity?.finish()
     }
 }

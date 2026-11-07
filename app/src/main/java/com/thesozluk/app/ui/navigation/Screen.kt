@@ -10,6 +10,8 @@ sealed class Screen(val route: String) {
     object Login : Screen("login")
     /** The site's trash (/cop) */
     object Trash : Screen("trash")
+    /** Choosing among the accounts signed in on this device */
+    object Accounts : Screen("accounts")
     /** The site's follow / block lists (/takip-engellenmis) */
     object Relations : Screen("relations")
     object Settings : Screen("settings") {

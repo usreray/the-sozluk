@@ -1,5 +1,8 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.rounded.SwitchAccount
 import com.thesozluk.app.ui.components.AppAlertDialog
 import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.glassSource
@@ -109,6 +112,7 @@ fun ProfileScreen(
         }
     }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             // The page shows a big "profil"; the bar takes the title only once it scrolled away
@@ -141,9 +145,31 @@ fun ProfileScreen(
                     isLoggedIn = isLoggedIn,
                     nick = nick,
                     onLogin = { navController.navigate(Screen.Login.route) },
-                    onLogout = { EksiSession.logout() },
+                    // Another account signed in here takes over; start the screens over for it
+                    onLogout = { if (EksiSession.logout() != null) com.thesozluk.app.ui.screens.restartApp(context) },
                     onOpenProfile = { nick?.let { navController.navigate(Screen.Author.createRoute(it)) } }
                 )
+            }
+            // Accounts signed in on this device: switch with a tap, or add one
+            if (isLoggedIn && !com.thesozluk.app.network.Demo.active) item(key = "accounts") {
+                // Opens the account picker (switch, add, manage)
+                val others = EksiSession.accounts.value.count { !it.nick.equals(nick, ignoreCase = true) }
+                Surface(
+                    onClick = { navController.navigate(Screen.Accounts.route) },
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier.padding(top = 12.dp).cardEdge(RoundedCornerShape(24.dp))
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                        Icon(Icons.Rounded.SwitchAccount, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                        Text("hesap değiştir", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 16.dp))
+                        Text(
+                            if (others > 0) "${others + 1} hesap" else "hesap ekle",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
             // Device-side library sections
             item(key = "library") {

@@ -113,6 +113,7 @@ fun Navigation(navController: NavHostController) {
             AuthorScreen(nick = backStackEntry.arguments?.getString("nick").orEmpty(), navController = navController)
         }
 
+        screen(navController, Screen.Accounts.route) { com.thesozluk.app.ui.screens.AccountPickerScreen(navController) }
         screen(navController, Screen.Trash.route) { com.thesozluk.app.ui.screens.TrashScreen(navController) }
         screen(navController, Screen.Relations.route) { com.thesozluk.app.ui.screens.RelationsScreen(navController) }
 
