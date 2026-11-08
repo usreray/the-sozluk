@@ -200,17 +200,9 @@ fun ProfileScreen(
                     }
                 }
             }
-            item(key = "creator-links") {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.padding(top = 20.dp).cardEdge(RoundedCornerShape(24.dp))
-                ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("geliştirici", style = MaterialTheme.typography.titleMedium)
-                        CreatorLinks()
-                    }
-                }
+            // Supporting the app: a drawn card leading to Buy Me a Coffee (and the developer on GitHub)
+            item(key = "support") {
+                com.thesozluk.app.ui.components.SupportCard(Modifier.padding(top = 20.dp))
             }
         }
     }
