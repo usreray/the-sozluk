@@ -21,9 +21,11 @@ object WhatsNew {
             listOf(
                 "birden fazla hesap" to "profil → hesap değiştir: bu cihazda giriş yaptığın hesaplar arasında tek dokunuşla geç, yeni hesap ekle ya da kaldır.",
                 "yorumlar" to "entry altındaki yorumlar artık entry'ler gibi: yazarın adı, tarihi ve profil resmi sağ altta.",
+                "kart stili" to "ayarlar → okuma → entry'ler: entry kartları sitedeki gibi klasik ya da sosyal medya akışı gibi görünebilir; profil resmi ve yazar en üstte.",
+                "ilk ve son sayfa" to "sayfa çubuğunda tek tek ilerlemenin yanında başlığın ilk ve son sayfasına atlayan oklar var.",
                 "akıcı listeler" to "listeler ilk açılışta satır satır belirir.",
                 "sıvı cam" to "kapatılınca alt çubuk da diğer çubuklar gibi sade buzlu cama döner.",
-                "küçük düzeltmeler" to "yükleniyor kartları da cam kenarlı; öne çıkan rozetlerin yanında gereksiz \"+0\" yazmıyor."
+                "küçük düzeltmeler" to "basılı tutunca açılan menü sadeleşti; uzun başlıklar üst çubuktaki düğmelerin üstüne taşmıyor; yükleniyor kartları da cam kenarlı; öne çıkan rozetlerin yanında gereksiz \"+0\" yazmıyor."
             )
         ),
         Release(
