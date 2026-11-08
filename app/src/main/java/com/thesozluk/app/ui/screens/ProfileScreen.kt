@@ -153,7 +153,6 @@ fun ProfileScreen(
             // Accounts signed in on this device: switch with a tap, or add one
             if (isLoggedIn && !com.thesozluk.app.network.Demo.active) item(key = "accounts") {
                 // Opens the account picker (switch, add, manage)
-                val others = EksiSession.accounts.value.count { !it.nick.equals(nick, ignoreCase = true) }
                 Surface(
                     onClick = { navController.navigate(Screen.Accounts.route) },
                     shape = RoundedCornerShape(24.dp),
@@ -163,11 +162,6 @@ fun ProfileScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                         Icon(Icons.Rounded.SwitchAccount, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text("hesap değiştir", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(start = 16.dp))
-                        Text(
-                            if (others > 0) "${others + 1} hesap" else "hesap ekle",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }
