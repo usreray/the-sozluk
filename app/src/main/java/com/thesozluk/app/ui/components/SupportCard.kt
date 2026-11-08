@@ -10,7 +10,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,6 +42,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.thesozluk.app.R
 import kotlin.math.PI
@@ -80,12 +82,11 @@ fun SupportCard(modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(horizontal = 6.dp).padding(bottom = 4.dp)
+            SideBySideOrStacked(
+                gap = 8.dp,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp).padding(bottom = 4.dp)
             ) {
-                Button(onClick = { uriHandler.openUri(SUPPORT_URL) }, modifier = Modifier.weight(1f)) {
+                Button(onClick = { uriHandler.openUri(SUPPORT_URL) }) {
                     Image(
                         painter = painterResource(R.drawable.buymeacoffee_logo),
                         contentDescription = null,
@@ -93,13 +94,45 @@ fun SupportCard(modifier: Modifier = Modifier) {
                         modifier = Modifier.height(20.dp).width(14.dp)
                     )
                     Spacer(Modifier.width(10.dp))
-                    Text("kahve ısmarla")
+                    Text("kahve ısmarla", maxLines = 1, softWrap = false)
                 }
                 OutlinedButton(onClick = { uriHandler.openUri("https://github.com/usreray") }) {
                     Icon(painterResource(R.drawable.ic_github), contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("usreray")
+                    Text("usreray", maxLines = 1, softWrap = false)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Two buttons side by side, the first taking the room left over, when both fit at their natural
+ * width; otherwise (a large font or display size) one under the other at full width, so no label
+ * is cut.
+ */
+@Composable
+private fun SideBySideOrStacked(gap: Dp, modifier: Modifier, content: @Composable () -> Unit) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val gapPx = gap.roundToPx()
+        val (first, second) = measurables
+        val firstWidth = first.maxIntrinsicWidth(Constraints.Infinity)
+        val secondWidth = second.maxIntrinsicWidth(Constraints.Infinity)
+        val width = constraints.maxWidth
+        if (firstWidth + gapPx + secondWidth <= width) {
+            val b = second.measure(Constraints.fixedWidth(secondWidth))
+            val a = first.measure(Constraints.fixedWidth(width - gapPx - b.width))
+            val height = maxOf(a.height, b.height)
+            layout(width, height) {
+                a.place(0, (height - a.height) / 2)
+                b.place(a.width + gapPx, (height - b.height) / 2)
+            }
+        } else {
+            val a = first.measure(Constraints.fixedWidth(width))
+            val b = second.measure(Constraints.fixedWidth(width))
+            layout(width, a.height + gapPx + b.height) {
+                a.place(0, 0)
+                b.place(0, a.height + gapPx)
             }
         }
     }
