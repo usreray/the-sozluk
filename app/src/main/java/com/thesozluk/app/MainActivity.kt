@@ -270,7 +270,11 @@ fun MainScreen(pendingOpen: MutableState<String?>) {
                 .nestedScroll(com.thesozluk.app.ui.components.NavBarScroll.connection)
         ) {
             CompositionLocalProvider(LocalBottomBarInset provides if (showBar) FloatingNavBarInset else 0.dp) {
-                Navigation(navController)
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.thesozluk.app.ui.navigation.LocalNavController provides navController
+                ) {
+                    Navigation(navController)
+                }
             }
         }
         // Edge to edge: content scrolls under the status bar, so the bar gets a soft scrim of the

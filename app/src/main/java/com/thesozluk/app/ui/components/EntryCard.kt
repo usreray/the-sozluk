@@ -54,6 +54,7 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.rounded.MailOutline
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -611,6 +612,8 @@ private fun rememberEntryMenuItems(
     val link = "${EksiSession.BASE_URL}/entry/${entry.entryId}"
     val saved = EntryBookmarks.isSaved(entry.entryId)
     val toolbarColor = MaterialTheme.colorScheme.surface.toArgb()
+    val navController = com.thesozluk.app.ui.navigation.LocalNavController.current
+    val isLoggedIn by EksiSession.isLoggedIn
     return buildList {
         if (entry.entryId.isNotEmpty()) add(EntryMenuItem("paylaş", Icons.Rounded.Share) {
             val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, link)
@@ -631,6 +634,14 @@ private fun rememberEntryMenuItems(
         if (onShareImage != null) add(EntryMenuItem("görsel olarak paylaş", Icons.Rounded.Image, onClick = onShareImage))
         if (onEdit != null) add(EntryMenuItem("düzelt", Icons.Rounded.Edit, onClick = onEdit))
         if (onDelete != null) add(EntryMenuItem("sil", Icons.Rounded.Delete, destructive = true, onClick = onDelete))
+        // Someone else's entry: a message to its author, starting with the entry's number
+        if (onDelete == null && onEdit == null && isLoggedIn && navController != null &&
+            entry.entryId.isNotEmpty() && entry.author.isNotBlank()
+        ) add(EntryMenuItem("mesaj gönder", Icons.Rounded.MailOutline) {
+            navController.navigate(
+                com.thesozluk.app.ui.navigation.Screen.Messages.createRoute(to = entry.author, text = "(#${entry.entryId})\n")
+            )
+        })
         // Someone else's entry: the site's own complaint form, on the entry's page in a browser tab
         if (onDelete == null && onEdit == null && entry.entryId.isNotEmpty()) add(EntryMenuItem("şikayet et", Icons.Rounded.Flag) {
             com.thesozluk.app.ui.navigation.openInAppTab(context, link, toolbarColor)

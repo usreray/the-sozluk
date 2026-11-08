@@ -8,6 +8,8 @@ import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.components.SheetBlur
 import com.thesozluk.app.ui.components.glassSource
 import com.thesozluk.app.settings.AppSettings
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.font.FontWeight
 import com.thesozluk.app.ui.components.RevealPullToRefresh
 import androidx.compose.animation.core.animate
@@ -96,6 +98,7 @@ import com.thesozluk.app.viewmodel.MessagesViewModel
 fun MessagesScreen(
     navController: NavController,
     composeTo: String = "",
+    composeText: String = "",
     viewModel: MessagesViewModel = viewModel(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
@@ -122,6 +125,7 @@ fun MessagesScreen(
     if (composing) {
         NewMessageSheet(
             initialTo = composeTo,
+            initialText = composeText,
             isSending = isSending,
             onSend = { to, text -> viewModel.send(to, text) { composing = false } },
             onDismiss = { if (!isSending) composing = false }
@@ -296,9 +300,18 @@ private fun ThreadRow(thread: MessageThread, isNew: Boolean, index: Int, count: 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun NewMessageSheet(initialTo: String, isSending: Boolean, onSend: (String, String) -> Unit, onDismiss: () -> Unit) {
+fun NewMessageSheet(
+    initialTo: String,
+    isSending: Boolean,
+    onSend: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+    initialText: String = ""
+) {
     var to by rememberSaveable { mutableStateOf(initialTo) }
-    var text by rememberSaveable { mutableStateOf("") }
+    // The cursor after any text given (an entry's number), ready to write on
+    var text by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length)))
+    }
     AppBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         SheetBlur.BlurBehind()
         Column(
@@ -323,8 +336,8 @@ fun NewMessageSheet(initialTo: String, isSending: Boolean, onSend: (String, Stri
                 modifier = Modifier.fillMaxWidth()
             )
             Button(
-                onClick = { onSend(to.trim(), text.trim()) },
-                enabled = to.isNotBlank() && text.isNotBlank() && !isSending,
+                onClick = { onSend(to.trim(), text.text.trim()) },
+                enabled = to.isNotBlank() && text.text.isNotBlank() && !isSending,
                 modifier = Modifier.align(Alignment.End)
             ) {
                 if (isSending) LoadingIndicator(modifier = Modifier.padding(end = 8.dp).size(20.dp))

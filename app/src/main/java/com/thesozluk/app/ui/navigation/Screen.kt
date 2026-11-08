@@ -29,8 +29,10 @@ sealed class Screen(val route: String) {
             "channels?path=${Uri.encode(path)}&name=${Uri.encode(name)}"
     }
     object Messages : Screen("messages") {
-        const val pattern = "messages?to={to}"
-        fun createRoute(to: String = ""): String = "messages?to=${Uri.encode(to)}"
+        const val pattern = "messages?to={to}&text={text}"
+        /** [to] (and [text]) start a new message to that nick right away. */
+        fun createRoute(to: String = "", text: String = ""): String =
+            "messages?to=${Uri.encode(to)}&text=${Uri.encode(text)}"
     }
     object MessageThread : Screen("message_thread") {
         const val pattern = "message_thread?id={id}&nick={nick}"

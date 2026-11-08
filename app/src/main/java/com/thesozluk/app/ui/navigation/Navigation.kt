@@ -85,9 +85,16 @@ fun Navigation(navController: NavHostController) {
         screen(
             navController,
             Screen.Messages.pattern,
-            arguments = listOf(navArgument("to") { type = NavType.StringType; defaultValue = "" }),
+            arguments = listOf(
+                navArgument("to") { type = NavType.StringType; defaultValue = "" },
+                navArgument("text") { type = NavType.StringType; defaultValue = "" }
+            ),
         ) { backStackEntry ->
-            MessagesScreen(navController, composeTo = backStackEntry.arguments?.getString("to").orEmpty())
+            MessagesScreen(
+                navController,
+                composeTo = backStackEntry.arguments?.getString("to").orEmpty(),
+                composeText = backStackEntry.arguments?.getString("text").orEmpty()
+            )
         }
 
         screen(
@@ -180,3 +187,6 @@ fun Navigation(navController: NavHostController) {
         }
     }
 }
+
+/** The app's navigation, for parts deep in a screen (an entry's menu) that need to open another. */
+val LocalNavController = androidx.compose.runtime.staticCompositionLocalOf<androidx.navigation.NavController?> { null }
