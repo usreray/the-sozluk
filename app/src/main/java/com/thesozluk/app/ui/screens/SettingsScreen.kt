@@ -1274,9 +1274,13 @@ private fun LazyListScope.about() {
             onClick = {
                 if (!checking) scope.launch {
                     checking = true
-                    val release = AppUpdates.check(context, force = true)
+                    val result = AppUpdates.check(context, force = true)
                     checking = false
-                    if (release == null) prompt?.show("en güncel sürümü kullanıyorsun")
+                    when (result) {
+                        AppUpdates.Result.UpToDate -> prompt?.show("en güncel sürümü kullanıyorsun")
+                        AppUpdates.Result.Failed -> prompt?.show("kontrol edilemedi, sonra tekrar dene")
+                        is AppUpdates.Result.Found -> Unit
+                    }
                 }
             },
             shape = segmentedShape(1, 3),

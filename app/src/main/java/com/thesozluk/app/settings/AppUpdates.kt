@@ -27,18 +27,28 @@ object AppUpdates {
     private val _available = mutableStateOf<AppRelease?>(null)
     val available: State<AppRelease?> = _available
 
-    /** Looks for a newer release; [force] skips the twice-a-day limit. Returns it, or null. */
-    suspend fun check(context: Context, force: Boolean = false): AppRelease? {
+    /** How a check went: a newer release, nothing newer, or GitHub couldn't be reached. */
+    sealed interface Result {
+        data class Found(val release: AppRelease) : Result
+        data object UpToDate : Result
+        data object Failed : Result
+    }
+
+    /**
+     * Looks for a newer release; [force] skips the twice-a-day limit and the dismissed release.
+     * A check skipped for the limit counts as [Result.UpToDate].
+     */
+    suspend fun check(context: Context, force: Boolean = false): Result {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        if (!force && now - prefs.getLong("lastCheck", 0L) < CHECK_EVERY_MS) return null
-        val release = runCatching { latest() }.getOrNull() ?: return null
+        if (!force && now - prefs.getLong("lastCheck", 0L) < CHECK_EVERY_MS) return Result.UpToDate
+        val release = runCatching { latest() }.getOrNull() ?: return Result.Failed
         prefs.edit().putLong("lastCheck", now).apply()
         val installed = installedVersion(context)
-        if (!isNewer(release.tag, installed)) return null
-        if (!force && prefs.getString("dismissed", null) == release.tag) return null
+        if (!isNewer(release.tag, installed)) return Result.UpToDate
+        if (!force && prefs.getString("dismissed", null) == release.tag) return Result.UpToDate
         _available.value = release
-        return release
+        return Result.Found(release)
     }
 
     /** "sonra": this release is not offered again on its own. */
