@@ -20,6 +20,8 @@ object WhatsNew {
             "3.4",
             listOf(
                 "birden fazla hesap" to "profil → hesap değiştir: bu cihazda giriş yaptığın hesaplar arasında tek dokunuşla geç, yeni hesap ekle ya da kaldır.",
+                "anlık bildirimler" to "ayarlar → bildirimler: açarsan yeni mesaj ve entry'lere 15 dakika yerine dakikada bir bakılır. pil tüketimini artırabilir.",
+                "mesaj bildirimleri" to "okunmamış bir mesajın varken gelen yeni mesajlar da bildirilir; bildirimde gönderen ve mesajın başı görünür.",
                 "yorumlar" to "entry altındaki yorumlar artık entry'ler gibi: yazarın adı, tarihi ve profil resmi sağ altta.",
                 "kart stili" to "ayarlar → okuma → entry'ler: entry kartları sitedeki gibi klasik ya da sosyal medya akışı gibi görünebilir; profil resmi ve yazar en üstte.",
                 "ilk ve son sayfa" to "sayfa çubuğunda tek tek ilerlemenin yanında başlığın ilk ve son sayfasına atlayan oklar var.",
@@ -27,7 +29,7 @@ object WhatsNew {
                 "destek ol" to "profil sekmesinin altında: uygulamayı beğendiysen geliştirilmesine bir kahveyle destek olabilirsin.",
                 "açılış rehberi" to "uygulamayı yeni kuranları kısa bir rehber karşılar: tema, palet ve sıvı cam ilk açılışta seçilir.",
                 "sıvı cam" to "kapatılınca alt çubuk da diğer çubuklar gibi sade buzlu cama döner.",
-                "küçük düzeltmeler" to "basılı tutunca açılan menü sadeleşti; uzun başlıklar üst çubuktaki düğmelerin üstüne taşmıyor; yükleniyor kartları da cam kenarlı; öne çıkan rozetlerin yanında gereksiz \"+0\" yazmıyor."
+                "küçük düzeltmeler" to "basılı tutunca açılan menü sadeleşti; uzun başlıklar üst çubuktaki düğmelerin üstüne taşmıyor; yükleniyor kartları da cam kenarlı; öne çıkan rozetlerin yanında gereksiz \"+0\" yazmıyor; güncelleme kontrolü github'a ulaşamayınca \"en güncel sürüm\" yerine kontrol edilemediğini söylüyor."
             )
         ),
         Release(
