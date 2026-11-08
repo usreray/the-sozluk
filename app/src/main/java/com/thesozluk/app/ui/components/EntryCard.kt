@@ -163,6 +163,9 @@ fun EntryCard(
     var overflows by remember(entry.entryId) { mutableStateOf(false) }
     val showAvatars by AppSettings.showAvatars
     val showNumbers by AppSettings.showEntryNumbers
+    // X-like layout: the author leads, the text sits beside the avatar
+    val feed = AppSettings.entryStyle.value == com.thesozluk.app.settings.EntryStyle.Feed
+    val feedIndent = if (feed && showAvatars) 52.dp else 0.dp
     var confirmDelete by remember { mutableStateOf(false) }
     var spoilersRevealed by rememberSaveable(entry.entryId) { mutableStateOf(false) }
     val text = rememberEntryText(
@@ -264,6 +267,8 @@ fun EntryCard(
                     )
                 }
             }
+            if (feed) FeedHeader(entry, number, showAvatars, showNumbers, actions.onAuthor, menu)
+            Column(modifier = Modifier.padding(start = feedIndent)) {
             if (textSelectable) SelectionContainer {
                 Text(
                     text = text,
@@ -297,9 +302,10 @@ fun EntryCard(
                 onOpen = { ref -> actions.onLink(EksiLink.Image(ref)) },
                 modifier = Modifier.padding(top = 8.dp, end = 12.dp)
             )
+            }
 
             Spacer(Modifier.size(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = (feedIndent - 12.dp).coerceAtLeast(0.dp))) {
                 if (entry.canVote) VoteButtons(entry, actions.onVote)
                 FavoriteButton(
                     isFavorited = entry.isFavorited,
@@ -321,8 +327,10 @@ fun EntryCard(
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                EntryMenu(menu)
+                // In the feed layout the menu sits up by the author
+                if (!feed) EntryMenu(menu)
             }
+            if (!feed) {
             // Author on a line of its own below the actions, so a long nick and the full date
             // (with an edit time) have the card's whole width
             Row(
@@ -380,6 +388,7 @@ fun EntryCard(
                         modifier = Modifier.clip(CircleShape).clickable { actions.onAuthor(entry.author) }
                     )
                 }
+            }
             }
             val comments = actions.comments?.invoke(entry)
             AnimatedVisibility(visible = comments?.isOpen == true) {
@@ -682,5 +691,64 @@ fun AuthorAvatar(author: String, modifier: Modifier = Modifier, size: Int = 36, 
                 color = content
             )
         }
+    }
+}
+
+/**
+ * The feed layout's top line, as in a social feed: the avatar, the nick (with its marks) over
+ * the date, and the ⋮ menu at the end. The avatar and the nick open the author.
+ */
+@Composable
+private fun FeedHeader(
+    entry: Entry,
+    number: Int?,
+    showAvatars: Boolean,
+    showNumbers: Boolean,
+    onAuthor: (String) -> Unit,
+    menu: List<EntryMenuItem>
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 6.dp)) {
+        if (showAvatars) {
+            AuthorAvatar(
+                entry.author,
+                avatarUrl = entry.avatarUrl,
+                size = 40,
+                modifier = Modifier.clip(CircleShape).clickable { onAuthor(entry.author) }
+            )
+            Spacer(Modifier.width(12.dp))
+        }
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onAuthor(entry.author) }
+                .padding(vertical = 2.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    entry.author,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                if (entry.authorIsVerified) {
+                    Icon(Icons.Rounded.Verified, contentDescription = "onaylanmış hesap", tint = Color(0xFF34A853), modifier = Modifier.padding(start = 3.dp).size(16.dp))
+                }
+                if (entry.authorIsAdFree) {
+                    Icon(Icons.Rounded.Verified, contentDescription = "reklamsız kullanıcı", tint = Color(0xFFFFC107), modifier = Modifier.padding(start = 3.dp).size(16.dp))
+                }
+            }
+            Text(
+                if (showNumbers && number != null) "#$number · ${entry.date}" else entry.date,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        EntryMenu(menu)
     }
 }

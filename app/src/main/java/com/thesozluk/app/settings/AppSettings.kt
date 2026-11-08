@@ -10,6 +10,14 @@ import androidx.compose.runtime.mutableStateOf
 
 enum class ThemeMode(val label: String) { System("sistem"), Light("açık"), Dark("koyu") }
 
+/** How an entry card is laid out. */
+enum class EntryStyle(val label: String) {
+    /** The site's way: the text, the actions, then the author at the bottom right */
+    Classic("klasik"),
+    /** Like a social feed (X): the avatar on the left, nick and date on top, the text under them */
+    Feed("akış")
+}
+
 /** Ready-made seed colors; each one generates a whole Material 3 palette. */
 enum class SeedColor(val label: String, val argb: Long) {
     Eksi("ekşi", 0xFF81C14B),
@@ -120,6 +128,14 @@ object AppSettings {
     /** "#12" on each entry: its position in the topic */
     private val _showEntryNumbers = mutableStateOf(false)
     val showEntryNumbers: State<Boolean> = _showEntryNumbers
+
+    private val _entryStyle = mutableStateOf(EntryStyle.Classic)
+    val entryStyle: State<EntryStyle> = _entryStyle
+
+    fun setEntryStyle(style: EntryStyle) {
+        _entryStyle.value = style
+        prefs.edit().putInt("entryStyle", style.ordinal).apply()
+    }
 
     private val _showAvatars = mutableStateOf(true)
     val showAvatars: State<Boolean> = _showAvatars
@@ -287,6 +303,7 @@ object AppSettings {
         _tabOrder.value = prefs.getString("tabOrder", null)?.split(',')?.filter { it.isNotBlank() }.orEmpty()
         _showEntryNumbers.value = prefs.getBoolean("showEntryNumbers", false)
         _showAvatars.value = prefs.getBoolean("showAvatars", true)
+        _entryStyle.value = EntryStyle.entries.getOrElse(prefs.getInt("entryStyle", 0)) { EntryStyle.Classic }
         _showLinkAddresses.value = prefs.getBoolean("showLinkAddresses", false)
         _hideSpoilers.value = prefs.getBoolean("hideSpoilers", true)
         _dimReadTopics.value = prefs.getBoolean("dimReadTopics", false)

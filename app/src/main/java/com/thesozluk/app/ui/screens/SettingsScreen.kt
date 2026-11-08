@@ -605,13 +605,65 @@ private fun LazyListScope.reading(onRememberOpenTabsChanged: (Boolean) -> Unit) 
         "entry'ler",
         changed = AppSettings.showEntryNumbers.value || !AppSettings.showAvatars.value ||
             AppSettings.showLinkAddresses.value || !AppSettings.hideSpoilers.value ||
-            AppSettings.dimReadTopics.value || AppSettings.inlineImages.value,
+            AppSettings.dimReadTopics.value || AppSettings.inlineImages.value ||
+            AppSettings.entryStyle.value != com.thesozluk.app.settings.EntryStyle.Classic,
         onReset = {
+            AppSettings.setEntryStyle(com.thesozluk.app.settings.EntryStyle.Classic)
             AppSettings.setShowEntryNumbers(false); AppSettings.setShowAvatars(true)
             AppSettings.setShowLinkAddresses(false); AppSettings.setHideSpoilers(true)
             AppSettings.setDimReadTopics(false); AppSettings.setInlineImages(false)
         }
     ) }
+    // The card's layout, with an entry drawn the chosen way right above the choice
+    item {
+        Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.padding(bottom = 8.dp).cardEdge(RoundedCornerShape(24.dp))) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("kart stili", style = MaterialTheme.typography.titleMedium)
+                com.thesozluk.app.ui.components.EntryCard(
+                    entry = remember {
+                        com.thesozluk.app.model.Entry(
+                            content = "kartın nasıl göründüğünü buradan görebilirsin. stili değiştirince hemen güncellenir.",
+                            author = "örnek yazar",
+                            date = "08.11.2026 12:00",
+                            favoriteCount = 12,
+                            entryId = "preview",
+                            flags = setOf("vote")
+                        )
+                    },
+                    isExpanded = true,
+                    onToggleExpand = {},
+                    actions = remember {
+                        com.thesozluk.app.ui.components.EntryActions(
+                            onToggleFavorite = {},
+                            onVote = { _, _ -> },
+                            onAuthor = {},
+                            onLink = {}
+                        )
+                    },
+                    showExpandToggle = false,
+                    peekable = false
+                )
+                ConnectedRow {
+                    com.thesozluk.app.settings.EntryStyle.entries.forEachIndexed { index, style ->
+                        val checked = AppSettings.entryStyle.value == style
+                        ToggleButton(
+                            checked = checked,
+                            onCheckedChange = { AppSettings.setEntryStyle(style) },
+                            modifier = Modifier.weight(1f).toggleEdge(index, com.thesozluk.app.settings.EntryStyle.entries.size, checked = checked),
+                            shapes = connectedShapes(index, com.thesozluk.app.settings.EntryStyle.entries.size)
+                        ) { Text(style.label, maxLines = 1) }
+                    }
+                }
+                Text(
+                    if (AppSettings.entryStyle.value == com.thesozluk.app.settings.EntryStyle.Feed)
+                        "profil resmi ve yazar en üstte, entry altında; sosyal medya akışı gibi."
+                    else "sitedeki gibi: önce entry, yazar sağ altta.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
     item {
         SwitchRow("entry sıra numarası", "her entry'nin başlıktaki sırası (#12)", AppSettings.showEntryNumbers.value, true, segmentedShape(0, 5), AppSettings::setShowEntryNumbers)
     }
