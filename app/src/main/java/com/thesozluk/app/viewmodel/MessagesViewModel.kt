@@ -65,6 +65,13 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
+    /** Opening a conversation reads it on the site too, so its new-message dot goes right away. */
+    fun markRead(id: String) {
+        val box = _box.value ?: return
+        if (box.threads.none { it.id == id && it.isUnread }) return
+        _box.value = box.copy(threads = box.threads.map { if (it.id == id) it.copy(isUnread = false) else it })
+    }
+
     fun openThread(id: String) {
         if (threadId == id && _thread.value != null) return
         threadId = id

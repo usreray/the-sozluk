@@ -8,6 +8,7 @@ import com.thesozluk.app.ui.components.PromptState
 import com.thesozluk.app.ui.components.SheetBlur
 import com.thesozluk.app.ui.components.glassSource
 import com.thesozluk.app.settings.AppSettings
+import androidx.compose.ui.text.font.FontWeight
 import com.thesozluk.app.ui.components.RevealPullToRefresh
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
@@ -199,9 +200,13 @@ fun MessagesScreen(
                         itemsIndexed(threads, key = { _, t -> t.id }) { index, thread ->
                             ThreadRow(
                                 thread = thread,
+                                isNew = thread.isUnread,
                                 index = index,
                                 count = threads.size,
-                                onClick = { navController.navigate(Screen.MessageThread.createRoute(thread.id, thread.nick)) },
+                                onClick = {
+                                    viewModel.markRead(thread.id)
+                                    navController.navigate(Screen.MessageThread.createRoute(thread.id, thread.nick))
+                                },
                                 modifier = Modifier.animateItem()
                             )
                         }
@@ -249,7 +254,7 @@ fun MessagesScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ThreadRow(thread: MessageThread, index: Int, count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun ThreadRow(thread: MessageThread, isNew: Boolean, index: Int, count: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
         onClick = onClick,
         shape = segmentedShape(index, count),
@@ -259,32 +264,32 @@ private fun ThreadRow(thread: MessageThread, index: Int, count: Int, onClick: ()
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             AuthorAvatar(thread.nick, size = 44, avatarUrl = rememberAvatarUrl(thread.nick))
             Column(modifier = Modifier.weight(1f).padding(horizontal = 14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        thread.nick,
-                        style = MaterialTheme.typography.titleMediumEmphasized,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (thread.messageCount > 1) {
-                        Text(
-                            "· ${thread.messageCount} mesaj",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 6.dp)
-                        )
-                    }
-                }
+                Text(
+                    thread.nick,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
+                    fontWeight = if (isNew) FontWeight.Bold else null,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
                 Text(
                     thread.preview,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (isNew) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(thread.time, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // Time on top, and below it a dot while there are new messages, like a messaging app
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    thread.time,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isNew) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (isNew) {
+                    Box(Modifier.size(10.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+                }
+            }
         }
     }
 }

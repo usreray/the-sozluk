@@ -159,7 +159,9 @@ data class MessageThread(
     /** Messages in the conversation (the number next to the nick) */
     val messageCount: Int,
     val preview: String,
-    val time: String
+    val time: String,
+    /** Has messages not read yet (the site marks it article.unread) */
+    val isUnread: Boolean = false
 )
 
 data class Message(

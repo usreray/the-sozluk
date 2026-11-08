@@ -296,7 +296,9 @@ object HtmlParser {
                                 messageCount = count,
                                 // Our own last message carries the same "sender -> recipient:" prefix
                                 preview = link.selectFirst("p")?.also(::stripSenderPrefix)?.text().orEmpty(),
-                                time = article.selectFirst("time")?.text().orEmpty()
+                                time = article.selectFirst("time")?.text().orEmpty(),
+                                // The site marks a conversation with messages not yet read
+                                isUnread = article.hasClass("unread")
                         )
                 },
                 sendForm = document.selectFirst("form#message-send-form")?.let(::formSpec),
