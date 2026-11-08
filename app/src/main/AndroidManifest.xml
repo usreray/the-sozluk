@@ -4,6 +4,11 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- "anlık bildirimler": the every-minute check runs as a foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
                      android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" 
@@ -67,6 +72,23 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/gundem_widget" />
+        </receiver>
+        <!-- "anlık bildirimler": checks for new messages and olay entries every minute -->
+        <service
+            android:name="com.thesozluk.app.notify.LiveCheckService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Checks eksisozluk.com every minute for new private messages and new entries in followed topics, since the site offers no push to third-party apps." />
+        </service>
+        <receiver
+            android:name="com.thesozluk.app.notify.LiveCheckBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
         </receiver>
         <!-- Shares entry pictures from the cache with other apps -->
         <provider

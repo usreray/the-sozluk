@@ -14,7 +14,7 @@ object LocalDataBackup {
     private val preferenceFiles = listOf(
         "app_settings", "search_history", "reading_history", "entry_bookmarks", "entry_drafts"
     )
-    private val excludedSettings = setOf("notifications", "askedNotifications")
+    private val excludedSettings = setOf("notifications", "askedNotifications", "instantNotifications")
 
     suspend fun export(context: Context, uri: Uri) = withContext(Dispatchers.IO) {
         val json = createJson(context)

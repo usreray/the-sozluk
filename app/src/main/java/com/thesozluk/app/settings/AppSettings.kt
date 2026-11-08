@@ -310,6 +310,7 @@ object AppSettings {
         _keepScreenOn.value = prefs.getBoolean("keepScreenOn", false)
         _prefetchNextPage.value = prefs.getBoolean("prefetchNextPage", true)
         _notifications.value = prefs.getBoolean("notifications", true)
+        _instantNotifications.value = prefs.getBoolean(com.thesozluk.app.notify.LiveCheckService.PREF, false)
         _marqueeTitles.value = prefs.getBoolean("marqueeTitles", true)
         _hideBarsOnScroll.value = prefs.getBoolean("hideBarsOnScroll", true)
         _themeMode.value = ThemeMode.entries.getOrElse(prefs.getInt("themeMode", 0)) { ThemeMode.System }
@@ -433,6 +434,16 @@ object AppSettings {
     fun setNotifications(enabled: Boolean) {
         _notifications.value = enabled
         prefs.edit().putBoolean("notifications", enabled).apply()
+    }
+
+    /** "anlık bildirimler": the every-minute check in a foreground service (costs battery) */
+    private val _instantNotifications = mutableStateOf(false)
+    val instantNotifications: State<Boolean> = _instantNotifications
+
+    fun setInstantNotifications(enabled: Boolean) {
+        _instantNotifications.value = enabled
+        // commit, so the service reads the new value right away
+        prefs.edit().putBoolean(com.thesozluk.app.notify.LiveCheckService.PREF, enabled).commit()
     }
 
     fun setPrefetchNextPage(enabled: Boolean) {

@@ -178,6 +178,8 @@ object Notifier {
 
     /** Starts or stops the periodic check (every 15 minutes, the shortest WorkManager allows). */
     fun schedule(context: Context, enabled: Boolean) {
+        // "anlık bildirimler" adds the live service on top; the 15-minute check stays as a fallback
+        LiveCheckService.sync(context, enabled && LiveCheckService.wanted(context))
         val work = WorkManager.getInstance(context)
         if (!enabled) {
             work.cancelUniqueWork(WORK)

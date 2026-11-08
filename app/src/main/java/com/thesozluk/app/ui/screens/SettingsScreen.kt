@@ -852,9 +852,10 @@ private fun LazyListScope.notifications() {
         val enabledByDefault = EksiSession.isLoggedIn.value && Notifier.canNotify(context)
         SectionTitle(
             "bildirimler",
-            changed = AppSettings.notifications.value != enabledByDefault,
+            changed = AppSettings.notifications.value != enabledByDefault || AppSettings.instantNotifications.value,
             onReset = {
                 AppSettings.setNotifications(enabledByDefault)
+                AppSettings.setInstantNotifications(false)
                 Notifier.schedule(context, enabledByDefault)
             }
         )
@@ -873,7 +874,7 @@ private fun LazyListScope.notifications() {
             else "giriş yapınca kullanılabilir",
             checked = AppSettings.notifications.value,
             enabled = isLoggedIn,
-            shape = RoundedCornerShape(24.dp),
+            shape = segmentedShape(0, 2),
             onCheckedChange = { enabled ->
                 if (enabled && !Notifier.canNotify(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     permissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -886,6 +887,27 @@ private fun LazyListScope.notifications() {
     }
     item {
         val context = LocalContext.current
+        val isLoggedIn by EksiSession.isLoggedIn
+        SwitchRow(
+            title = "anlık bildirimler",
+            subtitle = "kapalıyken yeni mesaj ve entry'lere 15 dakikada bir bakılır, açıkken dakikada bir bakılır. pil tüketimini artırabilir",
+            checked = AppSettings.instantNotifications.value,
+            enabled = isLoggedIn && AppSettings.notifications.value,
+            shape = segmentedShape(1, 2),
+            onCheckedChange = { enabled ->
+                AppSettings.setInstantNotifications(enabled)
+                Notifier.schedule(context, AppSettings.notifications.value)
+            }
+        )
+    }
+    item {
+        val context = LocalContext.current
+        if (AppSettings.instantNotifications.value) {
+            Hint("telefon uyurken android kontrolleri yine geciktirebilir. daha düzenli çalışması için pil ayarlarından the sözlük'ü \"kısıtlanmamış\" yapabilirsin")
+            TextButton(onClick = {
+                context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            }) { Text("pil ayarlarını aç") }
+        }
         Hint("bildirim sesi ve önemi telefonun bildirim ayarlarından değiştirilebilir")
         TextButton(onClick = {
             context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
