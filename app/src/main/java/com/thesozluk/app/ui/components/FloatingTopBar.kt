@@ -1,5 +1,6 @@
 package com.thesozluk.app.ui.components
 
+import androidx.compose.ui.layout.layout
 import com.thesozluk.app.settings.AppSettings
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.material3.rememberTooltipState
@@ -104,7 +105,22 @@ fun FloatingTopBar(
             }
             // The title card sits centered in the space between back and actions, as wide as
             // its text: short titles stay balanced instead of hugging the back button
-            Box(modifier = Modifier.weight(1f).offset(x = titleOffset), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    // Centered, nudged by [titleOffset] to balance a wider action group, but
+                    // only as far as there is room: a long title (or a large font scale) fills the
+                    // space and must not be pushed into the buttons beside it
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints.copy(minWidth = 0))
+                        val width = constraints.maxWidth
+                        layout(width, placeable.height) {
+                            val free = (width - placeable.width).coerceAtLeast(0)
+                            val x = (free / 2 + titleOffset.roundToPx()).coerceIn(0, free)
+                            placeable.place(x, 0)
+                        }
+                    }
+            ) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = showTitle,
                     enter = fadeIn() + scaleIn(initialScale = 0.9f),
