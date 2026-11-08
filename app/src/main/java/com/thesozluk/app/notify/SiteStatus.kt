@@ -26,6 +26,8 @@ import com.thesozluk.app.R
 import com.thesozluk.app.network.EksiNetworkDataSource
 import com.thesozluk.app.network.EksiSession
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** The site's header lights (GET /top/led): unread messages and new entries in followed topics. */
 data class SiteStatus(val hasMessages: Boolean = false, val hasEvents: Boolean = false)
@@ -49,17 +51,20 @@ object SiteStatusStore {
  * stays on until the list is opened, so for followed topics the olay list itself is compared with
  * the last check: a topic that is new there, or has more new entries, is news.
  */
-class SiteStatusWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result {
-        EksiSession.init(applicationContext)
-        if (!EksiSession.isLoggedIn.value) return Result.success()
-        val status = EksiNetworkDataSource.fetchSiteStatus() ?: return Result.retry()
+object SiteStatusCheck {
+    // The worker and the live service may both check; one at a time, so a light isn't news twice
+    private val lock = Mutex()
 
-        // Only a light that just turned on is news; one already notified stays quiet
-        val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (status.hasMessages && !prefs.getBoolean(KEY_MESSAGES, false)) {
-            Notifier.show(applicationContext, ID_MESSAGES, "yeni mesajın var", "okumak için dokun", Notifier.OPEN_MESSAGES)
-        }
+    /** One check; false when the site couldn't be read (try again later). */
+    suspend fun run(context: Context): Boolean = lock.withLock { check(context.applicationContext) }
+
+    private suspend fun check(context: Context): Boolean {
+        EksiSession.init(context)
+        if (!EksiSession.isLoggedIn.value) return true
+        val status = EksiNetworkDataSource.fetchSiteStatus() ?: return false
+
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val messageCounts = notifyMessages(context, prefs, status.hasMessages)
         val previous = runCatching { JSONObject(prefs.getString(KEY_EVENT_COUNTS, "{}").orEmpty()) }.getOrDefault(JSONObject())
         var current = JSONObject()
         val fresh = mutableListOf<Triple<String, Int, String>>()
@@ -85,7 +90,7 @@ class SiteStatusWorker(context: Context, params: WorkerParameters) : CoroutineWo
             fresh.forEach { (title, count, path) ->
                 val id = 1000 + (path.hashCode() and 0x3fffffff)
                 Notifier.show(
-                    applicationContext, id, title, "$count yeni entry", Notifier.OPEN_EVENTS,
+                    context, id, title, "$count yeni entry", Notifier.OPEN_EVENTS,
                     topicPath = path
                 )
             }
@@ -93,17 +98,74 @@ class SiteStatusWorker(context: Context, params: WorkerParameters) : CoroutineWo
         prefs.edit()
             .putBoolean(KEY_MESSAGES, status.hasMessages)
             .putString(KEY_EVENT_COUNTS, current.toString())
+            .apply {
+                if (messageCounts != null) putString(KEY_MESSAGE_COUNTS, messageCounts.toString())
+            }
             .apply()
-        return Result.success()
+        return true
     }
 
-    private companion object {
-        const val PREFS = "site_status"
-        const val KEY_MESSAGES = "messages"
-        const val KEY_EVENT_COUNTS = "event_counts"
-        const val ID_MESSAGES = 1
-        const val ID_EVENTS = 2
+    /**
+     * The message light stays on until the box is read, so a light that is merely on says nothing
+     * about a second message. While it is on, the first page of the box is compared with the last
+     * check: a conversation that is new there or has more messages is news. Returns the counts to
+     * keep (none once the light is off), or null when the box couldn't be read (then only a light
+     * that just turned on notifies).
+     */
+    private suspend fun notifyMessages(context: Context, prefs: android.content.SharedPreferences, lightOn: Boolean): JSONObject? {
+        val lightWasOn = prefs.getBoolean(KEY_MESSAGES, false)
+        // Read box: start over, so the user's own replies meanwhile don't count as news later
+        if (!lightOn) return JSONObject()
+        val threads = try {
+            EksiNetworkDataSource.fetchMessageBox(archive = false, page = 1).threads
+        } catch (e: Exception) {
+            null
+        }
+        if (threads == null) {
+            if (!lightWasOn) {
+                Notifier.show(context, ID_MESSAGES, "yeni mesajın var", "okumak için dokun", Notifier.OPEN_MESSAGES)
+            }
+            return null
+        }
+        val previous = runCatching { JSONObject(prefs.getString(KEY_MESSAGE_COUNTS, "{}").orEmpty()) }.getOrDefault(JSONObject())
+        val current = JSONObject()
+        threads.forEach { current.put(it.id, it.messageCount) }
+        val fresh = threads.filter { !previous.has(it.id) || it.messageCount > previous.optInt(it.id) }
+        when {
+            // The light just turned on: the box lists the latest conversation first
+            !lightWasOn || previous.length() == 0 -> if (!lightWasOn) {
+                val thread = threads.firstOrNull()
+                Notifier.show(
+                    context, ID_MESSAGES, thread?.nick?.ifBlank { null } ?: "yeni mesajın var",
+                    thread?.preview?.ifBlank { null } ?: "okumak için dokun", Notifier.OPEN_MESSAGES
+                )
+            }
+            fresh.size == 1 -> {
+                val thread = fresh.first()
+                Notifier.show(
+                    context, ID_MESSAGES, thread.nick.ifBlank { "yeni mesajın var" },
+                    thread.preview.ifBlank { "okumak için dokun" }, Notifier.OPEN_MESSAGES
+                )
+            }
+            fresh.size > 1 -> Notifier.show(
+                context, ID_MESSAGES, "${fresh.size} konuşmada yeni mesaj",
+                fresh.joinToString(", ") { it.nick }, Notifier.OPEN_MESSAGES
+            )
+        }
+        return current
     }
+
+    private const val PREFS = "site_status"
+    private const val KEY_MESSAGES = "messages"
+    private const val KEY_MESSAGE_COUNTS = "message_counts"
+    private const val KEY_EVENT_COUNTS = "event_counts"
+    private const val ID_MESSAGES = 1
+    private const val ID_EVENTS = 2
+}
+
+/** The periodic check WorkManager runs, every 15 minutes at best. */
+class SiteStatusWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result = if (SiteStatusCheck.run(applicationContext)) Result.success() else Result.retry()
 }
 
 object Notifier {
