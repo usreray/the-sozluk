@@ -231,7 +231,7 @@ fun EntryCard(
                                     number = number,
                                     actions = actions,
                                     bounds = bounds[0],
-                                    menu = peekMenu(entry, actions, menu)
+                                    menu = menu
                                 )
                             )
                         }
@@ -627,16 +627,6 @@ private fun rememberEntryMenuItems(
             com.thesozluk.app.ui.navigation.openInAppTab(context, link, toolbarColor)
         })
     }
-}
-
-/** The preview's menu: favoriting and the author first, since the card up there can't be tapped. */
-private fun peekMenu(entry: Entry, actions: EntryActions, menu: List<EntryMenuItem>): List<EntryMenuItem> = buildList {
-    add(EntryMenuItem(
-        if (entry.isFavorited) "favoriden çıkar" else "favorile",
-        if (entry.isFavorited) FavoriteIcons.DropFilled else FavoriteIcons.Drop
-    ) { actions.onToggleFavorite(entry) })
-    if (entry.author.isNotBlank()) add(EntryMenuItem(entry.author, Icons.Rounded.Person) { actions.onAuthor(entry.author) })
-    addAll(menu)
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
