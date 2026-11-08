@@ -23,6 +23,7 @@ object WhatsNew {
                 "anlık bildirimler" to "ayarlar → bildirimler: açarsan yeni mesaj ve entry'lere 15 dakika yerine dakikada bir bakılır. pil tüketimini artırabilir.",
                 "mesaj bildirimleri" to "okunmamış bir mesajın varken gelen yeni mesajlar da bildirilir; bildirimde gönderen ve mesajın başı görünür.",
                 "yeni mesajlar" to "mesajlar listesinde okunmamış mesajı olan konuşma noktayla işaretlenir; açınca işaret kalkar.",
+                "entry'den mesaj" to "başkasının entry'sindeki ⋮ menüsünden yazarına mesaj gönder; mesaj entry'nin numarasıyla başlar.",
                 "yorumlar" to "entry altındaki yorumlar artık entry'ler gibi: yazarın adı, tarihi ve profil resmi sağ altta.",
                 "kart stili" to "ayarlar → okuma → entry'ler: entry kartları sitedeki gibi klasik ya da sosyal medya akışı gibi görünebilir; profil resmi ve yazar en üstte.",
                 "ilk ve son sayfa" to "sayfa çubuğunda tek tek ilerlemenin yanında başlığın ilk ve son sayfasına atlayan oklar var.",
