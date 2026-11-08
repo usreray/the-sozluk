@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.material.icons.rounded.LastPage
+import androidx.compose.material.icons.rounded.FirstPage
 import com.thesozluk.app.ui.components.staggerIn
 import com.thesozluk.app.ui.components.rememberStagger
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -817,6 +819,8 @@ fun TopicDetailScreen(
             canWrite = canWrite,
             onPrevious = { goToPage(visiblePage - 1) },
             onNext = { goToPage(visiblePage + 1) },
+            onFirst = { goToPage(1) },
+            onLast = { goToPage(totalPages) },
             onPickPage = { showPagePicker = true },
             onWrite = { showComposer = true },
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -990,6 +994,8 @@ private fun BottomToolbar(
     canWrite: Boolean,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onFirst: () -> Unit,
+    onLast: () -> Unit,
     onPickPage: () -> Unit,
     onWrite: () -> Unit,
     modifier: Modifier = Modifier
@@ -1027,7 +1033,12 @@ private fun BottomToolbar(
             }
         }
         val glassModifier = if (liquid) Modifier else Modifier.glass(CircleShape)
+        // First and last page too, once there are more than two (with two, back and forth is it)
+        val showEnds = totalPages > 2
         val pageControls: @Composable () -> Unit = {
+            if (showEnds) IconButton(onClick = onFirst, enabled = currentPage > 1) {
+                Icon(Icons.Rounded.FirstPage, contentDescription = "ilk sayfa")
+            }
             IconButton(onClick = onPrevious, enabled = currentPage > 1) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, contentDescription = "önceki sayfa")
             }
@@ -1040,6 +1051,9 @@ private fun BottomToolbar(
             }
             IconButton(onClick = onNext, enabled = currentPage < totalPages) {
                 Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = "sonraki sayfa")
+            }
+            if (showEnds) IconButton(onClick = onLast, enabled = currentPage < totalPages) {
+                Icon(Icons.Rounded.LastPage, contentDescription = "son sayfa")
             }
         }
         val pages: @Composable () -> Unit = {
