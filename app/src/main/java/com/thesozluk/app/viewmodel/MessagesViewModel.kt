@@ -41,13 +41,21 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
 
     private var threadId: String? = null
 
+    /** A conversation opened by nick that has no messages yet: the first message starts it. */
+    private var newConversationWith: String? = null
+
+    /** The words searched for in the messages, or null for the plain box */
+    private val _query = mutableStateOf<String?>(null)
+    val query: State<String?> = _query
+
     // The "yeni mesaj" form (with its CSRF token) from the last page that had one
     private var sendForm: FormSpec? = null
 
     fun loadBox(archive: Boolean = _archive.value) {
         // Another tab: drop the old list so its emptiness isn't shown while loading
-        if (archive != _archive.value) _box.value = null
+        if (archive != _archive.value || _query.value != null) _box.value = null
         _archive.value = archive
+        _query.value = null
         _isLoading.value = true
         _error.value = null
         viewModelScope.launch {
@@ -65,6 +73,77 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
         }
     }
 
+    /** The conversations whose messages contain [keywords]; blank goes back to the box. */
+    fun search(keywords: String) {
+        if (keywords.isBlank()) {
+            loadBox(false)
+            return
+        }
+        val words = keywords.trim()
+        _query.value = words
+        _box.value = null
+        _isLoading.value = true
+        _error.value = null
+        viewModelScope.launch {
+            try {
+                val result = repository.searchMessages(words, 1)
+                if (_query.value == words) _box.value = result
+                result.sendForm?.let { sendForm = it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _error.value = e.message ?: "mesajlarda aranamadı"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    /** Nicks for the "yeni mesaj" author picker. */
+    suspend fun suggestNicks(query: String): List<String> =
+        if (query.isBlank()) emptyList() else runCatching { repository.suggestNicks(query) }.getOrDefault(emptyList())
+
+    /**
+     * The conversation with [nick]: found in the box (and the archive), or, when there is none
+     * yet, an empty one that the first message starts. The site has no address for "the
+     * conversation with someone", so the box is looked through.
+     */
+    fun openConversationWith(nick: String) {
+        if (nick.isBlank()) return
+        if (newConversationWith.equals(nick, ignoreCase = true) && _thread.value != null) return
+        threadId = null
+        newConversationWith = null
+        _thread.value = null
+        _threadError.value = null
+        viewModelScope.launch {
+            try {
+                val found = findThreadId(nick)
+                if (found != null) {
+                    threadId = found
+                    _thread.value = repository.getThread(found)
+                } else {
+                    newConversationWith = nick
+                    _thread.value = ThreadDetail(nick, emptyList(), null, null)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _threadError.value = e.message ?: "konuşma yüklenemedi"
+            }
+        }
+    }
+
+    private suspend fun findThreadId(nick: String): String? {
+        fun MessageBox.match() = threads.firstOrNull { it.nick.equals(nick, ignoreCase = true) }?.id
+        for (page in 1..3) {
+            val box = repository.getMessageBox(false, page)
+            box.sendForm?.let { sendForm = it }
+            box.match()?.let { return it }
+            if (box.threads.isEmpty()) break
+        }
+        return repository.getMessageBox(true, 1).match()
+    }
+
     /** Opening a conversation reads it on the site too, so its new-message dot goes right away. */
     fun markRead(id: String) {
         val box = _box.value ?: return
@@ -75,6 +154,7 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
     fun openThread(id: String) {
         if (threadId == id && _thread.value != null) return
         threadId = id
+        newConversationWith = null
         _thread.value = null
         _threadError.value = null
         refreshThread()
@@ -104,7 +184,8 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
             val sentBefore = _thread.value?.messages?.count { it.isOutgoing && !it.isPending && !it.isFailed }
             // In a conversation the message appears at once as "sending"; the input clears now
             val pending = Message(text, "", "gönderiliyor…", isOutgoing = true, isPending = true)
-            if (threadId != null) {
+            val starting = newConversationWith
+            if (threadId != null || starting != null) {
                 _thread.value = _thread.value?.let { it.copy(messages = it.messages + pending) }
                 onSent()
             }
@@ -137,11 +218,19 @@ class MessagesViewModel(private val repository: EksiRepository) : ViewModel() {
                     // A new message: its conversation should now be on top of the box
                     val top = repository.getMessageBox(false, 1).threads.firstOrNull()
                     if (top == null || !top.nick.equals(to, ignoreCase = true)) {
+                        markFailed()
                         _message.value = "mesaj ekşi'de görünmüyor; gönderilememiş olabilir"
                         return@launch
                     }
-                    _message.value = "mesaj gönderildi"
-                    onSent()
+                    if (starting != null) {
+                        // The first message started the conversation: show it as the site has it
+                        newConversationWith = null
+                        threadId = top.id
+                        _thread.value = repository.getThread(top.id)
+                    } else {
+                        _message.value = "mesaj gönderildi"
+                        onSent()
+                    }
                 }
                 loadBox()
             } catch (e: CancellationException) {

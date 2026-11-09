@@ -356,7 +356,7 @@ fun AuthorScreen(
                             profile = profile!!,
                             isOwn = nick.equals(EksiSession.nick.value, ignoreCase = true),
                             onFollow = { requireLogin { viewModel.toggleFollow() } },
-                            onMessage = { requireLogin { navController.navigate(Screen.Messages.createRoute(nick)) } },
+                            onMessage = { requireLogin { navController.navigate(Screen.MessageThread.withNick(nick)) } },
                             onShowFollows = { following -> followSheet = following },
                             onShowEntries = {
                                 scope.launch {

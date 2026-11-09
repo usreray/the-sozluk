@@ -301,6 +301,18 @@ object EksiNetworkDataSource {
         HtmlParser.parseMessageBox(response.parse())
     }
 
+    /** The conversations whose messages contain [keywords] (the site's /mesaj/ara), as a box page. */
+    suspend fun searchMessages(keywords: String, page: Int): MessageBox = Demo.on?.messageBox() ?: withContext(Dispatchers.IO) {
+        val response = applyCommonConnectionSettings(
+            session.newRequest("$BASE_URL/mesaj/ara?keywords=${URLEncoder.encode(keywords.trim(), "UTF-8")}&p=$page")
+        )
+            .followRedirects(false)
+            .execute()
+        if (response.statusCode() in 300..399) throw IOException("oturum süresi dolmuş; tekrar giriş yap")
+        if (response.statusCode() != 200) throw IOException("mesajlarda aranamadı (HTTP ${response.statusCode()})")
+        HtmlParser.parseMessageBox(response.parse())
+    }
+
     /**
      * Posts the "yeni mesaj" form. Where ekşi redirects afterwards varies (the conversation or
      * /mesaj), so only a notice on the landing page means a rejection; callers confirm delivery

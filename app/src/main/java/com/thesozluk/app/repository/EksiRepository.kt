@@ -108,6 +108,13 @@ class EksiRepository(
 
     suspend fun getThread(id: String): ThreadDetail = EksiNetworkDataSource.fetchThread(id)
 
+    suspend fun searchMessages(keywords: String, page: Int): MessageBox =
+        EksiNetworkDataSource.searchMessages(keywords, page)
+
+    /** Nicks starting with [query], from the site's autocomplete (as for "@nick" in the search box). */
+    suspend fun suggestNicks(query: String): List<String> =
+        EksiNetworkDataSource.fetchSuggestions("@" + query.trim().removePrefix("@")).second
+
     /** Returns the site's reason when it rejects the message, or null once it is sent. */
     suspend fun sendMessage(form: FormSpec, to: String, text: String): String? =
         EksiNetworkDataSource.sendMessage(form, to, text)

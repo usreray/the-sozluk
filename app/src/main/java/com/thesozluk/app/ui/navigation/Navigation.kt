@@ -85,16 +85,8 @@ fun Navigation(navController: NavHostController) {
         screen(
             navController,
             Screen.Messages.pattern,
-            arguments = listOf(
-                navArgument("to") { type = NavType.StringType; defaultValue = "" },
-                navArgument("text") { type = NavType.StringType; defaultValue = "" }
-            ),
-        ) { backStackEntry ->
-            MessagesScreen(
-                navController,
-                composeTo = backStackEntry.arguments?.getString("to").orEmpty(),
-                composeText = backStackEntry.arguments?.getString("text").orEmpty()
-            )
+        ) {
+            MessagesScreen(navController)
         }
 
         screen(
@@ -102,12 +94,14 @@ fun Navigation(navController: NavHostController) {
             Screen.MessageThread.pattern,
             arguments = listOf(
                 navArgument("id") { type = NavType.StringType; defaultValue = "" },
-                navArgument("nick") { type = NavType.StringType; defaultValue = "" }
+                navArgument("nick") { type = NavType.StringType; defaultValue = "" },
+                navArgument("text") { type = NavType.StringType; defaultValue = "" }
             ),
         ) { backStackEntry ->
             MessageThreadScreen(
                 threadId = backStackEntry.arguments?.getString("id").orEmpty(),
                 nick = backStackEntry.arguments?.getString("nick").orEmpty(),
+                initialText = backStackEntry.arguments?.getString("text").orEmpty(),
                 navController = navController
             )
         }

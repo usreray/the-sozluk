@@ -657,7 +657,7 @@ private fun rememberEntryMenuItems(
             entry.entryId.isNotEmpty() && entry.author.isNotBlank()
         ) add(EntryMenuItem("mesaj gönder", Icons.Rounded.MailOutline) {
             navController.navigate(
-                com.thesozluk.app.ui.navigation.Screen.Messages.createRoute(to = entry.author, text = "(#${entry.entryId})\n")
+                com.thesozluk.app.ui.navigation.Screen.MessageThread.withNick(entry.author, "(#${entry.entryId})\n")
             )
         })
         // Someone else's entry: the site's own complaint form, on the entry's page in a browser tab

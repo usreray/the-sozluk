@@ -1,5 +1,20 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.foundation.layout.isImeVisible
+
+import androidx.compose.foundation.layout.WindowInsets
+
+
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.clickable
+
 import com.thesozluk.app.ui.components.AppBottomSheet
 import com.thesozluk.app.ui.components.cardEdge
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -97,8 +112,6 @@ import com.thesozluk.app.viewmodel.MessagesViewModel
 @Composable
 fun MessagesScreen(
     navController: NavController,
-    composeTo: String = "",
-    composeText: String = "",
     viewModel: MessagesViewModel = viewModel(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
@@ -109,10 +122,11 @@ fun MessagesScreen(
     val isLoading by viewModel.isLoading
     val error by viewModel.error
     val message by viewModel.message
-    val isSending by viewModel.isSending
+    val query by viewModel.query
     val prompt = remember { PromptState() }
-    // Opened from a profile's "mesaj" button: start a message to that nick
-    var composing by rememberSaveable { mutableStateOf(composeTo.isNotEmpty()) }
+    // "yeni mesaj": pick the author, then their conversation opens
+    var picking by rememberSaveable { mutableStateOf(false) }
+    var searchText by rememberSaveable { mutableStateOf("") }
 
     LaunchedEffect(isLoggedIn) { if (isLoggedIn && box == null) viewModel.loadBox() }
     LaunchedEffect(message) {
@@ -122,13 +136,14 @@ fun MessagesScreen(
         }
     }
 
-    if (composing) {
-        NewMessageSheet(
-            initialTo = composeTo,
-            initialText = composeText,
-            isSending = isSending,
-            onSend = { to, text -> viewModel.send(to, text) { composing = false } },
-            onDismiss = { if (!isSending) composing = false }
+    if (picking) {
+        AuthorPickerSheet(
+            suggest = viewModel::suggestNicks,
+            onPick = { nick ->
+                picking = false
+                navController.navigate(Screen.MessageThread.withNick(nick))
+            },
+            onDismiss = { picking = false }
         )
     }
 
@@ -156,7 +171,7 @@ fun MessagesScreen(
         floatingActionButton = {
             if (isLoggedIn) {
                 ExtendedFloatingActionButton(
-                    onClick = { composing = true },
+                    onClick = { picking = true },
                     icon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                     text = { Text("yeni mesaj") }
                 )
@@ -191,7 +206,11 @@ fun MessagesScreen(
                     if (threads.isEmpty() && !isLoading) {
                         MessageState(
                             icon = Icons.Rounded.Inbox,
-                            title = if (archive) "arşiv boş" else "mesaj yok",
+                            title = when {
+                                query != null -> "\"$query\" geçen mesaj yok"
+                                archive -> "arşiv boş"
+                                else -> "mesaj yok"
+                            },
                             modifier = Modifier.padding(top = top)
                         )
                     }
@@ -233,23 +252,65 @@ fun MessagesScreen(
                     onTitleClick = { scope.launch { threadListState.animateScrollToItem(0) } }
                 )
                 if (isLoggedIn) {
+                    // No 48dp touch-target padding around the buttons (as in the settings): with it
+                    // the glass edge was drawn on the padding, making the button look bigger
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        androidx.compose.material3.LocalMinimumInteractiveComponentSize provides 0.dp
+                    ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween)
                     ) {
                         ToggleButton(
-                            checked = !archive,
-                            onCheckedChange = { viewModel.loadBox(archive = false) },
-                            modifier = Modifier.weight(1f),
+                            checked = !archive && query == null,
+                            onCheckedChange = {
+                                searchText = ""
+                                viewModel.loadBox(archive = false)
+                            },
+                            // Liquid glass on the one not chosen; the chosen one stays solid, as elsewhere
+                            modifier = Modifier.weight(1f).then(
+                                if (!archive && query == null) Modifier
+                                else Modifier.cardEdge(ButtonGroupDefaults.connectedLeadingButtonShapes().shape)
+                            ),
                             shapes = ButtonGroupDefaults.connectedLeadingButtonShapes()
                         ) { Text("gelen kutusu") }
                         ToggleButton(
-                            checked = archive,
-                            onCheckedChange = { viewModel.loadBox(archive = true) },
-                            modifier = Modifier.weight(1f),
+                            checked = archive && query == null,
+                            onCheckedChange = {
+                                searchText = ""
+                                viewModel.loadBox(archive = true)
+                            },
+                            modifier = Modifier.weight(1f).then(
+                                if (archive && query == null) Modifier
+                                else Modifier.cardEdge(ButtonGroupDefaults.connectedTrailingButtonShapes().shape)
+                            ),
                             shapes = ButtonGroupDefaults.connectedTrailingButtonShapes()
                         ) { Text("arşiv") }
                     }
+                    }
+                    // "mesajlarda ara": the site's search through the messages
+                    val focus = androidx.compose.ui.platform.LocalFocusManager.current
+                    androidx.compose.material3.OutlinedTextField(
+                        value = searchText,
+                        onValueChange = { searchText = it },
+                        placeholder = { Text("mesajlarda ara") },
+                        leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                        trailingIcon = if (searchText.isNotEmpty() || query != null) ({
+                            IconButton(onClick = {
+                                searchText = ""
+                                focus.clearFocus()
+                                viewModel.search("")
+                            }) { Icon(Icons.Rounded.Close, contentDescription = "aramayı temizle") }
+                        }) else null,
+                        singleLine = true,
+                        shape = RoundedCornerShape(28.dp),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = {
+                            focus.clearFocus()
+                            viewModel.search(searchText)
+                        }),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp)
+                    )
                 }
                         }
         }
@@ -298,52 +359,83 @@ private fun ThreadRow(thread: MessageThread, isNew: Boolean, index: Int, count: 
     }
 }
 
+/**
+ * "yeni mesaj": type a few letters of a nick and pick the author from the site's suggestions (or
+ * take the nick as typed); their conversation opens next.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun NewMessageSheet(
-    initialTo: String,
-    isSending: Boolean,
-    onSend: (String, String) -> Unit,
-    onDismiss: () -> Unit,
-    initialText: String = ""
-) {
-    var to by rememberSaveable { mutableStateOf(initialTo) }
-    // The cursor after any text given (an entry's number), ready to write on
-    var text by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length)))
+fun AuthorPickerSheet(suggest: suspend (String) -> List<String>, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    var query by rememberSaveable { mutableStateOf("") }
+    var nicks by remember { mutableStateOf<List<String>>(emptyList()) }
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    // Ask once typing pauses
+    LaunchedEffect(query) {
+        kotlinx.coroutines.delay(250)
+        nicks = suggest(query.trim().removePrefix("@"))
     }
+    val typed = query.trim().removePrefix("@")
     AppBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         SheetBlur.BlurBehind()
+        // Back puts the keyboard away first; once it is down the sheet's own back (with its
+        // predictive gesture) closes it. The handler is added afresh each time the keyboard comes
+        // up, so it is the newest one and goes before the sheet's
+        // Some phones keep reporting the keyboard as up after it went down; the handler steps
+        // aside after one use either way (typing or the keyboard coming up again re-arms it), so a
+        // second back always reaches the sheet
+        // The sheet's own window: the keyboard and focus belong to it, not to the screen behind
+        val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+        val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+        val keyboardUp = imeVisible()
+        androidx.compose.runtime.key(keyboardUp, query) {
+            var used by remember { mutableStateOf(false) }
+            if (keyboardUp && !used) {
+                androidx.activity.compose.BackHandler {
+                    used = true
+                    keyboard?.hide()
+                    focusManager.clearFocus()
+                }
+            }
+        }
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 16.dp).imePadding(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("yeni mesaj", style = MaterialTheme.typography.titleLargeEmphasized)
             OutlinedTextField(
-                value = to,
-                onValueChange = { to = it },
-                label = { Text("kime") },
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("yazar ara") },
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
                 singleLine = true,
-                enabled = !isSending,
-                modifier = Modifier.fillMaxWidth()
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Go),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onGo = { if (typed.isNotBlank()) onPick(typed) }),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus)
             )
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text("mesaj") },
-                minLines = 5,
-                enabled = !isSending,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Button(
-                onClick = { onSend(to.trim(), text.text.trim()) },
-                enabled = to.isNotBlank() && text.text.isNotBlank() && !isSending,
-                modifier = Modifier.align(Alignment.End)
-            ) {
-                if (isSending) LoadingIndicator(modifier = Modifier.padding(end = 8.dp).size(20.dp))
-                else Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                Text("gönder")
+            // The suggestions, and the nick as typed when it isn't among them
+            val options = (if (typed.isNotBlank() && nicks.none { it.equals(typed, ignoreCase = true) }) listOf(typed) else emptyList()) + nicks
+            Column(modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                options.forEach { nick ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onPick(nick) }
+                            .padding(horizontal = 8.dp, vertical = 10.dp)
+                    ) {
+                        AuthorAvatar(nick, size = 36, avatarUrl = rememberAvatarUrl(nick))
+                        Text(nick, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
+                    }
+                }
             }
         }
     }
 }
+
+/** Whether the keyboard is up in this window. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun imeVisible(): Boolean = WindowInsets.isImeVisible

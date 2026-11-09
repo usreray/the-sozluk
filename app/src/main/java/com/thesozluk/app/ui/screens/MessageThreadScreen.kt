@@ -1,5 +1,7 @@
 package com.thesozluk.app.ui.screens
 
+import androidx.compose.material.icons.rounded.AutoAwesome
+
 import com.thesozluk.app.ui.components.cardEdge
 import com.thesozluk.app.ui.components.AppAlertDialog
 import com.thesozluk.app.ui.components.AppMenuItem
@@ -91,6 +93,8 @@ fun MessageThreadScreen(
     threadId: String,
     nick: String,
     navController: NavController,
+    /** Ready in the reply box (an entry's number, when messaging from an entry) */
+    initialText: String = "",
     viewModel: MessagesViewModel = viewModel(
         factory = EksiViewModelFactory(LocalContext.current.applicationContext as Application)
     )
@@ -102,12 +106,26 @@ fun MessageThreadScreen(
     val prompt = remember { PromptState() }
     val listState = rememberLazyListState()
     val uriHandler = LocalUriHandler.current
-    var reply by rememberSaveable { mutableStateOf("") }
+    var reply by rememberSaveable { mutableStateOf(initialText) }
+    var proofreading by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val otherNick = thread?.nick?.ifBlank { null } ?: nick
 
-    LaunchedEffect(threadId) { viewModel.openThread(threadId) }
+    // By id from the box; by nick from a profile, an entry or the author picker
+    LaunchedEffect(threadId, nick) {
+        if (threadId.isNotBlank()) viewModel.openThread(threadId) else viewModel.openConversationWith(nick)
+    }
+    if (proofreading) {
+        com.thesozluk.app.ui.components.ProofreadSheet(
+            text = reply,
+            onApply = { fixed ->
+                reply = fixed
+                proofreading = false
+            },
+            onDismiss = { proofreading = false }
+        )
+    }
     LaunchedEffect(message) {
         message?.let {
             prompt.show(it)
@@ -194,8 +212,14 @@ fun MessageThreadScreen(
                     TextField(
                         value = reply,
                         onValueChange = { reply = it },
-                        placeholder = { Text("yanıt yaz") },
+                        placeholder = { Text(if (thread?.messages?.isEmpty() == true) "ilk mesajı yaz" else "yanıt yaz") },
                         maxLines = 5,
+                        // Spelling and punctuation by the AI chosen in the settings
+                        trailingIcon = if (com.thesozluk.app.ai.TopicSummary.engine.value != com.thesozluk.app.ai.AiEngine.Off && reply.isNotBlank()) ({
+                            IconButton(onClick = { proofreading = true }) {
+                                Icon(androidx.compose.material.icons.Icons.Rounded.AutoAwesome, contentDescription = "imla")
+                            }
+                        }) else null,
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = Color.Transparent,
                             unfocusedContainerColor = Color.Transparent,
@@ -239,6 +263,17 @@ fun MessageThreadScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (thread!!.messages.isEmpty()) {
+                        // No conversation yet: the first message starts one
+                        item {
+                            Text(
+                                "${otherNick} ile henüz mesajlaşmadınız. ilk mesajı aşağıdan yazabilirsin.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth().padding(top = 24.dp, start = 12.dp, end = 12.dp)
+                            )
+                        }
+                    }
                     itemsIndexed(thread!!.messages) { _, item ->
                         Bubble(item) { link -> navController.openEksiLink(link, uriHandler) }
                     }

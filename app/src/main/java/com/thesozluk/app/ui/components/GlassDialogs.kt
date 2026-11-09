@@ -90,6 +90,8 @@ fun GlassSheetHandle() {
 fun AppBottomSheet(
     onDismissRequest: () -> Unit,
     sheetState: androidx.compose.material3.SheetState,
+    /** Takes over the back button (the sheet no longer closes on it by itself) */
+    onBack: (() -> Unit)? = null,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
@@ -105,10 +107,12 @@ fun AppBottomSheet(
         tonalElevation = 0.dp,
         dragHandle = null,
         properties = androidx.compose.material3.ModalBottomSheetProperties(
+            shouldDismissOnBackPress = onBack == null,
             isAppearanceLightStatusBars = !dark,
             isAppearanceLightNavigationBars = !dark
         )
     ) {
+        if (onBack != null) androidx.activity.compose.BackHandler(onBack = onBack)
         androidx.compose.foundation.layout.Column(
             modifier = Modifier
                 .padding(horizontal = 10.dp)
