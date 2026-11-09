@@ -17,6 +17,16 @@ object WhatsNew {
     /** Newest first; the first entry is the current version's. Titles and descriptions in lowercase, like the app. */
     val releases = listOf(
         Release(
+            "3.5",
+            listOf(
+                "başlığı özetle" to "ayarlar → yapay zeka: açarsan başlığın ⋮ menüsünden açık sayfanın entry'leri birkaç maddede özetlenir. entry'lerin ⋮ menüsünde \"entry'yi özetle\" de var; özetin uzunluğunu ve modeli seçebilirsin. kendi gemini, claude ya da openai anahtarınla, ya da nvidia, openrouter gibi openai uyumlu bir servisle çalışır; özetler yanlış olabilir.",
+                "imla denetimi" to "yapay zeka açıksa entry ve mesaj yazarken \"imla\" ile yazım ve noktalama hataları düzeltilir; değişenler renkli gösterilir, uygulamak sana kalır.",
+                "bildirimler" to "arka plan kontrolü bir kez başarısız olunca saatlerce beklemiyor, bir sonraki kontrolde yeniden bakıyor. ayarlar → bildirimler'de son kontrolün ne zaman yapıldığı ve android'in uygulamayı kısıtlayıp kısıtlamadığı görünür.",
+                "mesajlar" to "mesajlarda ara: gelen kutusunun üstünden mesajların içinde arama yapabilirsin. yeni mesajda yazarı arayıp seçince onunla konuşman açılır; profildeki ve entry menüsündeki mesaj gönder de doğrudan konuşmaya götürür.",
+                "başlıkta basılı tut" to "listelerdeki bir başlığa basılı tutunca entry'lerdeki gibi öne çıkar; baştan oku, kaydet, paylaş, google'da ara ve çevrimdışı kaydet altında açılır."
+            )
+        ),
+        Release(
             "3.4",
             listOf(
                 "birden fazla hesap" to "profil → hesap değiştir: bu cihazda giriş yaptığın hesaplar arasında tek dokunuşla geç, yeni hesap ekle ya da kaldır.",
