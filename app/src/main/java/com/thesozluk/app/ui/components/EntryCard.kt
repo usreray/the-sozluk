@@ -249,13 +249,17 @@ fun EntryCard(
                         onClick = onClick ?: {},
                         onLongClick = {
                             EntryPeek.open(
-                                EntryPeek.Peek(
-                                    entry = entry,
-                                    number = number,
-                                    actions = actions,
-                                    bounds = bounds[0],
-                                    menu = menu
-                                )
+                                EntryPeek.Peek(id = entry.entryId, bounds = bounds[0], menu = menu) {
+                                    EntryCard(
+                                        entry = entry,
+                                        isExpanded = false,
+                                        onToggleExpand = {},
+                                        actions = actions,
+                                        number = number,
+                                        showExpandToggle = false,
+                                        peekable = false
+                                    )
+                                }
                             )
                         }
                     )

@@ -63,18 +63,19 @@ class EntryMenuItem(
 )
 
 /**
- * Long-pressing an entry lifts it out of the list: the app behind blurs and dims, the entry rises
- * from where it was to where it fits with room for its actions, and the actions open under it.
- * Tapping outside (or back) puts it back where it came from.
+ * Long-pressing an entry (or a topic in a list) lifts it out of the list: the app behind blurs and
+ * dims, the card rises from where it was to where it fits with room for its actions, and the
+ * actions open under it. Tapping outside (or back) puts it back where it came from.
  */
 object EntryPeek {
     class Peek(
-        val entry: Entry,
-        val number: Int?,
-        val actions: EntryActions,
+        /** Which card is lifted (an entry id, or "topic:" and the topic's link) */
+        val id: String,
         /** Where the card sat on screen, in window coordinates */
         val bounds: Rect,
-        val menu: List<EntryMenuItem>
+        val menu: List<EntryMenuItem>,
+        /** The card as in the list, only to look at */
+        val card: @Composable () -> Unit
     )
 
     var current by mutableStateOf<Peek?>(null)
@@ -93,7 +94,7 @@ object EntryPeek {
         closing = false
     }
 
-    fun isLifted(entryId: String) = current?.entry?.entryId == entryId
+    fun isLifted(id: String) = current?.id == id
 }
 
 @Composable
@@ -182,15 +183,7 @@ fun EntryPeekOverlay(
                     }
                 }
         ) {
-            EntryCard(
-                entry = peek.entry,
-                isExpanded = false,
-                onToggleExpand = {},
-                actions = peek.actions,
-                number = peek.number,
-                showExpandToggle = false,
-                peekable = false
-            )
+            peek.card()
         }
 
         // The actions, opening from under the card
