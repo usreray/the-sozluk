@@ -71,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.ui.unit.dp
 
 /** ekşi markup the toolbar can insert: [before] + selection + [after]. */
@@ -104,6 +105,7 @@ fun EntryComposerSheet(
 ) {
     var value by remember { mutableStateOf(TextFieldValue(initialText, TextRange(initialText.length))) }
     var previewing by remember { mutableStateOf(false) }
+    var proofreading by remember { mutableStateOf(false) }
     var addingLink by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
     var uploadError by remember { mutableStateOf<String?>(null) }
@@ -150,6 +152,18 @@ fun EntryComposerSheet(
     // Opens over the whole screen right away (writing wants the room); dragging down closes it.
     // The send buttons sit at the top, next to the heading.
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    if (proofreading) {
+        ProofreadSheet(
+            text = value.text,
+            onApply = { fixed ->
+                value = TextFieldValue(fixed, TextRange(fixed.length))
+                onTextChange?.invoke(fixed)
+                proofreading = false
+            },
+            onDismiss = { proofreading = false }
+        )
+    }
 
     AppBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         SheetBlur.BlurBehind()
@@ -224,6 +238,15 @@ fun EntryComposerSheet(
                         )
                     }
                     SuggestionChip(onClick = { addingLink = true }, label = { Text("link") }, enabled = !isSubmitting)
+                    // Spelling and punctuation by the AI chosen in the settings
+                    if (com.thesozluk.app.ai.TopicSummary.engine.value != com.thesozluk.app.ai.AiEngine.Off) {
+                        SuggestionChip(
+                            onClick = { proofreading = true },
+                            label = { Text("imla") },
+                            icon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            enabled = !isSubmitting && value.text.isNotBlank()
+                        )
+                    }
                     if (onUploadImage != null) {
                         SuggestionChip(
                             onClick = {

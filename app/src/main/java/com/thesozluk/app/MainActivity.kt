@@ -90,6 +90,7 @@ class MainActivity : ComponentActivity() {
         com.thesozluk.app.settings.ReadingHistory.init(this)
         com.thesozluk.app.settings.EntryBookmarks.init(this)
         com.thesozluk.app.settings.SearchHistory.init(this)
+        com.thesozluk.app.ai.TopicSummary.init(this)
         com.thesozluk.app.data.offline.OfflineStore.init(this)
         getSharedPreferences("drive_backup", MODE_PRIVATE).takeIf { it.all.isNotEmpty() }?.let { prefs ->
             androidx.work.WorkManager.getInstance(this).cancelUniqueWork("google-drive-backup")

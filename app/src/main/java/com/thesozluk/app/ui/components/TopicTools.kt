@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.TravelExplore
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.material3.FilterChip
@@ -80,6 +81,8 @@ sealed interface TopicMenuAction {
     data object Share : TopicMenuAction
     /** Looks the topic's title up on Google in the browser */
     data object SearchWeb : TopicMenuAction
+    /** "başlığı özetle", when an AI is chosen in the settings */
+    data object Summarize : TopicMenuAction
     data object SaveOffline : TopicMenuAction
     data object DeleteOffline : TopicMenuAction
 }
@@ -116,6 +119,9 @@ fun TopicMenu(
                 FilterItem("yazara göre", Icons.Rounded.AlternateEmail, current is TopicFilter.Author) { pick(TopicMenuAction.SearchAuthor) }
                 FilterItem("başlığı açan", Icons.Rounded.Info, false) { pick(TopicMenuAction.Creator) }
                 FilterItem("google'da ara", Icons.Rounded.TravelExplore, false) { pick(TopicMenuAction.SearchWeb) }
+                if (com.thesozluk.app.ai.TopicSummary.engine.value != com.thesozluk.app.ai.AiEngine.Off) {
+                    FilterItem("başlığı özetle", Icons.Rounded.AutoAwesome, false) { pick(TopicMenuAction.Summarize) }
+                }
                 FilterItem("paylaş", Icons.Rounded.Share, false) { pick(TopicMenuAction.Share) }
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 when (offlineState) {
@@ -329,6 +335,68 @@ private fun FilterRow(
         )
         if (selected) {
             Icon(Icons.Rounded.Check, contentDescription = "seçili", tint = colors.primary, modifier = Modifier.size(20.dp))
+        }
+    }
+}
+
+/**
+ * "başlığı özetle" / "entry'yi özetle": a summary by the AI chosen in the settings, with what it is
+ * doing while it works and [footer], a reminder of what was summarized and that it may be wrong.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun SummarySheet(
+    heading: String,
+    title: String,
+    footer: String,
+    run: suspend (progress: (String) -> Unit) -> String,
+    onDismiss: () -> Unit
+) {
+    var step by remember { mutableStateOf("hazırlanıyor") }
+    var summary by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        try {
+            summary = run { step = it }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            error = e.message ?: "özetlenemedi"
+        }
+    }
+    AppBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        SheetBlur.BlurBehind()
+        Column(
+            // A long summary scrolls inside the sheet
+            modifier = Modifier.fillMaxWidth()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(horizontal = 24.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(heading, style = MaterialTheme.typography.titleLargeEmphasized)
+            if (title.isNotBlank()) {
+                Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            val text = summary
+            when {
+                error != null -> Text(error.orEmpty(), color = MaterialTheme.colorScheme.error)
+                text == null -> androidx.compose.foundation.layout.Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(vertical = 12.dp)
+                ) {
+                    LoadingIndicator(modifier = Modifier.size(32.dp))
+                    Text("$step…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                else -> androidx.compose.foundation.text.selection.SelectionContainer {
+                    Text(text, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            Text(
+                footer,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

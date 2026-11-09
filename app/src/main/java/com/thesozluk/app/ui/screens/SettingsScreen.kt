@@ -75,6 +75,7 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.LightMode
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AlertDialog
@@ -160,6 +161,7 @@ enum class SettingsSection(val key: String, val label: String, val icon: ImageVe
     Content("icerik", "içerik ve gizlilik", Icons.Rounded.Block),
     Data("veri", "indirme ve arşiv", Icons.Rounded.Download),
     Links("baglantilar", "bağlantılar", Icons.Rounded.Link),
+    Ai("yapayzeka", "yapay zeka", Icons.Rounded.AutoAwesome),
     About("hakkinda", "hakkında", Icons.Rounded.Info)
 }
 
@@ -213,6 +215,7 @@ fun SettingsScreen(navController: NavController, section: String? = null) {
                 SettingsSection.Content -> content()
                 SettingsSection.Data -> data(navController)
                 SettingsSection.Links -> links()
+                SettingsSection.Ai -> ai()
                 SettingsSection.About -> about()
             }
         }
@@ -248,6 +251,7 @@ private fun summaryOf(section: SettingsSection): String = when (section) {
         if (AppSettings.historyEnabled.value) "açık" else "kapalı"
     SettingsSection.Data -> "${OfflineStore.topics.value.size} çevrimdışı başlık, entry yedeği"
     SettingsSection.Links -> "ekşi linklerini uygulamada aç"
+    SettingsSection.Ai -> com.thesozluk.app.ai.TopicSummary.engine.value.let { if (it == com.thesozluk.app.ai.AiEngine.Off) "kapalı" else "${it.short} ile" }
     SettingsSection.About -> "sürüm ${appVersion()}"
 }
 
@@ -912,6 +916,157 @@ private fun LazyListScope.notifications() {
         TextButton(onClick = {
             context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
         }) { Text("sistem bildirim ayarlarını aç") }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// yapay zeka
+
+private fun LazyListScope.ai() {
+    item {
+        SectionTitle(
+            "sağlayıcı",
+            changed = com.thesozluk.app.ai.TopicSummary.engine.value != com.thesozluk.app.ai.AiEngine.Off,
+            onReset = { com.thesozluk.app.ai.TopicSummary.setEngine(com.thesozluk.app.ai.AiEngine.Off) }
+        )
+    }
+    item {
+        Hint("seçtiğin yapay zeka başlıkları ve entry'leri özetler (⋮ menülerinde \"başlığı özetle\" ve \"entry'yi özetle\"), entry ve mesaj yazarken \"imla\" ile yazım ve noktalamanı denetler. yapay zeka hata yapabilir.")
+    }
+    val engines = com.thesozluk.app.ai.AiEngine.entries
+    engines.forEachIndexed { index, engine ->
+        item(key = "ai_${engine.name}") {
+            val description = when (engine) {
+                com.thesozluk.app.ai.AiEngine.Off -> "yapay zeka özellikleri menülerde görünmez"
+                com.thesozluk.app.ai.AiEngine.Gemini -> "entry'ler google'a gönderilir. anahtarı aistudio.google.com'dan alabilirsin; ücretsiz kullanım sınırları ve ücretler google'ındır."
+                com.thesozluk.app.ai.AiEngine.Claude -> "entry'ler anthropic'e gönderilir. anahtarı console.anthropic.com'dan alabilirsin; kullanım ücretlidir ve anahtarın hesabından ödenir."
+                com.thesozluk.app.ai.AiEngine.OpenAi -> "entry'ler openai'ye gönderilir. anahtarı platform.openai.com'dan alabilirsin; kullanım ücretlidir ve anahtarın hesabından ödenir."
+                com.thesozluk.app.ai.AiEngine.Custom -> "openai'nin istek biçimini kullanan herhangi bir servis: nvidia, openrouter, groq ya da kendi bilgisayarında çalışan bir model. entry'ler girdiğin adrese gönderilir; türkçe özet kalitesi modele göre değişir."
+            }
+            val selected = com.thesozluk.app.ai.TopicSummary.engine.value == engine
+            Surface(
+                onClick = { com.thesozluk.app.ai.TopicSummary.setEngine(engine) },
+                shape = segmentedShape(index, engines.size),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                modifier = Modifier.fillMaxWidth().cardEdge(segmentedShape(index, engines.size))
+            ) {
+                Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                    androidx.compose.material3.RadioButton(selected = selected, onClick = null)
+                    Column(Modifier.padding(start = 12.dp)) {
+                        Text(engine.label, style = MaterialTheme.typography.titleMedium)
+                        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+    item {
+        val engine = com.thesozluk.app.ai.TopicSummary.engine.value
+        if (engine != com.thesozluk.app.ai.AiEngine.Off) {
+            var key by remember(engine) { mutableStateOf(com.thesozluk.app.ai.TopicSummary.key(engine)) }
+            val custom = engine == com.thesozluk.app.ai.AiEngine.Custom
+            Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (custom) {
+                    // "diğer": where to send it and which model to ask for
+                    var url by remember { mutableStateOf(com.thesozluk.app.ai.TopicSummary.customUrl()) }
+                    var model by remember { mutableStateOf(com.thesozluk.app.ai.TopicSummary.customModel()) }
+                    androidx.compose.material3.OutlinedTextField(
+                        value = url,
+                        onValueChange = {
+                            url = it
+                            com.thesozluk.app.ai.TopicSummary.setCustomUrl(it)
+                        },
+                        label = { Text("adres") },
+                        placeholder = { Text("https://integrate.api.nvidia.com/v1") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = model,
+                        onValueChange = {
+                            model = it
+                            com.thesozluk.app.ai.TopicSummary.setCustomModel(it)
+                        },
+                        label = { Text("model") },
+                        placeholder = { Text("servisin model adı") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Hint("adres /v1 ile biten kısım; model adı servisin listesinde yazdığı gibi. örnek: nvidia için https://integrate.api.nvidia.com/v1, openrouter için https://openrouter.ai/api/v1.")
+                }
+                androidx.compose.material3.OutlinedTextField(
+                    value = key,
+                    onValueChange = {
+                        key = it
+                        com.thesozluk.app.ai.TopicSummary.setKey(engine, it)
+                    },
+                    label = {
+                        Text(
+                            when (engine) {
+                                com.thesozluk.app.ai.AiEngine.Gemini -> "gemini api anahtarı"
+                                com.thesozluk.app.ai.AiEngine.Claude -> "claude api anahtarı"
+                                com.thesozluk.app.ai.AiEngine.OpenAi -> "openai api anahtarı"
+                                else -> "api anahtarı (gerekmiyorsa boş bırak)"
+                            }
+                        )
+                    },
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Hint("anahtar sadece bu telefonda durur; uygulamanın yedeklerine ve telefonun bulut yedeğine girmez.")
+                // Which model writes the summary (typed above for "diğer")
+                val options = com.thesozluk.app.ai.TopicSummary.models[engine].orEmpty()
+                if (options.isNotEmpty()) {
+                    val chosen = com.thesozluk.app.ai.TopicSummary.model(engine)
+                    Text("model", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+                    ConnectedRow {
+                        options.forEachIndexed { index, option ->
+                            val checked = option == chosen
+                            ToggleButton(
+                                checked = checked,
+                                onCheckedChange = { com.thesozluk.app.ai.TopicSummary.setModel(engine, option) },
+                                modifier = Modifier.weight(1f).toggleEdge(index, options.size, checked = checked),
+                                shapes = connectedShapes(index, options.size),
+                                // Narrow phones and large fonts: less padding, and a second line before cutting
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                            ) { Text(option.label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+                        }
+                    }
+                    Hint("${chosen.id}: ${chosen.note}")
+                }
+            }
+        }
+    }
+    item {
+        if (com.thesozluk.app.ai.TopicSummary.engine.value != com.thesozluk.app.ai.AiEngine.Off) {
+            // How long the summaries are, for topics and entries alike
+            val lengths = com.thesozluk.app.ai.SummaryLength.entries
+            val current = com.thesozluk.app.ai.TopicSummary.length.value
+            Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("özet uzunluğu", style = MaterialTheme.typography.titleMedium)
+                ConnectedRow {
+                    lengths.forEachIndexed { index, length ->
+                        val checked = length == current
+                        ToggleButton(
+                            checked = checked,
+                            onCheckedChange = { com.thesozluk.app.ai.TopicSummary.setLength(length) },
+                            modifier = Modifier.weight(1f).toggleEdge(index, lengths.size, checked = checked),
+                            shapes = connectedShapes(index, lengths.size),
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+                        ) { Text(length.label, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center) }
+                    }
+                }
+                Hint(
+                    when (current) {
+                        com.thesozluk.app.ai.SummaryLength.VeryShort -> "yaklaşık tek cümle."
+                        com.thesozluk.app.ai.SummaryLength.Short -> "başlıkta yaklaşık 3 madde, entry'de 2-3 cümle."
+                        com.thesozluk.app.ai.SummaryLength.Medium -> "başlıkta yaklaşık 3-6 madde, entry'de 3-4 madde."
+                        com.thesozluk.app.ai.SummaryLength.Long -> "başlıkta yaklaşık 6-10 madde, entry'de 5-8 madde."
+                    }
+                )
+            }
+        }
     }
 }
 

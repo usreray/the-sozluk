@@ -220,6 +220,7 @@ fun TopicDetailScreen(
     var showFilters by remember { mutableStateOf(false) }
     val context = LocalContext.current
     var showCreator by remember { mutableStateOf(false) }
+    var showSummary by remember { mutableStateOf(false) }
     val filter by viewModel.filter
 
     // Keep the screen awake while reading, if chosen in settings
@@ -362,6 +363,7 @@ fun TopicDetailScreen(
         )
     }
     val actions = EntryActions(
+        topicTitle = topic?.title?.ifBlank { null } ?: displayTitle,
         onShowFavoriters = { entry -> requireLogin { favoritersOf = entry } },
         onToggleFavorite = { entry -> requireLogin { viewModel.toggleEntryFavorite(entry) } },
         onVote = { entry, rate -> requireLogin { viewModel.vote(entry, rate) } },
@@ -462,6 +464,7 @@ fun TopicDetailScreen(
                 if (!it.isSaved) viewModel.saveTopic(visiblePage)
                 scope.launch { notes.show("indirme başladı; ilerlemesi ⋮ menüsünde ve profilde") }
             }
+            TopicMenuAction.Summarize -> showSummary = true
             TopicMenuAction.DeleteOffline -> topic?.let {
                 OfflineStore.delete(it.topicPath.ifBlank { it.url })
                 scope.launch { notes.show("çevrimdışı kopya silindi") }
@@ -491,6 +494,20 @@ fun TopicDetailScreen(
             onDismiss = { prompt = null }
         )
         else -> Unit
+    }
+    if (showSummary) {
+        val all = topic?.entries.orEmpty().distinctBy { it.entryId }
+        // The page in view; everything loaded when the page isn't known
+        val onPage = all.filter { it.page == visiblePage }.ifEmpty { all }
+        val summaryTitle = topic?.title?.ifBlank { null } ?: displayTitle
+        com.thesozluk.app.ui.components.SummarySheet(
+            heading = "başlığın özeti",
+            title = summaryTitle,
+            // That it covers this page only, and may be wrong
+            footer = "sadece bu sayfanın entry'leri yapay zeka ile özetlenir; yapay zeka hata yapabilir.",
+            run = { progress -> com.thesozluk.app.ai.TopicSummary.summarize(summaryTitle, onPage, progress) },
+            onDismiss = { showSummary = false }
+        )
     }
     if (showCreator) {
         TopicCreatorDialog(

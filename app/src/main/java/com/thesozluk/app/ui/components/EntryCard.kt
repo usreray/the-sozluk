@@ -55,6 +55,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material.icons.rounded.MailOutline
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material3.DropdownMenuPopup
 import androidx.compose.material3.DropdownMenuGroup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -131,7 +132,9 @@ data class EntryActions(
     /** "entry'yi kaydet": keep the entry (with a note) on the device */
     val onBookmark: ((Entry) -> Unit)? = null,
     /** Share the entry as a picture */
-    val onShareImage: ((Entry) -> Unit)? = null
+    val onShareImage: ((Entry) -> Unit)? = null,
+    /** The topic the entries are in, when shown on its page (entries elsewhere carry their own) */
+    val topicTitle: String = ""
 )
 
 /** What the card needs to show an entry's comments. */
@@ -195,8 +198,24 @@ fun EntryCard(
 
     // The user's own entries: the site's flags say so, or the nick matches
     val own = entry.author.isNotBlank() && entry.author.equals(EksiSession.nick.value, ignoreCase = true)
+    // "entry'yi özetle", when an AI is chosen in the settings
+    var summarizing by remember { mutableStateOf(false) }
+    if (summarizing) {
+        // The topic gives the entry its meaning, so the AI gets it too
+        val topicTitle = entry.topicTitle.ifBlank { actions.topicTitle }
+        SummarySheet(
+            heading = "entry'nin özeti",
+            title = topicTitle,
+            footer = "bu entry yapay zeka ile özetlenir; yapay zeka hata yapabilir.",
+            run = { progress -> com.thesozluk.app.ai.TopicSummary.summarizeEntry(topicTitle, entry, progress) },
+            onDismiss = { summarizing = false }
+        )
+    }
+    val canSummarize = com.thesozluk.app.ai.TopicSummary.engine.value != com.thesozluk.app.ai.AiEngine.Off &&
+        entry.content.isNotBlank()
     val menu = rememberEntryMenuItems(
         entry = entry,
+        onSummarize = if (canSummarize) ({ summarizing = true }) else null,
         onAuthorInTopic = actions.onAuthorInTopic?.let { show -> { show(entry) } },
         onEdit = if (("edit" in entry.flags || own) && actions.onEdit != null) ({ actions.onEdit(entry) }) else null,
         onBookmark = actions.onBookmark?.let { { it(entry) } },
@@ -600,6 +619,7 @@ private fun FavoriteButton(isFavorited: Boolean, count: Int, onToggle: () -> Uni
 @Composable
 private fun rememberEntryMenuItems(
     entry: Entry,
+    onSummarize: (() -> Unit)?,
     onAuthorInTopic: (() -> Unit)?,
     onEdit: (() -> Unit)?,
     onDelete: (() -> Unit)?,
@@ -622,10 +642,8 @@ private fun rememberEntryMenuItems(
         add(EntryMenuItem("metni kopyala", Icons.Rounded.ContentCopy) {
             scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", entry.content))) }
         })
-        if (entry.entryId.isNotEmpty()) add(EntryMenuItem("linki kopyala", Icons.Rounded.Link) {
-            scope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("entry", link))) }
-        })
-        if (onAuthorInTopic != null) add(EntryMenuItem("${entry.author} · bu başlıktakiler", Icons.Rounded.FilterList, onClick = onAuthorInTopic))
+        if (onSummarize != null) add(EntryMenuItem("entry'yi özetle", Icons.Rounded.AutoAwesome, onClick = onSummarize))
+        if (onAuthorInTopic != null) add(EntryMenuItem("yazarın bu başlıktakileri", Icons.Rounded.FilterList, onClick = onAuthorInTopic))
         if (onBookmark != null) add(EntryMenuItem(
             if (saved) "kayıttan çıkar" else "entry'yi kaydet",
             if (saved) Icons.Rounded.BookmarkRemove else Icons.Rounded.BookmarkAdd,
