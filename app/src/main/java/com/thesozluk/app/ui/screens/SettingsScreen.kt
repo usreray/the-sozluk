@@ -905,12 +905,36 @@ private fun LazyListScope.notifications() {
         )
     }
     item {
+        // How the background check is doing, and what on the phone can hold it back
         val context = LocalContext.current
-        if (AppSettings.instantNotifications.value) {
-            Hint("telefon uyurken android kontrolleri yine geciktirebilir. daha düzenli çalışması için pil ayarlarından the sözlük'ü \"kısıtlanmamış\" yapabilirsin")
-            TextButton(onClick = {
-                context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-            }) { Text("pil ayarlarını aç") }
+        if (AppSettings.notifications.value && EksiSession.isLoggedIn.value) {
+            val (at, problem) = remember { com.thesozluk.app.notify.SiteStatusCheck.lastCheck(context) }
+            val power = context.getSystemService(android.os.PowerManager::class.java)
+            val activity = context.getSystemService(android.app.ActivityManager::class.java)
+            val usage = context.getSystemService(android.app.usage.UsageStatsManager::class.java)
+            val batteryFree = power.isIgnoringBatteryOptimizations(context.packageName)
+            val restricted = activity.isBackgroundRestricted
+            val bucket = usage.appStandbyBucket
+            val lines = buildList {
+                add(
+                    if (at == 0L) "son arka plan kontrolü: henüz yok"
+                    else "son arka plan kontrolü: " + timeAgo(at) +
+                        (problem?.let { " · başarısız: $it" } ?: " · sorunsuz")
+                )
+                if (restricted) add("android bu uygulamanın arka planda çalışmasını kısıtlamış; bildirimler gelmez.")
+                else if (!batteryFree) add("pil optimizasyonu açık: android kontrolleri geciktirebilir. pil ayarlarından the sözlük'ü \"kısıtlanmamış\" yapabilirsin.")
+                if (bucket >= android.app.usage.UsageStatsManager.STANDBY_BUCKET_RARE) {
+                    add("android uygulamayı az kullanılan saydığı için kontrolleri seyrekleştiriyor.")
+                }
+            }
+            Hint(lines.joinToString("\n"))
+            if (restricted || !batteryFree) {
+                TextButton(onClick = {
+                    context.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:${context.packageName}"))
+                    )
+                }) { Text("uygulamanın pil ayarlarını aç") }
+            }
         }
         Hint("bildirim sesi ve önemi telefonun bildirim ayarlarından değiştirilebilir")
         TextButton(onClick = {
@@ -1707,3 +1731,14 @@ private fun ChipFlowRow(content: @Composable androidx.compose.foundation.layout.
 @Composable
 private fun Modifier.toggleEdge(index: Int, count: Int, checked: Boolean): Modifier =
     cardEdge(connectedShapes(index, count).let { if (checked) it.checkedShape else it.shape })
+
+/** "az önce", "5 dakika önce", "2 saat önce", "3 gün önce": in Turkish whatever the phone's language. */
+private fun timeAgo(at: Long): String {
+    val minutes = ((System.currentTimeMillis() - at) / 60_000L).coerceAtLeast(0)
+    return when {
+        minutes < 1 -> "az önce"
+        minutes < 60 -> "$minutes dakika önce"
+        minutes < 24 * 60 -> "${minutes / 60} saat önce"
+        else -> "${minutes / (24 * 60)} gün önce"
+    }
+}

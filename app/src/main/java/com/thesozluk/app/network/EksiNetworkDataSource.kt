@@ -627,7 +627,12 @@ object EksiNetworkDataSource {
     }
 
     /** The header lights the site polls (GET /top/led); null when it can't be read. */
+    /** Why the last [fetchSiteStatus] came back empty, for the notification settings. */
+    @Volatile var siteStatusProblem: String? = null
+        private set
+
     suspend fun fetchSiteStatus(): com.thesozluk.app.notify.SiteStatus? = Demo.on?.let { com.thesozluk.app.notify.SiteStatus(hasMessages = true, hasEvents = true) } ?: withContext(Dispatchers.IO) {
+        siteStatusProblem = null
         try {
             val response = applyCommonConnectionSettings(session.newRequest("$BASE_URL/top/led"))
                 .header("X-Requested-With", "XMLHttpRequest")
@@ -635,13 +640,21 @@ object EksiNetworkDataSource {
                 .followRedirects(false)
                 .timeout(15000)
                 .execute()
-            if (response.statusCode() != 200) return@withContext null
+            if (response.statusCode() != 200) {
+                siteStatusProblem = when (response.statusCode()) {
+                    in 300..399 -> "oturum düşmüş olabilir (yönlendirme)"
+                    403 -> "site isteği engelledi (HTTP 403)"
+                    else -> "HTTP ${response.statusCode()}"
+                }
+                return@withContext null
+            }
             val json = JSONObject(response.body())
             com.thesozluk.app.notify.SiteStatus(
                 hasMessages = json.optBoolean("HasMessages"),
                 hasEvents = json.optBoolean("HasEvents")
             )
         } catch (e: Exception) {
+            siteStatusProblem = e.message?.take(120) ?: e.javaClass.simpleName
             null
         }
     }

@@ -61,9 +61,15 @@ object SiteStatusCheck {
     private suspend fun check(context: Context): Boolean {
         EksiSession.init(context)
         if (!EksiSession.isLoggedIn.value) return true
-        val status = EksiNetworkDataSource.fetchSiteStatus() ?: return false
-
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val status = EksiNetworkDataSource.fetchSiteStatus()
+        // When it last ran and how it went, for ayarlar → bildirimler
+        prefs.edit()
+            .putLong(KEY_LAST_CHECK, System.currentTimeMillis())
+            .putString(KEY_LAST_PROBLEM, if (status == null) EksiNetworkDataSource.siteStatusProblem ?: "siteye ulaşılamadı" else null)
+            .apply()
+        status ?: return false
+
         val messageCounts = notifyMessages(context, prefs, status.hasMessages)
         val previous = runCatching { JSONObject(prefs.getString(KEY_EVENT_COUNTS, "{}").orEmpty()) }.getOrDefault(JSONObject())
         var current = JSONObject()
@@ -156,6 +162,14 @@ object SiteStatusCheck {
     }
 
     private const val PREFS = "site_status"
+    private const val KEY_LAST_CHECK = "last_check"
+    private const val KEY_LAST_PROBLEM = "last_problem"
+
+    /** The last background check: when (0 if never) and what went wrong (null if nothing). */
+    fun lastCheck(context: Context): Pair<Long, String?> {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return prefs.getLong(KEY_LAST_CHECK, 0L) to prefs.getString(KEY_LAST_PROBLEM, null)
+    }
     private const val KEY_MESSAGES = "messages"
     private const val KEY_MESSAGE_COUNTS = "message_counts"
     private const val KEY_EVENT_COUNTS = "event_counts"
@@ -165,7 +179,12 @@ object SiteStatusCheck {
 
 /** The periodic check WorkManager runs, every 15 minutes at best. */
 class SiteStatusWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
-    override suspend fun doWork(): Result = if (SiteStatusCheck.run(applicationContext)) Result.success() else Result.retry()
+    // A failed check waits for the next round: a retry would back off (up to hours) and push the
+    // following checks back with it
+    override suspend fun doWork(): Result {
+        SiteStatusCheck.run(applicationContext)
+        return Result.success()
+    }
 }
 
 object Notifier {
